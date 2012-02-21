@@ -1,0 +1,768 @@
+# HG changeset patch
+# Parent dfc33ccc4e2a253539a07f201244e53d21452658
+
+diff --git a/browser/themes/gnomestripe/browser/browser.css b/browser/themes/gnomestripe/browser/browser.css
+--- a/browser/themes/gnomestripe/browser/browser.css
++++ b/browser/themes/gnomestripe/browser/browser.css
+@@ -2038,3 +2038,174 @@
+ #inspector-tools > toolbarbutton[checked]:hover:active {
+   background-color: hsla(210,8%,5%,.2)!important;
+ }
++
++/* Highlighter toolbar - breadcrumbs */
++
++#inspector-breadcrumbs {
++  padding: 0 6px;
++  margin: 2px!important;
++  overflow: auto;
++  -moz-box-flex: 1;
++}
++
++.inspector-breadcrumbs-button {
++  -moz-appearance: none;
++  background-color: transparent;
++  border-width: 0 13px 1px 13px;
++  color: hsl(210,30%,85%);
++  max-width: 85px;
++  overflow: hidden;
++  -moz-transition-property: max-width min-width;
++  -moz-transition-duration: 0.1s;
++}
++
++.inspector-breadcrumbs-button > label {
++  margin: 0;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open],
++.inspector-breadcrumbs-button[checked],
++.inspector-breadcrumbs-button:hover {
++  max-width: 120px;
++  min-width: 120px;
++}
++
++.inspector-breadcrumbs-button[checked] > .inspector-breadcrumbs-tag {
++  color: hsl(208,100%,60%);
++}
++
++.inspector-breadcrumbs-button[checked] > .inspector-breadcrumbs-id {
++  color: hsl(205,100%,70%);
++}
++
++.inspector-breadcrumbs-id {
++  color: #8d99a6;
++}
++
++.inspector-breadcrumbs-classes {
++  color: #8d99a6;
++}
++
++/* Highlighter toolbar - breadcrumbs - LTR */
++
++.inspector-breadcrumbs-button {
++  margin: 0 0 0 -11px;
++  padding: 1px 6px 0px 9px;
++}
++
++.inspector-breadcrumbs-button {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-middle.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:not([checked]),
++.inspector-breadcrumbs-button:not([checked]):hover:active {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-middle-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[checked] {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-middle-selected.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[checked][siblings-menu-open],
++.inspector-breadcrumbs-button[checked]:hover:active {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-middle-selected-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:first-of-type {
++  margin-left: 0px;
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:first-of-type:not([checked]),
++.inspector-breadcrumbs-button:first-of-type:not([checked]):hover:active {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:first-of-type[checked] {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start-selected.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:first-of-type[checked],
++.inspector-breadcrumbs-button:first-of-type[checked]:hover:active {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start-selected-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:last-of-type {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:last-of-type:not([checked]),
++.inspector-breadcrumbs-button:last-of-type:not([checked]):hover:active {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:last-of-type[checked] {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:last-of-type[checked],
++.inspector-breadcrumbs-button:last-of-type[checked]:hover:active {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected-pressed.png") 0 13 1 13 stretch;
++}
++
++/* Highlighter toolbar - breadcrumbs - RTL */
++
++.inspector-breadcrumbs-button:-moz-locale-dir(rtl) {
++  margin: 0 -11px 0 0;
++  padding: 1px 9px 0px 6px;
++}
++
++.inspector-breadcrumbs-button:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-middle.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:not([checked]):-moz-locale-dir(rtl),
++.inspector-breadcrumbs-button:not([checked]):hover:active:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-middle-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[checked]:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-middle-selected.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[checked][siblings-menu-open]:-moz-locale-dir(rtl),
++.inspector-breadcrumbs-button[checked]:hover:active:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-middle-selected-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:first-of-type:-moz-locale-dir(rtl) {
++  margin-right: 0px;
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:first-of-type:not([checked]):-moz-locale-dir(rtl),
++.inspector-breadcrumbs-button:first-of-type:not([checked]):hover:active:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:first-of-type[checked]:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start-selected.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:first-of-type[checked]:-moz-locale-dir(rtl),
++.inspector-breadcrumbs-button:first-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start-selected-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:last-of-type:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:last-of-type:not([checked]):-moz-locale-dir(rtl),
++.inspector-breadcrumbs-button:last-of-type:not([checked]):hover:active:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:last-of-type[checked]:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-selected.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:last-of-type[checked]:-moz-locale-dir(rtl),
++.inspector-breadcrumbs-button:last-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-selected-pressed.png") 0 13 1 13 stretch;
++}
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-end-pressed.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-end-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..16081517d4e925b20779baa3150021930c0aaa96
+GIT binary patch
+literal 850
+zc$@)J1FigtP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0009SNkl<ZSi|L*
+zId2m|7>0MQJ$xj#*X#A6h=RXBO+~>UpydZ3(IO-cMFAv)P=plGL6d?82|9#CmjX!S
+z5I|5umvF>5!FJ+fXJ>iWNnk@Damrnf^m+D}we&vUF$W2PKpW>q+;a8Nm}&k5d-3(l
+z>cS8}7y;!<?J=&`2_XaYK1?Oi*)R^hY4j%SDIh%IyD!f{{5+xbGe&ih6kbBT&*1S4
+z^f`f2XK=p*;Q2ybJA3-nc}mC}W9%dPEsYR~S3$xefGVYOFe;Tg89v;LfISEo8D)34
+zuD@rD_J~G2fCv%<fJo1yp7gTlwS5305H3+lZy9>}9T%d9YmX!dLcibBwVu}R<L3Z?
+z2!tz?u^SV*{#NLE8)=ak2q=P5N?-2X^M4K6g>a2gI<4!*iV#9_E_^_U{p_H8<@X1J
+z!vRDfOjAa$3*CKV7`z1#3Mmn52m^@cjHx35L?Fyi%C71{ESsj;(hVbsGlXt;+edo)
+zBLRp&xCzmh4J);n%47$IVaT`w5bd^PjE@c=0^zo<>lX@kv2Ix@Kdt~c=RPI$cmSf)
+zh~QjVmK9q7aH7H*CpZ=Wcwd9(XR5WS1;a9>X<4zY0fLKwP@+Z#5Q@*`^LL9*>2-Eu
+zax0zANYsGX0$`jeLPm^$Q2b;*KU*x8mWqzkDA;y)VlpQYMnQZ5@NgD88o-X{3$sqi
+zU4nftS8FZDar>re1y~uzcRR?qh7`~a1rUnQ7wp-RTdq5$@_MCGZP}$#C?0>n$nM4>
+zmJKrir4a)BKLzg|PKxS|>o&@jYR4`*nEOov@igvBVLEJoLYV(89>s1BCq&B#`=(o|
+zZX@qe^h_3hmWb^jB?40T0RW-+lIz~D)TUO74#bx$+xdJ!V(FV0@z@5^Km`Uib;dpb
+zp?G-wA@co0CX?-9&5yyJvC;e?NTg!Md>cGG4C!>*xz1MG#-rwM0Pyw$2w#O*;(1=`
+z=jJAFw^}Me2O&EEq{o|$hW%}A?F1e@8>Ym#9gCxow`#T8%caFv^Fsh2Q`N?+g{#;N
+cSU<e^1vfGv`vQ+NDgXcg07*qoM6N<$f}=NkB>(^b
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..a39572d74e9daea9f36bbd53126b2a7ef3dd4333
+GIT binary patch
+literal 917
+zc$@*118V$<P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBU#H%UZ6R9M61m^*VLMHGe4x!pZpG7<`V
+zWy#}Lncv1wA|xOrB7=y4qTmnUvSrJ5NtU5l9s!m$)Ata}=&@^9doz#SswoBPk#xR$
+z`poSHUijdro3FomVVZ{kzP*`Fz6SsTz~)x(4agaQ+)mPSEH(gx^pB(=fG=*Qldrk>
+zbgS2&Li!VAUIU<K0A!)jAQ+%1VMFq7Zl;sZ<6_qJ_-eC1D6eVud(K|DyGZDnxPcN3
+zgaOQe7Z5%MfVe*E>T<NTQ|@1-7=LrA@|<0QciaU8#6~;<q+k|u?TxJX?(B=vuwU*T
+zTm%bKqt)4SmZT0Z2Ldz-L6DOsK#Q!q4*&p0=cha6?*5sDFrkH<v%93XoWKq!*LwI-
+z8Db;>Io=PTfiT=F_YO`|QH*JM=DBqOsr$e2bW0C_kW65pgcgQB2mk;^XQv0d`-jJ=
+zD8^3a?Cu?04hGVprE#;?iWncd`+RtEw0C%PoKkTG_gT)_v2w!G2hdb35OP5dz}Z^i
+zQ2+qo?Bw{U+&law7U_bEKA|fBNTA6tYyYo=l>_Xt-!nQp`K+4VePRF!(pDEba>>B<
+zwHon5U^-+1jMh}2?8394srw?i2w~aTd<cN;etD8&x@0>VcXb57J22Kg@F)P=gYvvc
+z#n{X;n^grg9Mn1WSSolNfbD*H8DqMpSq-)~lVE#wOFtpL-NnTR#E)Z2Qwvs+bdoZ%
+zS^JCkPBq1B9$=3N!Crr75>x!u%;rYRG`f*aqm$-s2zF(+sKx*kn+$k=AJA6*#>{Tb
+zY)-SvXcdhWX?f8LbOZna8RTfgy9W9Ht?>4syiBQ>nAwa?_2*_w@ioazQY0McLI{cy
+zg2QAEs7ZnU-VF5z<ylO{*h087v&zioF~*9tI)qT85$|jWY8~+t_P$Ai+?jJW$rZBQ
+z&w&15_oUc(HBKqbLDnh7%%=J^%_=U$gO2X3eE@<as15O4*Cv+%c(Vjh?(Uz*l>Q1K
+zyb8fKjLeW{5?NA4_AJm>M`Y~8c6f0bq~<IzxI9(W-AA{x+X;a0fERcy9zyuL*X#Z8
+r^G`p1*&Y_^HD1<m0Dq9Y1Au=4?P;KabUuA%00000NkvXXu0mjfR-v!K
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-end-selected.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-end-selected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..537ee049dc46e8eb9e9f6b302dfeb4a9beb61385
+GIT binary patch
+literal 902
+zc$@)-19|+3P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBU#C`m*?R9M61n7?maMG(io-`UyRodXgT
+z2{{Q-L?9s~5W4y*3jdFE6qM9RP^AEYC?G<KNMgstgd`NPgk*E~c6Wy2?Q`CpV#n#S
+z@=Bvu+z-9^%y+*#J9Kwk=EZB*Z+v~pa^3^*-P0$JZvg<^9oOHR{{!F{K&f9E%c6CO
+zaP$-a9e{@bzI^)R@i$sOd{;ysnb}c=;G<|A0!I-5TmkSQfG+^_0KUET3wD=__hXC)
+zAfA;{l9|~U1W!S>v%IexN7WYq8IB2ncK~2ezyRTc$z<|CRQ@)zu9Q;T-L_QV?UbI|
+z$p-*NVe0EU0x*Jbb2^>=5o0_gnMM#=-45gAm86fnZWF)=!bj8T^iGWNfaLlm5L)wq
+z)9M2N$+H2BAbdQV&3@OYdlDq&oW~HnK?U@dKnNV?0~kU0WVSQ=ErjrZWX?I8yBk3V
+z+koKi0{}RjB#Yxk_owImxI*}J=jzp8L(qGq{Fig~Dy1fR1rlDnT?5=m8r*Cw54;M(
+z$?@@Lsq1c%n2<ybCuueO4G!CQPr%R{;l%(95LT<z=c!9`A%y^i90Dx`x!KX^>&VH>
+z7((bX2ib}boZ2?~C&||Xu)AD9Rd1{6ee~%M$4Nsyp@R<i)+_5pk`JnPHO764WcCYf
+z0eB$<R%g5rfSUaMsQM?##G3T*C#?b4z8;<nV0XDd2w`7CIHX9o<*ZFApf(1t-U7Aq
+z2O7d(BC;ZxN#?o*N^K>rdVx1kZ~`#6o0C312K9{O_ceq=5jkcLpc9cb$y8$i;Eez<
+z0Py|@4?OEKRNelbsvc0}M94KoRzh}l8>Fg+R;oWtz0}NH$a)IC<TA9oTtH*IqpA-@
+z<U~XgMOIO@qev%YLY4n0`C;Pl#)5D_+#PO4a~C&@R*G!^*j+9VW4x^~?!_3_B9c@?
+zCS@H$NEAsVvxt=1N?Jp+0e5#RrI?!`<)r2w0X#niFquy8Y6#C`jBiN@J3<zK89=g9
+zGTn=ac-b72wR0VImtq#&{fg!CcDG(10r(!cgk$j#!oTzR{D+@^`ths5Aa3AtEdy`_
+cU=0BO1GqxIB)<r#zyJUM07*qoM6N<$f}NU{_5c6?
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-end.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-end.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..0687e54504e7b354d03485603eabfc1c77fc9a83
+GIT binary patch
+literal 612
+zc%17D@N?(olHy`uVBq!ia0vp^4nQo$!3-n~7OkpfU|?hl@Ck7Ra{t3XNmXNMbyHny
+zPiak4S#5K9U28>s+k_blCeB<~+0ZU7Aq8YtH+J+*pVv2SZcTG%@6@@qE!{v8s0E0C
+z3aT19dZx?)GV0s=dZ)~3?C9^AGTY43wyA3(kZWmeZ)NLfV{6~iJ*ju<92<M*)}ARq
+z?e<P?ZGBT6Ts-=w&Ta3X<`WR=?B?AuVLH&F&WSVJJbk++&Fr5(-@_+h!t@26zCjaa
+zE|@T5KG0P_m43nDljke}+87WL85AB98X2c+U>p{m5D}XM6pV~Z29i+;snRlX(TQmj
+zXDpbvY{R_e>w$tmmjInnT-m@YZD<b+g|Lz!zhDM-2`O0xMI}`YZCyQm14APtQ!@)o
+zYa3fTJ3D(vM;BLjcMnf*An^6`4+snj3JwVk4GoWoh=`7kjY~*KOi4*i%go8kFDxo9
+zDJd(fuBmHiY?^W+D^?w7!){L(#}En0r3cHM9SbGe9`3ePnc5MwW%@Lsi`N#J%=_^#
+z{^-W@`}cp35ocM-Fz@+Cllry)r2cE#+^<}G=<a#--1zBX{)-lu<(25~vh&Nyb3Oli
+zqNnGVz3-w$jvhEY?ch|2RZH&9<(z-KH2wIY_lgf+IsBNKylz|TdEYCMZalI2J8law
+z@7!>3)(h*oTRXbvz3Dl*>4nvtZIME<yMx`j7v-iO(o(XS{Wxs$>d*&DDW=;$O=DpV
+hxX*lyNkX<!?EL3#pB-Cuo&deU;OXk;vd$@?2>{*v0W|;s
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-middle-pressed.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-middle-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..123c455f6ee2276e82844562078f74151740ecd3
+GIT binary patch
+literal 1013
+zc$@+C0}A|!P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj000BLNkl<Zc-rll
+z$#xn?6oz?=*isN+WTs{oGc<J5%peA}m`BMV2_u;ymO+t(WDJs`0n1iwC+8#^FPudl
+zCi^@<UPHN+g?d|AmXpQTz&X&T{*S6#w_0?6fB&CG^v$D%FJB=d08ap1(3gJ)K0bQ9
+zcnjPBR|NA8vit^!FnACkf**c<yeK|hSQHQ8bwDs9;0#H?7VyWPfBo}e;oGG<u|&2b
+zkv^$PWbz_VAdMyIlbU!*y0<8n%#Z|J0S^+yOR`J(Q&mNw(qxn>Dxp+s<0PR_YEm%%
+zvQ)O*g)HYt0;T{#f<!8xX()Y8Z(NBQ&DMZv#m12W8n4b^imNobqI_A|mCED~%K<}x
+zAVDTqyfK(8yw%|jIow{>>G3fnfW~Tf(cFsF5z`sW1%-;*g)CDf0aJh=Vfm@*)M|I9
+zXomB%fr!^1jCx1_#!CDAA)kw8!e)y-tDy{S$nqLVz!V@zfLbti(QG0RPI#k<j4Phx
+z9V8H2U2{faDL2D~Ih%vdz--ut`f!3IU<wc<z<N4j{Gn(fweDWamF??=s+9!ze8raL
+z3yyFs#kgrUX*AoKN{#jyNx&2!NYH2vqi{UU=E@t^>gJA#6e=5A=0auDvYN@kvIxh`
+zR>y{#(jOuTm;wX|P+^}JYfal$XP_sEX1iyoH#;UiUv;s;SPUdQgDrD{B>Y<eo!aJ(
+zrTg-bB8|PlfwtN18q<7{c6yk+MrZgQTL20V(`EvNCD7{hjKkxpnluKZ6RP#RXG)~A
+ztldf1P<ZSjs8mzeG!t0Qmp7cfS4Z0M^h!w*2PbFh-Tp`qMbYDh94I{gHmIiNP(cfs
+zY>{cdcxfEZu2s{k_X<)#<LwWRb-7aA?c>5c);1{o^V+$`$3gg#zunz8kEhq_vzrgf
+zA8vnAkieVE_p1HFiLO|E=4OLY9<LD+_Wrq-4VIvCa=X2u<>c&!I-h@3U%vZUMFO*{
+zI}NOTL%GqSxln8!uN4*w-YvsLD%ny!wD;YC{q%gUhwxgsF+~Ei>mPNa@yrZ;027R?
+z=23X;<1nQ&-f^LL1Dc0ecmK%q`r_@%#oJFNxUrE0AiNoho~_a91R{xa8T&YlKEN^Z
+zLnxMPmg=o!e>i3)7q<=wZ-X0KNdac7v;AT}2yJ@>`+*30qt%;!g_Betdi~1g_FfXE
+zez^bYI0*Y^fF!ne2l2IBMF@{003Lk&;_@&PE*u{~&%6bNuaPa*Yq?URN*XD?(8LW7
+j{Qp=ST^7DVum$`LW1V|J+7L@k00000NkvXXu0mjfo50*P
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..acca09319b898f1768b1748793d246d7d03812ad
+GIT binary patch
+literal 1002
+zc$@+10~P#<P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBU#j7da6R9M61m|suaRuIL{nd|FakXo9S
+zmIPQZ5Y*4qe!zZ^rmZSfs`5~^O;eGEgk@m~f0QaLYu`D2Si?dniSrbbSh^3svTU8-
+zJu{ve;v>JfaCh;$4^7nGp#N=S0040J-qIn+5r9<h>$V;!0LuNr-k|?YV*mhfZ>cwc
+zbPO_G0-#$0gcnO7pc!}nxd{YbzUi$LyEJ=|l9%o-61pXBAOJ`(00t;Z`b6$OybS_h
+z-&id+o{=27RC-D-!Eb>J2#5eofB^`SI*@<r?mxZ>0{?HbSiAp}w1K2?@{}a0<>5d8
+z2EhawfB-3z)R8pjo_@Ls0&jX_v9_^gA@n7krQ|N@iWArp<+_>!43Y`R0A-S*q>lV%
+z2yfI;tl$4T=J`%aY2>MP0;%iYfB*3hiM9O=QV<Yp7eq;2cc1fg9l~1=a&2StQOxrl
+zPid6g+Zqm+{sJ;hLm-nB0YrE2%6%@q2BDFY*Ehd@6l4A@xsOsx2~#Ju2Y>`!2?J#i
+zLhXQhc~|bArK-9}jEzINSl|3J%i~jbjUai;08EP@X$nEg1O-eX<Z^Z0)7&|Pcgkg}
+z#m28O&!0<hP64zQf+WKPLU!Q-S1x%srF18y>ic&B&@0v-=6UBiC)MI*2xv2eX)aKN
+zkdv6Hs_Kig(da>A0L#7Nao*`{TL_~XKx!#~s}O1c05UVnA<ZUFpa1*v<u8pxV0oo@
+zlE-|<LU={8B3XfSlHTG9@!SOgfEk$sn(>t8PfkuAHco=ey<$6yaW{l;O0)4f0NxS+
+zB!U?OVY5|P&L1Bi{nq$5xZEptvKR*z?9^yunw2&YpFp-d1SEo_8H0f{WmSH8ba?oC
+z<3ebux7v>}?wf^EGaJ)b8m*+UBCXX)aB}jbk%7i;RaIXd9vuA9xD>8We&5V$@pdl0
+zBrVlRP%Q*-RXo|Ps&e7Q!SJuf&Cv2nu^nT+XJ#Xsjg2-oyAWTowmu05*iP|g0l;i3
+z#|y*Z{#N65xVKVlWij8g5YEi3G_!G*WhH4<2%)Ou{#x?mdvt-O8aQc)WOB_^<=NuF
+zaQIK-fk<y<?Q!1e4q}XBkX4LXBJIq~Dw>r%7Z0|y3>GDsnT64-)A{|q{!!zRSh2S8
+zB#ZGRgsjZ6OhzUU$;>9%9!vmzIwE7s+F=1g-44rk`#ZzNL(z|ZEG}vBLjypv-}Kr4
+Y0MI3a8UE8sZ2$lO07*qoM6N<$f^A~UH2?qr
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-middle-selected.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-middle-selected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..dc9a846cce2036056ee46645c1c6859ea8e1ec45
+GIT binary patch
+literal 963
+zc$@*l13dhRP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBU#Wl2OqR9M61m|aiXFcgMu$0;3U7u%!(
+zZD|W=KWh7d`y<=MKD3Fk3B*?ggTcz6oe+gKiS4~koZtclb2S5z4yTF|<M;77$0w%b
+zkzaIrruz1wiR%2`f8z{5{{e(UxIRpn`^tJo`M!vkerx*#2(Rz-@@%#KQ%ZScASlc3
+z3xwPltO8qdfnd`k^||IY?sS9@F<?j=1RZ_Un@eSDV~f{T!tH19pKpV3MOC9YzX`Vw
+z{SiP2rIfrB1<Lc)4`3Wt#@sc8FE>HBc3GRPg*C?5ZjvMe3xdz-z>Jo_0uW-}W%w8H
+zV<C)<Yd}~Df?yjE&aZ($JcYoFc#ipoX(|x%1i!~ZxG}L?^NT-Nz_ySM=Kx_t@HGvx
+z6i@&_3;;z+nD^v32)9<Y*23a9M8c*G0R>UvP32J~#DtVx1a$=P0sv7L5acKXr_w&Z
+z_-Y9d)^iBBB|YjDXyKIth&&1uqJV_(0H8r!K!A<{g7e;nn(&o}d>#7F3;^G1La`e_
+zWLgYO6zF1DG9V^W2vR=JA>3(m#}@exk+6k91f|r+dXNJsb_5L}FNp9H#wG#aCG5kU
+z0H9HNABN!;{*6E#knqyif|x@v(U3&}AYkFjm~llaIWrs#KRN@b)f>wYzd;#0!yt)n
+znXM=wo<d-DDxkM12aHXjj!pOb{qN2xP^~vsA-;_PP9Zwh<~aaj1JH)6#3+4=mS*<k
+z<Ydjc2txcu$oURd{uBcY;bXiM6H4y|0L)Q~=a}=9RI2*7*K0d(gVowxn{&R)f}oFq
+zh6RB8kOH~}P|8yAluSw?YrS4?$GH*0%5U=^*hAR&A$phs$b4b|NKXNz1(0S-uf<n{
+z7T@jeI=8|Q--h^KM*IL{MMivVOc(&(ZG$7?aW0SuQHS^g=Z_&&`*no<p04&L<OlE(
+zd}PGy2=H<BbMXj!roRWY_(u2m_{jNlxHi{ZNpoI{*SQYyD1fPWrYnC|_^vcT^gn`7
+zqpfiIEr3pM3gTN3-*Y|?L6fu0!*B=NozC@`^8hQ&1_-4%FMPO<1_;eh2EeDYfuaT0
+z7DdtQpH7E5ABi<u3#-WaF2qNOAIWr%XQ8gQyaWIQ#4D@+_w#cY5g?>whn-I1d?@<p
+lkHrx()rSTEk-P8u>^~&XK^eQrF>C+;002ovPDHLkV1nIow5<RD
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-middle.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-middle.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..bf759a06f012b2173eabb7c7b856ed06f9fff208
+GIT binary patch
+literal 626
+zc%17D@N?(olHy`uVBq!ia0vp^4nQo$!3-n~7OkpfU|<vp@Ck7Ra{vGTUsBarTHRDy
+z(^OX5+%<7ld0lJggc%(ZW>nO-bxfE(Va9^WhW3vB>D7%LKyvotH8sthKt^p#H;}Ar
+z?E$I*s;_VFTf6N*V@E%by=LovGfUg1u8FI*?CqR5)6&|0<)+<MwvH{`le#9&TCs7r
+zjlFaC<k=f`9&YWKvV6l%dndQHzNtM^W;?ieEM2#wy?>fdKxprjxz29hK*N`=-PSpA
+zM(?z_Zl1nN)@<vWKF`A^pnv-O#cQ^D`UU}=w|Mmyp!!9txA+BzFIu%ZAS4pV4hoL}
+zvO^=|7OmO><c38j0Lh5hBp?|Xm%Mn*mZ*f(=)|;n%QlEhNG)8oW%ZW*#gz>}_RlZ=
+zA;55nDGBlmW{{FqP*PRZ(9qJ>)zvpJGBPnUv$V9eb#QccadCBbclYr0^7i)j@%8of
+z^A89N3<?Sk2?-4i4G)iqh>VVoj*X2=OiW2hOV7;8$;rzvC@d;2E-9;NXq+%*xyJdQ
+zn}POh^mK6yvFKfTWiyjAqkzlB8{2YkZ+rXafBllXy3e0}DLyUO`R}Vplc*j4mDhh$
+zTdTQE_kB9Fwoz(M<-;JyuYG$8v=-c|j<ZM!+$yV|^LWLhHt}nYAyr4Yz4f&=K4{%3
+zEjsVxp(~A_d?ON5oOiaFT-d%~PVBDt5`o{;?q2_@kv;RBx6~9(_wSXerzR}<Jw;||
+z@1<IwwxISGc1o@*|CGp2SRf*|YyGQ$XFPZR*S=0tJn@e`$8zOV%a`(-fR1PIboFyt
+I=akR{0FpT!Hvj+t
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-start-pressed.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-start-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..14c1bc114ed13aabad53766832491e37cd176827
+GIT binary patch
+literal 847
+zc$@)G1F-ywP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0009PNkl<ZSi|L*
+z%}*0S7{+&IXLi~m4T_`~FB;Asyn67W9{f0{c+r25c=K#Lk%)jA6%<fIG!fdeEp6$x
+z-R^cie1=GA!$*7Fb(*)^O?r8L@AJOz%rIk&^FJ?Uzh<vowU66~dx*Id=z4MVqg>h@
+z4FKyY;t8Tl2=Vchh@@J>gR2+td_IuekpS)zN(16J6^D=(-c^FL??FdfE7gZE4uC1w
+zb+;*{KB9qlom2-P`<~IdttmCK*Bc4p2!I0sZO(X;ao+qVKA8ZtW=bRfQc?<A$8mHn
+zggyX>k3>dvgvf*mu7B$QV%7J0QupE*iKQkC!!scqJAg6ic|vBgS()VaZvh~>AYfw7
+zO%z3nP*-=_ty3Wk0YLUuHk(T{fFlT6YcPlv4@1=ryUL|h1wr!!ggyY~x|(~QOap*E
+z1k{3cHDetahPE$KeQ?kig3t#*T~~RYr?R=6a#FG^1eCP0&gKDAZI>zHQr)Q4`Va=D
+z08<>avbhQAq-YtV0U;+nAr#}Dq5)Ny4!X8qJ%n)V074aG%=Q4~q->!d5Ru8k;X=Xb
+zcEZsqeMvOxwS@r(P=gZCSy(2GhaL-ob7n9h-EP>K?4mOcl>nhcV=rJ(Gdhg`dc7Wn
+zXd;zlXpUmPQn@iy0)$ZGGFJ;BbQ;CSQRJfTCz_4=^zUEW_fIrIj0gZ=2F)T>7X)z}
+z+sre6uQXY$Rtn#@Hs((qgD3$z2^`M7REZBe9bPUL^OcG}yY+4T*_j(5Oac3$xDTMI
+zusy`Lf+jES{>dZzg^l$u^XG1bDdq#pz>0U%Q1ii|_?^68E*HM8eSSRhFa+%k7U1?^
+zm~`>TJS&%Ad%s**`~30ISjS;lUl?tKlu}?rq>~FEW{rCNLe<|ZeEP8ZaNG-#TB{vQ
+zw^~7?w7X+)DWU-+k<*~v3Pi>CFTP({8YzAdz?;2d@j=GRpm9by#<)x>fGFyU<+qD>
+z#t}aV;ML5`<^0bdo43@ax|xC@a47!T^*LvGX>lw7&g#m$mw3Fk{V)w<&|ZgQ$2anS
+Ze*vICmfhj!FRB0l002ovPDHLkV1isMfr0=4
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-start-selected-pressed.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-start-selected-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..55f540f8cd566b58b190509d7903e40f137d0b8f
+GIT binary patch
+literal 826
+zc$@(`1I7G_P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBU!+(|@1R9M61n7?jZMHGj>-<i9zAb<h^
+zY`H@`0|*6_j*f~B3Q8V{SIA4yr9q;hKp;^d8e54Vtg|Mv);lvliaXc2>jc}|dBjMg
+znPPNx&v*VG_@6ILm;Hmo2f*jRhrJ8+<ni&>I|0}~IQ$a$wh8|_Pyu(UPyvsgJU;$v
+z7XaS@UjS<$HvqN0aYuqr`!(Q)n?M-ac^5EZ4HTdX^<)JaHRS-JsqM4<gTsf{L6`s#
+z5ykd-15jpe(2WHMO#m{Y+Wz!92p0e(6-n84eg%Xc0K{yknH%4~3c?lu+gZ})QXJ?h
+z22213+m;0I>?#Pu>|P}mvuy!Fx7`io@%QEcs*sHhSYwEIC4^zd&_HRyuK-z+XW8Hu
+zt6u_SyEXtuV^qBK@FfVt>?1~+%)SbYR6242B!q1<nS|{rlS^Qu*ba<y7qBE_8_AM-
+z$^yQqYNa|_K6w&)MoETe5pe-w9s~)EexMORZ&lz-Qq`vW>?WLT8Km*P0v_xi96sCv
+zfW~tYzGn!ssxd;jIfa4{5Ryu%#pmnuEf+wFEx|hk@B)H>F(?AAAxcCfq;Rcw&d$yr
+zZMnd_HN1TG3PDl}X{sqDfMom4f1W@8@#P>mX<OR9_q=QrK}0B}w8%N%Jv}}B=|9ro
+zlt*UwegUYJ2TCa^BKGoT^UmpN_45^l&_(2T6W*;5a)-hLkWz{W?Uh{KU9DEXTv-Zh
+zEQK>rB;~ey8;l5h(tHXrlv3}VoSgi6Z8PK-<?p8LtbQs%S}80=Xc&eB-m9hFTP~Ns
+z-KZTNQZNjIfs!JMq=HnN72I~gFLi`olw96hE|<UGbRhC~H4zb!BE~W}qP7mP_M-i9
+zt`ls|*LRl7<sZ9@#J)dYuRmBU7Vk&I8^8v;2&!9eaEnu&rgjI2l5;%$>*=364MhPy
+z`uLM?j*gD*mr~xM^R@F>d<5w|;O&c{V#iC;@lD_U3+Bp^9vsRG-T(jq07*qoM6N<$
+Ef|VI>5C8xG
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-start-selected.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-start-selected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..fa0f66e0890e4d32b26ce38ae43273f1c4c3e5e1
+GIT binary patch
+literal 866
+zc$@)Z1D*VdP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBU#1W80eR9M61n9pk@MHq&k_v>~xUV?(K
+zn*<aQJPSb(51#ZN@aEq4Z(F>17VolNJ$X@93G1Snkw|t;PglKr=;}_*7?bfft;G~o
+zG)*(_^L_RGsMa?B=g|T@I649N1o#Yi??0gH;kfzr+1cFyfX{(Pz`MW#$iV0t`|cvz
+z+6#CLd{G(qP5_?*?*lJ@OCS~Do&kVbxPSmYs3GhE;0+)lUI2aZfYA%A4aoa7JlLle
+zALa3fyFeHL5D{zJ9k4DQumNFzO|Nb1H$acbwomVZFaeO1Bz3me#S3Z(`#z!oXv(br
+z`>E}Jgs=g?_FB@m7tAG3j_%(A$##}x;QTfSZM9Dd^_VrH---ou34#G6OhUzYo(y;+
+zgtq#GB_-n|X#yZ={{a{oj{q{-5I&$8BH5|)CWN*MCRvIM9z|zKX$Br3#PGATOBN7g
+zjqCEtz{KIxobv>s@&H+okz4_oLkw`05G1f|7<Sid33S-YfC)moafqa8rCMh)Ty0Vj
+zfIU_U!nO=@#0vN*=lr<N0)t>xJ~b}@69ge_r}2r9Y==-tYA`7~`|7W&jVu7g11K<N
+z2;dsRa2B$JY$u66BHAV*`o2GWdHM3m#u1<rta$@qtC6#$+%%0tYEw#YUS3{)|F<Bx
+zefDP#fcj`RO(Vg*Y`=AJaq+{AX>jT*EAcZ1AZ#f@P1A(LK~DMpAFI`mw-iG1m<lCL
+zb4I1`q{KFg7%VRiQp!iG)#~Z3rLbVC044R3)};{g%)~1O%eR6>pVIx+a{0?n&5)!{
+z&`IhdVqJiEX5yo1qQM*#@y~W@ha)1lZJQO*htw-#@Ps`tg?)V`ChP$0oL}!#I$55d
+z|Gw*m$THh+E7ZQ$wkRSuO*6KWb0~!c3{{`4uImn$=jW?`b0zjocXjp7y~W}rDgIQ>
+z9XTgTPcWNy*p8HQ{Pz5Lzl-=9z*on|$A@QUXCJ4O4sZDQT#BDm=0kwRV!_W(f7%HE
+s-#z*EOW^C$Q_p@pI69&0x;x){1&|$$O=*+N#Q*>R07*qoM6N<$f+|0c761SM
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-start.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/ltr-start.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..c936387c31f8cb9d1c41389572b6c79f1fff49f0
+GIT binary patch
+literal 647
+zc$@);0(kw2P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0006`Nkl<Zc-rNd
+z?N8HC6o>oGKS6>oQ4<m(na(K-C>t(9AWkHp3p0xZ6O4&5gdm`@G1kFY_uh_f?N~d?
+z22Q)7Q_3PigNc9GJlA9)TIV{y?e4?Ve*QhZ=bqC;R4SF0=GWtNTRTDzJOw-$Kp?WR
+zqFF%yO_POO3&p*e{6}}@ZOPS)Y|9E+P>yNHlLrVbR0Yg4yyT?$t*Kx<We+g?M6*Kk
+z(&JoFd5I)6BEYjD>`YTMXTyOQx8=wdlsP0pvj8TwJ>`!jAK*fi%RB-Jvq*v_0dz{5
+zT#qKka3YcvCqTjsl2Bg&Cpmm!_C9VzSn(lrgBM7`KLtSD*r5wpaU{&9$FlPNb0ndr
+z0H_(8H^>a(N@ycJ0_E_mDnTtEA&!$&YyfA1@l7k7glQx}B_NUzM_2q&3+@D%)G(Zc
+zCrH8{0tBnu7dEv50h%Ak6_iON;Y0u{3@@*RdRqYya64B#aQr3!ZpuN|YQTs)Fe#dL
+zie<aH1X#i1Bq;;VP%*A|cdu;w>m?Xw1@jw^|0=FPc;oJeFXJcS)m`A$>y`B`9D(qL
+zeCcqs8ori*o>y*PCvHG^{ku;`_v((q(WKbDxV+kd6L8__-hV#2s|sIZ6gDilyq9o+
+zqWR0R@@+`_?=UZ2TX1?W-~jab&f>xGU?U5Wxg`%}hAHXd{1SPtnF%tR9ed^PcN$%Z
+znRWW>Ga#T3HbYn7H0YX<bgp=#bogWBf0m*|pQ+z^=Ir@JT-M^<#vVf6|EhT{j^3w$
+hHlQ5?s$aOSfS>IMX9%QGh*|&u002ovPDHLkV1o05A~FB~
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-end-pressed.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-end-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..d6ff78d369183a76d60cb3b2d60d1d9df7005785
+GIT binary patch
+literal 880
+zc$@)n1CRWPP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0009wNkl<Zc-rNd
+z+fUk19Dw(>*M(lNfGrd()YeK%xd@1WREh%>@B#=-96FV`sZ*z$EKKLN?3N{NX4&Os
+zOZKuq(w(zxCY$lLx7LR*r#TNzzAwM?aL$#(!^2C>(Z@9mix?1O*I+=uUnYLZBM6d5
+z5cC_^_=F(XTLX%|0=(28_-p6~Tn`Kg_Ty**;0A)?2Pld^Msa){tgCti!La*aZ3Ex0
+ze;olh3K(YG#X35gI6+JqO{Nl{s3S@QK~#a;Jn-Cy&c^~6jiybrnXHneEklxYnxg3I
+zdH}juC@M!-$O?{|Ui=n69>8qwT%l;Xz%XorVY&zP0Cch2nUu}um@pFNJ?MI301Ihb
+zayXqMJnxR`0gmg9xp;nv?s63fqH`B|o*KYPI~H7gZ`$MWhqaFA4Mqe>iaWb|Ml2Sx
+z4IR%6V7GVO5+tu03Pl52rmrs^^nw6<uavfs)<@9qTmc*m+mL0yGN@*}S|v6#?C<Z7
+zg+x(KQIu^Px}7^fm$SR>4-Ldp*@CE5U<Bx3wK_JT*M$NwtWXO^;*mnBCTNvpdejFd
+zc@a8YH~`D{R-*|uT)NTZw90U{AcFwS{|eCE<DOEKY^brg%xaa<^0Ye;jwUF|zH{LK
+zT#vh~rgMD@cQ>3`rFwIoA5?RFf+&x5QnptY3Lpq_DV50wR=3)WR=Is|%QX(B0378g
+zCy2#P%KGN~0Ytf!$xjBh+D{p+va!AETwLB}Co6R+5>Lf}(@}&o1GqiD^2k^*2!7<!
+zG9UumTxoH|>Wmyy(u2^8qUbkg1`uU`H8)-g-)}wVw9eXtJ^t?61EE--^T$(}A<65n
+zkXHNKQv*oeU_C!kj;*)%+<IWO^-R2TujQ%DEQS?zWEl8OgInSLi2*#m(0p#ZqONW2
+z_%~b6yn0~c;S=A|MmsRwxE)om=d->*e}i@~?~esQ5bPZ*xE~Iw*<!gmo2)dNN^N#2
+zp$DK#xjviBj#si#MXgA3V8u#zefcK<GD;Apk8a7g9!aET63KK;NoJ~g0s6$1;py-|
+zV$S0Wu5vx%4()J$J_-O~S+0hn_=n5*EdGb9fDVA^GVv3?1Z;Gr%&CU}0000<MNUMn
+GLSTXfNtXox
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-end-selected-pressed.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-end-selected-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..aeb9173c9576c0852e330a1d09a540ff3146aedb
+GIT binary patch
+literal 918
+zc$@*218Mw;P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj00009a7bBm000XU
+z000XU0RWnu7ytkRNJ&INR9M61naz$HMHGe4cdH!`Lga^u$DZ(`Bp}d;Ct$$}UVsN+
+z$y4$sk%$!HX?q-4AY~D|>K+zuJCh+HGZG6ssaC67t?p9Sx#ymHstVhBpIf)Rxji2L
+z5Sc&8Jba%3z_yN#j()b|S3(aZeIzL*y^GXfxE9$TK6|#jGcbT3L8nMBtoU0}3g_^$
+z4}QSj4jiN`z^&!-{LU@~Y~3QT#S2gy7?2Y001J!=03tN9xw)A4lYePIL^N9~NlmCB
+zr5rwB2C#{_gD4SbWb5X9{&f0U5tP&rRk%ttK@%hg27q^YZUPaMBE=0WKkfUcpTDsR
+zNHoILW)0L`8gN(uFyuQyKm^cbw!8h=?92ZwgMrgT3si>`Xc8%8?>P&2sqS0BBT6Wu
+z+^BUu>Ca{l-s%Gk4rrDWsfnnPjY#&M_GX7gK!HLjqqeS-e)jaMD;Xgq3v!5hN*HKT
+z_yE)nDX~#0B?{cAZGG=-_Qy9@c7nq|jc^E?T^T$G4L~8nAdgn-^=JJR27kE<NQ$lI
+z4V+@{HPC{PNF^w!tJU4UpM87nxqy%&b{e99OYU*My)6o4N20jS_i?c!2D8ZaLB!^b
+zy*`J31Qeo+?$7b@^wIShu#LPdM_h<|?7sjQkYt0xZPbkx$CK&f#k{|NWd`gJRS2|2
+z^#V2a_2g2FLPXSv?tDBsd2(e2T<p(cIQCxywiV1_VLL6`%7|DCFUQBz+4-WscLe~j
+z#KsVX1oEad?)#DvQl<nc0@CSlD%C=<qSJDGJUKgG%un7{1`|;c4O2x_HpXb*eE^~$
+zj8Z8wLpZ}$rX}2UEZ)R~S0_V61+Ag1h3du{@4peEh!n9g^b|`KRMSxv+0>$S-KdTy
+zCr{4jXJ5QN1p<{4Rz!=4#>?q&9)Jx{NGUrc*|sy&QCemtTXB-vipuPGGW~rq?;pGZ
+z0PvU60YsEyAb}KR-vPKZ6IRMCBxOXTU2N=5jaoB{yH+W)<H_{VV%~p!fdTp3s;=&r
+zTE<=I;~>^Hji{N2u_`n$AqBz-mP5FJi!)0p6q#ZNFnT^cx%ap~o84!-FK~ML-7m}K
+s^83vEMDJ1K!p6u4l5QV{_51(YKMH=A5oRFqX#fBK07*qoM6N<$f?JuJ2><{9
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-end-selected.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-end-selected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..406f4b61d500e64a2b1c680ce01c4e3d7097c0b7
+GIT binary patch
+literal 943
+zc$@*R15o^lP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj00009a7bBm000XU
+z000XU0RWnu7ytkRVM#<mR9M61nNM#URTRa~Id7aSkPsE|*d<a3v=k9lfLO9%1z&&<
+zz>aUpr|5!8AS$HdjGc+tR8+|G-aRa4Y??L%hn0ssY5pz7diT8FyZ2lVZR0MFYIAe1
+zuD?>mH!vUEIRTE2j=q)oJ;)CL9*_<IMt>SLA_RE#5wMv^zjb-p)&l|j8o(o%FG>Gl
+zpbP>S;D`nAX7bz|1QLa#%eJkz1lV{7L;?KLU`9_sum`|bMI24=K)-qfKv9x3fiYdJ
+znv*wj0IAOKnnnks01OlHHwj~+9>Zb-B$dbn>44_D%hlra+9W8V*jyXvNMwVBK%f@^
+zqZ7a&0VOFhr38D{G>eD-SOowU(;eY8$qrxvwgikW_mL2jl2V$u#CuJ%`1r;$2%t#J
+zusYBgM(*=~V?4WF1WXZ9N)UM%5hqQvIQv&00Ko)`=|UhA%mzZ_SOj1gq^KlO(xik>
+zoAbrvos1C802zP-U_cBJn{BY?39rAGhm{u(qQrw{@!MxRJ3$Zz5paKHA9(D!5Adem
+zZ_+-2!;<sE=6vz_t*mgr3jk9f3D_g4{w4@IK#9sFAFrD8FK*on5CTY$1`Swx6SBRH
+zAGAyxbi}P@TwS}ZB&fF$V~8I>Ko(6ap<30m`IC#)^3z@3*Ojh8W3;@lU}{iAPN{l6
+zt>;hw69J+?4L?cly$>P?g!@@aKopSdQc8<yJ^#7ASbnq{0k7k*ebSyE04P8Ndj<@^
+zB-cthpVqTyI}*U*<-QZ_OCd*Kg-O$(3DfMcbpntQ_$QUlr?dI5?P_^?qX41{*gHUy
+zdD9PY&js*MyFd$O0UU&E*oK1&%X&VY&7ZZa<%c&Aph9vDU`=XGvLl)Iod9laoMl3`
+zJKGaDGK>yZk(~v0bv^&-;$r#edIE%y6p}KjEHYcniv4YdViUhe8Vo?TgLVnKz)^B3
+z1;r&4orrEazyD*qY|gF-K=SvnPb#rWsRD&as)B@LkFBr<I<@_;&j#RPTMjS`Nk$dS
+zC5r9BoPU|k=1*3GPZ$V@A99!9uO^e@KzTuPjnWlLVefxC9NT<A4#hwSGomDrmBC3R
+zRbeD1s(>%%_m7`0o5d&Gd>1%7d;DG7wqHiX+qgr6uY4Fe1aR+lZ}5K~e*tvbwf{`q
+RNGAXQ002ovPDHLkV1mXRm>K{8
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-end.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-end.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..18607ba95b02cba5745dc785a7b6825ae9b75215
+GIT binary patch
+literal 530
+zc$@(e0`2{YP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0005mNkl<Zc-rOI
+z+e^Y=7zXg}x(!(oLC}FHGHoiFX=<8gwlX_NLKG`Z^O&25rPHz5hGsLpkgoer%@GTt
+z%)_0p7eDxJpNIGR_;@GU?e<vvK1@wdqY4Fb-@%TPukZ+BQ>rvv>WM9j?;niV`Y1w&
+zhZ3#t2~Z$Nh7lTcNvPu#TMcBH$|YnT??vv%6_7@Ot+j$#hWA6~IX=xunSU2hY2aC!
+zKZneX`O<RmUj>w^%^QN|PodgBJRzj4T?=6N#ub@=_Cn-3^ghagyH9}d7D!PX293jg
+z6qhpgEP&?g{zr;&L*j6HB68541r(pfvqYxogu-Uu56L0>n*i?hBuW<S5Lg_ppp<K%
+z0t(zKmLT$$QD?F_Z>3BF7x2W^4q~bN_NX)MIIf2(puoMj9*CR)0;Ab_HB15aP%Nv3
+zVr$D17^nb>6|La}xe1BRu<h@=fPA@TzK;<~Xta9cS-&44V<?_pg9z0be7(QIWl@iZ
+zlPgfE)%xTAA3>p^y^9b_kZqtktosC1>KgnZwE*3^O5^#f05Tk-tno~7@it1%L${{f
+zbjt<E8)576%4#y2rgvDOsV-IDRM44r_bz^{#WzqCo0*x-jpJHeHrX-TF*i;=0ULOF
+UryP;f8~^|S07*qoM6N<$f*E1<j{pDw
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-middle-pressed.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-middle-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..263ac1c431197bd20dc89b7a184488d61adb1bf3
+GIT binary patch
+literal 985
+zc$@**119{5P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj000A^Nkl<Zc-rll
+zNpsp(0D$`&%of>zK!8991QMGN$Ow=uHsb{oz!4Zbvg3eV8|>gECZ$ence+hFnf8=i
+zdT0*$k?!N*QPV?<jxQ}U-*91h->3KHJ?X3a`}_Yix;{KNXZ+(!Ly!DNgTeI6oYD9L
+zyqJFi4sQ(x<8N~Y)2FG|?D8hdt-)kEHyX`DSOMcd1Md?M;P(f&ndD6t%MIYr{OD1~
+zGC$vhkQRa<Z8L)Gn@pB>fA#xUd5Z<PLlEl`Vnv_WY>pKa#mX>Yw__D6imoA6yJ9xa
+zfB$#Kf0Rd%g<J5&Bbx(jVVI|k<AjLg{yaPoqRWLBolf^-3$k!C%PyeFFWBB#QRe~p
+zfhJB6B|k;wNiviT1i}IgOvmaA1eP$5uZAGD*E4K`n!MF&|JLDfKlgh5buz@rG#$$@
+zOq`EI5@{HqW85OeFgdS3xB^@zvz!AodAs8qm&@~vAVO<EJkPRxisLfLR7zlBAeqc@
+zF%TdSVk*Gp)eHwAP2Pq&$8MZZDT=PLtN>mjo0BW?d|^2T1KFigg6Fd-nvNDx)Oj`Y
+zNpLEUqOO-7uYWrniI-EEJTH~1QF(ctDOPJVEKDOLQkg7RzUQ+Z@E)%Gwbx5L4M$U@
+z+)|mV)|&KMLkZPd9SSDo%4!_U;NDbBR{+%Mz65Kgk;%*aYJD@@XzvGFTYVBXO4V8v
+z1n6smI+g%IQXMe$v$bZ2-rDVxYVVkUjn&O=m`w{JSkBkF0z5>Z>F9<a7SgSbN~ygO
+z@%(7yg^Bjl{Xo93mZX3OSk^!437|!YCTdc#n(FQy1P@Lwe8Y<g4hz%q*1;?Q7f~Q7
+zx@kilKkEwcd4zQkVGumInD{Oxw>S)pu3me4$5%u{*=81V#T=LkpGDAh6pkji4Y|C*
+z?>rlZKm<Sd10M{42t<D{CY$Y@XjZD^!M47MqL>yz&&^PbU2IfVH-x?ZF*7*34xWv_
+zBVpk5@+NR}dPz06_Y%3{@)8qED0YYIt&RX%1U9w!WTp04+&>(|k1r?8i^)wG28QE1
+z`s<T%q_fjYONEsZ6XUwzuJE0X09pi&&ntCBmHMaS<oWn61`DH?Z{mle3ENc<ghF|}
+z8fSSGbK}422%tp}q_R?PZk0Q`hayZUYG2yi-j%C$r7B1Tg^98Q2j=;pBY+lx&&jGJ
+zFSlVslq;Q_RO+TP;$9@q4ap#Vjk&$=|9>nF&=mkM|E2LKB9=2!kVRV700000NkvXX
+Hu0mjfioM5y
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-middle-selected-pressed.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-middle-selected-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..a2d82611e56d054113a84faf3e8efbda565463f7
+GIT binary patch
+literal 1052
+zc$@(o1mpXOP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj00009a7bBm000XU
+z000XU0RWnu7ytkR&PhZ;R9M61S=(~lL=@~kBdsrxtP`PRu^|u__a|Pcq7vXg_(Aq}
+z_y+K<cGnKXTzpy0oaRB&t^-vdKOrZonvx#$pzi6@ea?uI@Fri`ZC);l@`pE;fTAd;
+zG=2*}?YfH>+k1etdv<pEFzXFI*w+w$Yrsq3ogktCtPVH{cp!Ojdb)bpO9Ac9e*^J%
+z5;XvC7XaP?C5WJrB+ZaZ94{Buq*n>F;GY9_PVyQ+0^tN4vY{)0&7R9>!Hmcyj2DZO
+zcYAq213o-6;w8Xq5D{Pk;2<5ObASYBQ|F=)G=>1!NbsVnPTucjf*bILbCA~rYKakK
+z<hBGl9~joQxAjh=k!B<__f%H%*$2H+;BVls2-YB?ku``Uzzy^cyau2GZr!~zJX$cA
+zg;9+4q?*r;d&OW;lvA_tjD~YFyOK~h#>Yrn1e8cRAhqry4np>u&mfEpWMBw+s^g@Z
+zoqW`*4=9RqY9TzQ@g>MBku{rLuL-8c1I$Ty<Nk)Bm|&v-r$mGhERds^>ZAGW=TCbz
+zLLGQBJ121svL;xIs0m9(MhBdPlaw^P9)K{=L_+zxuHUPAfCqrA1^=Cy{n|twYl0C(
+zG%%5jfVt7#U~)l*;S3N0X#gEg!Wh@<vZ`jE-KrI~EGRQe0HVk!F|r{bwsGe$6CARe
+zNi(3{mM}sxXH%Q~Q$s>gl+(Tay|0Yn7XcT7uhGRG;iRc?dmmuqV_p3Rz=M)@>w5iU
+zwX8nwO+e=Z`)|MXrP0nnUb?iV;2_h$2OvT+046CDJX6wsO!d)nQ9b=n`nrb~FHXO|
+z_~XwXB^($n55Y)l6PDe5h>Lht^ah$mvuyQfa`;nk1>B6od-v~s5iC0ubeW{Yt?O%$
+z3IHf5KptGk<jN(DTxl=GG+8aHquvB;NEqM$JcO{4<4RDHOE42Kv?C-E?i68wf?S!)
+zbGdRzBgyw-jE`2!#bIv(wn`X(l4aRa(v_qnQLw=&fpAb1;Ru2UNx4fo+;hD`!atS3
+ze>)Q_igG$WI5-Yrv=ntA_as1UWS{}n039&62zhACP`M}NqK}j`lC&FBe7suBpY$f6
+zBjNt|;KPvRa~dzv4nj9ZVg1kbza4|OX%O5!lTzl<^CXSno+nQ`p5o)>qB`zPz(xrV
+ziU&J;yJwzK0z-EeFsM>!NJtwJB;`uVgtQZ*2S{0raTMeAWVvYi1ok}^FN$(nyi=AE
+zoREtc(m>QI!9jv@QjmcPY}6101_&X>NcWhhl*ZM3_LR5zFYr1Zi}RL0Mh;&$0{#L;
+WdrcL-QXI<w0000<MNUMnLSTYmN7X3+
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-middle-selected.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-middle-selected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..9e7531200a02497dd96f20e35345f93a7c722391
+GIT binary patch
+literal 1070
+zc$@()1kwA6P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj00009a7bBm000XU
+z000XU0RWnu7ytkR;7LS5R9M69nOSoiRS<>G>8p`sc?q^GC_+qJcH&f0EGb+p5Ab)<
+z-=ZM0Hk&+P3tPI~hli15n_?M1Wr{FQGgZ1%bH47=-S>);@IGIB2!L+4_v3pDpxf>B
+z0enM30M?6i=f0K#0p5QEBqmau=jYQ8D*@<sdwmeE0bBuyB>(}exqrkv!U=!`63G4Y
+z>EzQ&8PM(a`Xs&<@D|`4Q~(IxLa3|wQr}Xz(ag*W2p^5d!^27zSVsPoz*~{mlrlgE
+z5W2NO-Ll|r)Irh`nPAqW_;@rLJgZa#y4_x%##0CvB(6m+N&s+`5CkIXY5Vf)2v|y%
+zm{J?k!SHPGqEZoDizhE2{SI+X;{s9^kqO4K7Sy)(5ill8DWwg091e$rSAY4#KLfZc
+zp27^o9K@W$0>&)COYsyDwMu`%2#7|QrId`^h|uxyZ1CCNlDZ4vo_JzLVJ>n`Xbv(H
+z$Phz77;EQ$hCmuDnI$vZ@X)j2;LVr+xM&5S+wJwucuMj@<cuhV3!IZ&fXD!yih$W&
+z@$VAC{T{Dn<c%BQadI~J<@LY5K+;+~%zlM9BXL7w4ss4*VMGqlNjPdb1Bd{OC4f$Z
+zpA63iUsWQwx3}MCvhPSvNX{tUkh&4e$P>(<oPvW8R73Fu6)-cV9C17zp8Zfch4%LL
+z`$e<(mf(nnD+R7WEu+tcv21$;q_XwZtM4z{T|h=5WzWZx@#y=?09F=gwcDSkMjD65
+zB^1{J7bG(XN7?qo8qWRYq!$J;32G?RanH{u<IxwD0j!GPMyK;4B^yfkEh6TUd<CG6
+z;%@=SAS6izp(2E>ob%CiGJ07VzzV|V*4B}kok_a%@Jz{J7NrB~c#()O2}xvu@IqiK
+zBDUQ9>2xxBUKzj&!q)cIQ<@DV&E%2A)ef+ZyFU?v2}%$ek_t&JNv%+9hWo*EGCryd
+z;1<I6ft3)hB+ns=HQoHEw15d}NN7mWlGLKqiqNJjo=nH1!^!|w5Vm)=KQ>EmBwcw#
+zUW%_(G1PjmuhIrmf!i!-O3@B!Ga^2jjz>q80jwcB+SyOEpG98D-Ag;Lc4IIk6JU~-
+zHi%{kKy67aggWm2WHK3@R0goN!_M|@BQ<^^c?l_$ED+^Fdxs!mH3}O^fl&fTlu}3q
+z6wU13gsUBjA`~5uIGB!xuPOsrLD<>dRkJ9D<Z2|Qq9$2j>$5%?0COox(O{_X@B)f<
+z_Gm~da?Y*D`RRB$Cp_p-^n<<KhJit|2tlk_YZORhSriqb!js5`q=Hf-gcKg;o|_)A
+oHyRFJ{(mg~z&}PF|JMNg0c^gq$7IuG^8f$<07*qoM6N<$f>{6LuK)l5
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-middle.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-middle.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..34c8eb45b44bcbc7c290d2b08ebb5dbde8a8db6b
+GIT binary patch
+literal 595
+zc$@)K0<8UsP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0006SNkl<Zc-rll
+z?@v-u7=Zm7oS)p>TALfwP=Z9ENJa1p2#Ue9F&i`k<%e=FT&{R8caT@Gq@<*!Kr_pG
+z#o1b}t$&Yf)4hE>=i_UAc)p!4&vWiQ@7d|<bUObuRExX2dy2OW8u_z^dReO-YNcxZ
+zvxJ>+G*$oOMJ)fmd76>S`^&ssS;UUZ7s%bX5y`)6Xq>3*hj>{DV#nq6XaDvi*m*52
+zD%GdFs64?A<C)J89D*QUYpUy_@@A106+d>S-E%C-6ae`nHJRV82DtpT4?9k`Z-ZnE
+zf_&pNzFFGyr-hOSJ9cI^Npuf@o!4SQY0tYM$P9Mu4%ZsVMF>v&qpvH1yz5D2B?orK
+zC#Rz%BOc_NT7)lFX5!q|BzA0e=L+cs?|Rg!&$3d*kz(^U>{!Pg5fCH|&`?90Qe`5M
+z&Rei!ePmw-L5g3X-fA!Lg|cmx&6%+?_V95CBq<KTgH}73EtD<M1aHL7=%{UpA^=4A
+zaD1_l6BTnT#SLS}WVQq;0zibrlZ!ciYsdH^!46`_I5M_C5db25Jo!F*6~PcqW^~vw
+zn9TDu0pLsc^35$2Uh2cK^?vLO4UKrI0>CTK4<=JA4?JIE?_%ek!Q`O`01=wnrSmF+
+zF1(t)gPj5WeHTRlh|oIwImJt_`y+9#4?DWSVTK|AL^wYG<$ZPV=|N%ltsXnpiK)Q<
+hXK{EIC#Ltd@f*BqD$Jb`P$vKY002ovPDHLkV1j786xIL$
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-start-pressed.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-start-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..19e12dabbf3acb8813e5836f154961959a3d0d29
+GIT binary patch
+literal 826
+zc$@(`1I7G_P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj00009a7bBm000XU
+z000XU0RWnu7ytkQ>`6pHR9M61*voDlMHB|$bF0hrbk8_0H{vQUSh7Ll6?lm}K;D37
+zVm1lNg0Mks5RVX92o%Bs!K5?3r0v+#?y5R$Y%<Qx_OhGWl~kMmt5c^`C8`Sl=OMRQ
+z976r=;1i=h$wWUMHqFns0tlgAAY!Aa=R=K-ilPc1a@Ko0J3Bk8)#^LBad_sZ0J$Zl
+zp#lIfFlH<jpa#uf1HknFA=C>t{09Im5%~quU;$87NlCXbDWwdbUwZ^Xs29eVKZ&>j
+z<^w@IA)+|M^s0aWiYX<E8mp8NycZyZdf}XV3e3+$q%p*;h;#rr;A=y%i=73~uJ7U9
+z03p;1H<>(Pk);!}V#}=<(_zAlIAj2Tj5(&L|5dTPEqqZFzlqqTb9N=(x0ZN~h#AeW
+z!vg?B&?J3&J3t8aqA1H>oiR&mi^hA~I_K9!H29sr9KGh)pPlA6079r2)2iBY&i_+*
+z-xS5X^<LKG{Aj`h0Ce41I%P>$079r2RW*NXz59Dwmd&)R+G09ABbH1f3J(Cl&PT-K
+zR{$3~|GW2gIjQbE+uq(fDy!;@MKTeM?xFDF=rAF@Rslr3Hhyw4pO?q8`TW%RStR07
+zzLKo9nfX;!%l`iJyBD4RuNb2+3wqCLjLBmJFlZGKuQtI;1aIwwePeoSZ8Bz>je*f2
+zu;YvXdIew;VVC*7F;<=Tt)EoAwQf`hh^UP6Ccq{F0Ne)<_~f(QHU!sOXGen|#sKif
+z{PhKw2+aI|h=>r|JKM9-AP^xD5xx^(69G{k8UrlyX*(^qduxY}K!}8h{9b^ol>px}
+zlYI0sw#xHp?67YKL^Oyj*8*%J5Sd4IGQ$sCdE(g(@;?9oAjY0l$swY<5x^#b_5KmW
+z-X2%8ZiwNtX3X6=y*zHWPS-C3A|BibU=!hsFTeW9A07-6Ktb_5C20@#!_o6*7a;#|
+zV}K2W!GDVrQCrvbFME5BAKnV!0^ysX0{}n<fWynlzsQg`dziY5egFUf07*qoM6N<$
+Ef=^I#QUCw|
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-start-selected-pressed.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-start-selected-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..11c2682778c1a2b0611e344b40d51dea8e46b0bc
+GIT binary patch
+literal 896
+zc$@)%1AqL9P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj00009a7bBm000XU
+z000XU0RWnu7ytkRGD$>1R9M61n7fW!WfX<Kwf_^8x#c2{B}znrL_|R|5=ww7FOm1)
+znV1gILq)+8pmem6GEA6EC^F7D|6Ua59NQB-x6Vf#$&xMG#rpQz*Ty#g=cl>Lk7u*_
+zkCRs{|CtfLoSmHfb|(O{+58ys9pK?LIq5(M9Yy8n@bK{P^z`(n=GNlTH{f?m0M=AM
+zXo!3O0W`=@K+l1j0SuA<7W@yQ1yU$ck6|LQmwWMHQ-M!x9^IG%gZO8HbEE}!1rkVu
+z(F6b($w&~Of+#{Yom>lGHk%(yJT-cYSRi#m6`Ugk(Dnn6m*Op@EF;(P>*hM~5a*H?
+zNUfj)bwEm_dJ<a?AdqYVsDeg)%&rEoE*|+}DPFXat4$gu;22G|&GGLmKu8n=IKmA6
+z{}{k*Ha}MI6vw%w3k9vM7SRcH$W<Z%YdY;PK#2`VgzI|oZZ3=0Go-hYE+kqMZQ#~K
+zMeaa-2UrQ;dH@0&7o-f7#u=<E(5#CO=^V5`w7vD!5~_i^v@;@l@rkWz%+Rt>C^6x*
+zrEuTG1^|Qj?-g-|w2<9`IzeYq19gUMM)6>WtYN;`dH_SCGT6Z|zO0@Gpp?d;sK%W{
+zXXqq4NgX(YQG6Q7(~$mAl1hZZeN|imc=P737qi*?`2NoQBPkZxneMASkRnncJ8cvb
+z+yQjyy~4QqvI9m4J3G5y6Iuk|%)WAlOxiJpsqZ=iu(@q5yTB5{-tJdXN@uCfI@HRT
+zl<7AcV7+E*1Aui1ySsZ&%DqxU@jkN(L^{zl*WhbXV#6djLfG5e|FSf3g33kKtf3hH
+zKPd=f6G$6KhoBO^62Lly{e%54qQq-ax|+3Wbpx0V1R>*yP~X3C7rJ5;-U#8r!RHZr
+z-KhCcvsT*<g{O22ASv|gI~XN5Y=i$vhlBmkN{LrZX}Yv?+yfMWwj4w{`*<0p9e};k
+zfAdXngz(_u!Q;}D_t=)5L`)(TBEb@o*{|@KVJjs4eJcR#5FS2y{3$^ilI*7mZSio_
+zn^giwih_MFv+i_l`wH^cTLV~wF!{51M7*2N=fA&v`Nz+90x&@MVd?<r&v|F#hkpT4
+W<=F|v&XmUh0000<MNUMnLSTZWyqy>T
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-start-selected.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-start-selected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..f46d01a7f10cb1ff918021985a0d51490a5d6a96
+GIT binary patch
+literal 942
+zc$@*Q15x~mP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj00009a7bBm000XU
+z000XU0RWnu7ytkRU`a$lR9M61n9pt-WfaAK=gu@OB?%1^3n2tZEMSF%2p}GSm*72k
+zre=rO!-@q@fVx9M2v~%;*|bR*&vy@tZ^lW~v`KcJV#$(iS(eZ5-h1w!);9m=M|+nq
+zcirOg>=nzuWyFssM@K*32|(8^4uP*E46M_}mtJqAUeH>)6~O0F{KfwM{{Hdt@%Qbm
+z#f#5?6GM&w4BGhmF;?Y(BsaFUz#oIY0d5A+b&ErZFAXQ49yx(j4Zbe`Z>D@|lmvvW
+zKpuemHji#Bfidz2z!K?P_JCD@^hGIba2BXW-UK*+#!?Ec?0mHecHQDop##iP;v8uu
+z7=U6_1V$vAUju;%L1U{8utX`Z>H=%=(h_`TtCzF_28%%`VFu!>3koU#a9TpBytEBo
+z7B6#()D!fwS2P+hrHYqD&cFl}Kp<HTBnQd$0IrA^r-I&6FWeIvM2)^7Ll|P?0i+2*
+z)P7(Iien7pWdL2bIE>JNq@|@(p<Z$i>ZMpA22c^1inwfk8x0|#4!d@O6O@`9Z~`!i
+zC*rBCGeIxWqv&N;A%;XnqM(?~3^2wgHP$O$8~6IZw_Ue5R1;q#9Z5QyB5zgWlQbZg
+z#uS9{oWx(Gs1&1qUvcjipluop6$OKn6=IMyU=1OPi6UXwrZTVX$#oc(4FNdn>j}Ve
+z`Omjqw>Z52;K8R&+ni;|#5ouhg%Xjf5qH4sR>!K}*s2zA-8MKuc;n&2PujLQw;N|>
+zdbE%6cV3IVSs^Z;0M=b#g7D_{_D2!XOInpIW9o>x>K6jnmB?9r;HCF~3BvZy_J@iX
+z8a1abnO<*|njr-<7XLUG^P&k}4`Jv1i1^Emp4-J~O=U1M2$JP${vzw}c2NV@?gA5p
+zo!y;xBbq;Lt(-Z`(GOf#!n~M^XhJSGp2XG=-r9YqQT(B{{nw=wtL_1F$%NVg-PWk*
+z_)**p;7U2{?!4DF?eEdH&#==?Bw5pF(_3SPLTS>LospUM93^jk6rCXK?(OYvwe53B
+z)VrXZGsuD#+a^m6S-ZfhP5Yjtr?)<eP7ofwz4t+&R79q+*!-KirEq2>Zk*oAk~_m{
+zID!1>)&MR+c>H3C&7u#M@!3bj-;2fKmnTnt{ozgkMhM@%2E$+iC)1n%0JpdL-+mHh
+Q;{X5v07*qoM6N<$f`S#ZXaE2J
+
+diff --git a/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-start.png b/browser/themes/gnomestripe/browser/devtools/breadcrumbs/rtl-start.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..31a57c9f6fb5ff72ca9e5b16e74d301107c5123f
+GIT binary patch
+literal 639
+zc$@)$0)YLAP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0006;Nkl<Zc-rNd
+z-A~g{7>B*{mMn!36B9qONW|$_lt>hm2!S|}fG*4s$uPihU$$MluAgbQb{$(sr%WB)
+z44|}NFh*kHzc;(Y6GI%>UGD7SxjQ$%=j1)_d){-6Mx(1~>#)m(h!C*a)7$F>nc4||
+zV3^0{a@CTw$}ZQDeApGxw3r$63`so*@&E{M6#iXpKPlw&m!zOBbSjjX5AsSWBq%!T
+zLJ*>v%~ANbhJ~}TzDNpk00zWDWu;jT&3q1S-a=VfdqJ}DGguH+Jp=@t8NOUI6RccX
+zz*u<>Cir}L2?#hn{I(gRv)Xf<&OU_=!7gVYpmlg-Ka!S;b0{VGVT4yUgFrxwo43N0
+zRGfK32~)6QmvsOLIQiOde_5e~ygyEG6EMSNwRs@mZ}^(EOp5As1ZT!!hn0%6K)|0?
+zXD$((IuXa{(Qbf|ivE)V40AEfsSl$lJ<<)N#lrMIB~Ym!21!0Qx{jrWVTX}6CR;v&
+zTlK>L!RJQSqNERIYysn^w!!y1NAoFG9uCLxTd+cj+Sr+cP<8KUmShy)Y7`rU5js=2
+z_uo<Y<KFitwgm55EI9xhtX#V5=rdIP{OvKtXFQ>B!VMFAM!VzqJ8YOgrjlar`m5L2
+z6<A;t-RDREkWjOZCv6D>p>^~U4Df1c$guz*p?>i55y=(Y%MtuyCle#M%i$>1>;ib(
+zOVORLzh*YJKHcW?o1RWYRLVCaN%sC#_qBw*86NA(wRm4&f9i(U>u+~04!8gT{Wj-8
+Zrr$8RkJ1jOAwvKF002ovPDHLkV1jURCVT(@
+
+diff --git a/browser/themes/gnomestripe/browser/jar.mn b/browser/themes/gnomestripe/browser/jar.mn
+--- a/browser/themes/gnomestripe/browser/jar.mn
++++ b/browser/themes/gnomestripe/browser/jar.mn
+@@ -86,6 +86,31 @@
+   skin/classic/browser/tabview/tabview.css            (tabview/tabview.css)
+   skin/classic/browser/devtools/arrows.png            (devtools/arrows.png)
+   skin/classic/browser/devtools/csshtmltree.css       (devtools/csshtmltree.css)
++  skin/classic/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
++  skin/classic/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
++  skin/classic/browser/devtools/breadcrumbs/ltr-end-selected.png             (devtools/breadcrumbs/ltr-end-selected.png)
++  skin/classic/browser/devtools/breadcrumbs/ltr-end.png                      (devtools/breadcrumbs/ltr-end.png)
++  skin/classic/browser/devtools/breadcrumbs/ltr-middle-pressed.png           (devtools/breadcrumbs/ltr-middle-pressed.png)
++  skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png  (devtools/breadcrumbs/ltr-middle-selected-pressed.png)
++  skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected.png          (devtools/breadcrumbs/ltr-middle-selected.png)
++  skin/classic/browser/devtools/breadcrumbs/ltr-middle.png                   (devtools/breadcrumbs/ltr-middle.png)
++  skin/classic/browser/devtools/breadcrumbs/ltr-start-pressed.png            (devtools/breadcrumbs/ltr-start-pressed.png)
++  skin/classic/browser/devtools/breadcrumbs/ltr-start-selected-pressed.png   (devtools/breadcrumbs/ltr-start-selected-pressed.png)
++  skin/classic/browser/devtools/breadcrumbs/ltr-start.png                    (devtools/breadcrumbs/ltr-start.png)
++  skin/classic/browser/devtools/breadcrumbs/ltr-start-selected.png           (devtools/breadcrumbs/ltr-start-selected.png)
++  skin/classic/browser/devtools/breadcrumbs/rtl-end-pressed.png              (devtools/breadcrumbs/rtl-end-pressed.png)
++  skin/classic/browser/devtools/breadcrumbs/rtl-end-selected-pressed.png     (devtools/breadcrumbs/rtl-end-selected-pressed.png)
++  skin/classic/browser/devtools/breadcrumbs/rtl-end-selected.png             (devtools/breadcrumbs/rtl-end-selected.png)
++  skin/classic/browser/devtools/breadcrumbs/rtl-end.png                      (devtools/breadcrumbs/rtl-end.png)
++  skin/classic/browser/devtools/breadcrumbs/rtl-middle-pressed.png           (devtools/breadcrumbs/rtl-middle-pressed.png)
++  skin/classic/browser/devtools/breadcrumbs/rtl-middle-selected-pressed.png  (devtools/breadcrumbs/rtl-middle-selected-pressed.png)
++  skin/classic/browser/devtools/breadcrumbs/rtl-middle-selected.png          (devtools/breadcrumbs/rtl-middle-selected.png)
++  skin/classic/browser/devtools/breadcrumbs/rtl-middle.png                   (devtools/breadcrumbs/rtl-middle.png)
++  skin/classic/browser/devtools/breadcrumbs/rtl-start-pressed.png            (devtools/breadcrumbs/rtl-start-pressed.png)
++  skin/classic/browser/devtools/breadcrumbs/rtl-start-selected-pressed.png   (devtools/breadcrumbs/rtl-start-selected-pressed.png)
++  skin/classic/browser/devtools/breadcrumbs/rtl-start.png                    (devtools/breadcrumbs/rtl-start.png)
++  skin/classic/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
++
+ #ifdef MOZ_SERVICES_SYNC
+   skin/classic/browser/sync-16-throbber.png
+   skin/classic/browser/sync-16.png

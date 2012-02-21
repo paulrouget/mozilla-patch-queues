@@ -1,0 +1,711 @@
+# HG changeset patch
+# Parent bc9c53893239c997fa97bc9074c60338ec9affb4
+
+diff --git a/browser/themes/winstripe/browser/browser.css b/browser/themes/winstripe/browser/browser.css
+--- a/browser/themes/winstripe/browser/browser.css
++++ b/browser/themes/winstripe/browser/browser.css
+@@ -2601,3 +2601,171 @@
+ #inspector-tools > toolbarbutton[checked]:hover:active {
+   background-color: hsla(211,68%,6%,.2);
+ }
++
++/* Highlighter toolbar - breadcrumbs */
++
++#inspector-breadcrumbs {
++  padding: 0 6px;
++  margin: 2px!important;
++  overflow: auto;
++  -moz-box-flex: 1;
++}
++
++.inspector-breadcrumbs-button {
++  -moz-appearance: none;
++  background-color: transparent;
++  border-width: 0 13px 1px 13px;
++  color: hsl(210,30%,85%);
++  max-width: 85px;
++  overflow: hidden;
++  -moz-transition-property: max-width min-width;
++  -moz-transition-duration: 0.1s;
++}
++
++.inspector-breadcrumbs-button > label {
++  margin: 0;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open],
++.inspector-breadcrumbs-button[checked],
++.inspector-breadcrumbs-button:hover {
++  max-width: 120px;
++  min-width: 120px;
++}
++
++.inspector-breadcrumbs-button[checked] > .inspector-breadcrumbs-tag {
++  color: hsl(200,100%,60%);
++}
++
++.inspector-breadcrumbs-button[checked] > .inspector-breadcrumbs-id {
++  color: hsl(200,100%,70%);
++}
++
++.inspector-breadcrumbs-id,
++.inspector-breadcrumbs-classes {
++  color: #8d99a6;
++}
++
++/* Highlighter toolbar - breadcrumbs - LTR */
++
++.inspector-breadcrumbs-button {
++  margin: 0 0 0 -11px;
++  padding: 1px 6px 0px 9px;
++}
++
++.inspector-breadcrumbs-button {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-middle.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:not([checked]),
++.inspector-breadcrumbs-button:not([checked]):hover:active {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-middle-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[checked] {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-middle-selected.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[checked][siblings-menu-open],
++.inspector-breadcrumbs-button[checked]:hover:active {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-middle-selected-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:first-of-type {
++  margin-left: 0px;
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:first-of-type:not([checked]),
++.inspector-breadcrumbs-button:first-of-type:not([checked]):hover:active {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:first-of-type[checked] {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start-selected.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:first-of-type[checked],
++.inspector-breadcrumbs-button:first-of-type[checked]:hover:active {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start-selected-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:last-of-type {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:last-of-type:not([checked]),
++.inspector-breadcrumbs-button:last-of-type:not([checked]):hover:active {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:last-of-type[checked] {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:last-of-type[checked],
++.inspector-breadcrumbs-button:last-of-type[checked]:hover:active {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected-pressed.png") 0 13 1 13 stretch;
++}
++
++/* Highlighter toolbar - breadcrumbs - RTL */
++
++.inspector-breadcrumbs-button:-moz-locale-dir(rtl) {
++  margin: 0 -11px 0 0;
++  padding: 1px 9px 0px 6px;
++}
++
++.inspector-breadcrumbs-button:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-middle.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:not([checked]):-moz-locale-dir(rtl),
++.inspector-breadcrumbs-button:not([checked]):hover:active:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-middle-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[checked]:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-middle-selected.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[checked][siblings-menu-open]:-moz-locale-dir(rtl),
++.inspector-breadcrumbs-button[checked]:hover:active:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-middle-selected-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:first-of-type:-moz-locale-dir(rtl) {
++  margin-right: 0px;
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:first-of-type:not([checked]):-moz-locale-dir(rtl),
++.inspector-breadcrumbs-button:first-of-type:not([checked]):hover:active:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:first-of-type[checked]:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start-selected.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:first-of-type[checked]:-moz-locale-dir(rtl),
++.inspector-breadcrumbs-button:first-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start-selected-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:last-of-type:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:last-of-type:not([checked]):-moz-locale-dir(rtl),
++.inspector-breadcrumbs-button:last-of-type:not([checked]):hover:active:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-pressed.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button:last-of-type[checked]:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-selected.png") 0 13 1 13 stretch;
++}
++
++.inspector-breadcrumbs-button[siblings-menu-open]:last-of-type[checked]:-moz-locale-dir(rtl),
++.inspector-breadcrumbs-button:last-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
++  -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-selected-pressed.png") 0 13 1 13 stretch;
++}
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-end-pressed.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-end-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..80c1f3a26da4367b7512e8a2eafe281de42ddba8
+GIT binary patch
+literal 889
+zc$@)w1BU#GP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBU#8%ab#R9M61*gJ0=RTKyC|GjhX>|@q5
+zUdPE=``%4#tpyZFL$MN?iqC+kct{``Iz9m+pol<614QD{5J8^`QBWijHd-J72SGtl
+zQXt~MI<~XxnR5=sZlX00XWJQ{cA7cAIsc=%S8d*sB^=MX0|2VHRDJb0b)7F1Z@0Uv
+zTkl`I^b3HY5)nM{<Wrw5mdk&*x%}9%HdabW<~kPv5t%#Nx1HZ^+}JLb{L7zSy8NvH
+zfS;~!J-z<OqZe!S#h<-}V9&a_SZgiW>R%L5qVxHp=URJmFc_=@m;iirWfM_9d?uI6
+zeH<*7uNORT>=>Il1SZlV!uR%f^GT8v0l?gUI7N6)EA>fdt+(Zs{JSu23@FZwfYPM2
+zLyoZoKpg^@L3ma~KAIxzI@Uc9$qs^6iXp=P2{423yg)weuCD)3DEVZprK}*Z2=h?@
+zGYBsT^M&r(`j5p@K#nz;KoDUPW;zmJ2H`~!`Ji*Acdbwg$XJI&bgB`Ag_xNi3NVB4
+zl8C(5UF}`Vdp?<zPl5=O2r~fvP=FbPmx=h@?pp7=VktP#j-k}<04Cx|1f015W)NNx
+zs5g3#J$}_HonioHnKuIeEFwyhIF5~VlN9fOWI6$QZh)vCqTTMCuQr+kD8$T^>Ilf>
+z{pXv2s2`%)Y`$G@bqB@b!d=HPv9L&rBS2u8F9K0NM7`d4tKK^Ojpr}!7}q@j)HFir
+z1>kumAnJ#x)$8Z#t<I+B2RqiLzxm05XtD;6+yPNPM73Ibv({*Dl!Ee(o6E;aYZgiW
+z;ZTH0)DaPg`XN?UR?gNMt&Ngj9$GgS1B%oB<qt>Te}09h&A(o2wl};CHa`UrW|Dsa
+zMEwwzO69d`qxJPdur%~MFVV)ZqqWLT^P~Y$3d$S;i25OxmrtBKv3&A-*IHJR<m2%^
+zFwWGK7>E-m9_<CA(Vp)(X7>R=rE=<>a^T;zM){H)6h?a_BV?;YL<zGQ?)<fI^VaX>
+z<x`a_z~ox|JdROWYxg^+&s@Fm`4?XT7^+|Yl;&{)5J2{0jPJ$R20(uUn6s!+luRJ0
+P00000NkvXXu0mjf@a>zg
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..87808778c6e419886e064cfd1e593caccc1ed343
+GIT binary patch
+literal 450
+zc$@*k0X_bSP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0004rNkl<Zc-rOI
+zKTASU7=ZB$5e5-SQJ@eM6+}z9yO&0(R7#W@nL+<3lhTGtkx(K8m$Hbm#ZMEo`vIhe
+zHuu|e<8+C;oVjy`-*oO7-UqH;UgNE84rt1-7~TEercQc?$I9a~{(y+kWtgUExZK`X
+z4sV5P6j4x25f#+X@J!6ETM>Q&^bLBg2ruHH9FDM$U4`r+gG*Fh10!`iz<aCx8{u9I
+zzlC)~v7(4oY~TPTH2(&$BlNhvRSwgLVF^J5F#pd55JnPtX8>Iygb>G>Gl1d|<N*|q
+zAP=B?1bF~?gcPD!R5O4)!i~5bK~T*A@(5R4T*iW~0Sa0M5X0BFw5i=IAU=`nTsXv<
+zRzHGb_y-<7#s)%~{0+*7S2%!tc!dMVhgUIxF2e^9MgloU0DJgn4o;Cm3=xDB5k?GY
+zT%hS(i8aJZEQ4(%5m!h8X=G4lC3a^A5W`ncLLOP1C?<<@l<?%4^sQL|^jnJ$jXwJP
+sb3680{Ig?D>*S+jPPM*Fk2O4uZ(O#|^)sw>pa1{>07*qoM6N<$f{GEjrvLx|
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-end-selected.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-end-selected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..dbb728411333860e8b52604a4482916a1cc576ee
+GIT binary patch
+literal 461
+zc$@*v0W$uHP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0004$Nkl<Zc-rOI
+zOG^S#7=U3Rq9UR+3LG;mr?88dbOmKLQ5K~LVG><11)&QCT{c0~rlPh%NI$?|6SVgS
+zNG;mApWdm1h%L^#a~99WnQ!sE%qSk$Th;dH$hK{l!`0etly%bCKlBic#8*X#mY)jk
+zJ;oCkPjP}G^2jMBj{{tx<Ta<Zod`bxx_S*K!o9dDgEcH;Q6Wo6VHX!|9)GDG;Js4)
+zjo>z}#qu#kF^MrnjAI%J6i{vq&=}#Iix$Edh95o{|C|pd7LaWYpi6`xX0Xv5K=BCj
+z0E$PD2T(kMJb*0183S=lAb<h&0>~pAi{TOY6$~Jc(BU@r7z|-h*8n*!1Bh4PlA#6d
+zUIFnx;f8?~M6~)66wBXo^ST%`HTfBoFRyR_`SJ<}kT0)d09}^%!NeRge*%c*??jy#
+z!WczR5hlX0u!C~*k=P?2?js2c^O#Y{EG#5(#F5xbJ%CvL5Cv=^jg(^2$fAg6??`mZ
+z383GxcwgW(8c!7K$Kszgdt4_UH9J)Kvc1mo&eQ)5P6Pq&%JZgD00000NkvXXu0mjf
+DFCo9a
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-end.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-end.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..ee96024f1a812dc0a05ec7328f655489838ae5d1
+GIT binary patch
+literal 749
+zc$@+40uud+P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBU!k4Z#9R9M4fJoEIw5W~m>??412mylHP
+zNb)rYC)XPVCDrS*R&2Wi<bGuAnYV%A#+3_GG;|DJ41e$cXL|AcDbwz)8-9HI`t{WE
+zZO1OKynFqEVdcVEIgai=Wjgvs4~Mn?85tRQxVbq3!{em-T5B|cA{SWx|NqZ$==d21
+zJ4=%;AiHE(2LjNqKY#rA%Eit5>d&7)f*>Jq0Du5A5PJUq|5vP|Z~S0bX9R}-e?jR1
+zB><2Dq4)p4|AjgR!!r<=f!P3<68>Qg0Hi?Z2dc@}F)+D5{9>Ph5r~mfz&{K{&_I~@
+z@87>1UBlrO2>%(tDF7(|{{6?Q5E=+m{{8)zsb^$*Z}?P%=mCHw1)v4O^nd^Urs*4-
+z4U0ek=6ImT!2!So4uF3+QUF>Y%mQYI6n$g!yF<Sz@ShPF2*jlTv_O~x41`1j6Z1R6
+zAO-xvSqtC;fB*jd162QKXa~T5kjD{OfS42jjC}@R84zt~YJQU#^@BYZFrZe0{|S0t
+z*U&h^(A45ODXC>prvOIAKLo2mnCG?h3`31ft*-z7H}pLZ4uF6E8G$w7KY}R$<arHk
+zy&w~F>ubXy=1~ekMn>c^;6GN+t7+;4m|EHnE6>BS03*JpFv#;NYMQ=gR<>7%L4k*T
+zP=FCfAqeuklB&A5xsCnR;TH3#)gTih0Ju0g5XoLc%iG@B?fP&Y3t(ks0b_Uo@bmJ3
+zJ+G~+=k4k3H>^Dm4ghuz<~Ofi3NSOXd;tf5n4}DYldETxhmZelAYXVmdmfng8J|9T
+z%DZ;u5)%<I@$+CY;IMc%!w3SbtgPP@l~pd!S-oc;187+M!TbMmBPjrYMf?A6zZrgh
+f|IP3g)FcJ~2ZKOnFxX;100000NkvXXu0mjfQXx|^
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-middle-pressed.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-middle-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..57abb3ffbe7889003a2143e1162102f96957458b
+GIT binary patch
+literal 964
+zc$@*m13UbQP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj000AvNkl<Zc-q~W
+z&2!sC7>9jkhD$jB8HO2#LZKzomeQoDQze#d$zQT8%a-+FS+Zn(Se7i?vSd3>OcU3M
+zlN3&HU|<I51%|(c8Sb38z?DBC$T_e_tH;gZ(Q#*g&%FE2?yK1Ee_!3Yfy7o^U9Bhf
+z#;pzS1`>Pk;|I|MtUh1FlfR`3m2Y!&{cD14o)<Y~2`j4%Z@;tgOGqpV*8<*rYa_OW
+zV82p)YhE|Janm{QRQGTIBdh(BthxXaA_(~7&ws8ZJWCTl%a%W}#tYjyyfEC^OC2_>
+z@u?+R{xDx@oB;{z1^h2z4=cWs?O@Uwzqpp*9A0WL(K$HRb??|>TfHDd@#jFoS^+=;
+zk|utVI{wHS%{$KFxn@r<RG6?P%a%5H-ma<c5HE3{5~2tI$D#0}6qb@1%uRc`R6?^d
+zOti;mO|}1}&M4hJMzWwMtQP<z>?U(RG}_+4^iRUlI+d)+nFtf+Xwgu6M{2ccyD6f2
+z0wk;z03^iG?DuuO?}jC%v`6#087z31(1$02>`Z04(YBL$`Z<uWRsfLjG?DqPuJ@c)
+ze<qp131|588cb;3F)P^<v0OLWXs$d15`ciU61EZS8?M#W!jj^`1uL)-_JgWu1$>Fu
+zj6Iw@T1ki~07%$E@I|9DX2ZoO7-_mkWlkS(8A|AEBk9wXgx3=AD4sgzb&pnhGXh4`
+z{)`mNAwyIpYZuKffPe_$Hy_0>30C2G!z;?&X%04;?zGUb{Bl(?m2`ogL^uK<{Jn=y
+zUS`XpP*Yq&v_=`pKEPo@b`G+lIV7v1Dd9vVh|mN<_)qU|U*IKytH@4XF#WV>jZ-io
+zb;g*Wdju`$B37sjLHGz4p-=8_Ez?DoDL1SPr+KJg1__uD%^=COdO3<y`Bc6<0O2EC
+zh3{-WK1~)FniAV-RvYZ|hL6BR-SiWz>f$9<sU@>i4}_2K82aem=P%G)g(7(aWz^m?
+zR`cR8!RsEvG`lI1k*jEibfP_mK=}E7woDSNwqKFEaYpU$zyz!IcdL?(64eHsz>78r
+zA7LPJ`|iWzy$nSVYztx4-c#NfJ`vl&4ouXPE<&<RB7qfj5I(|4?1MX-%WVYX(*%<*
+z)?|#X>rg^6QZbn&<<}aC-M;(atH(P?e;38gRJNpI1zLfX1Ws5W{CZYn@yi=X?A;GP
+mi#8Vj>))&QZywQqjQj_XyJWcVwj7oK0000<MNUMnLSTZad&OG-
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..3898ba3ac10bbb61eb9301582b601fbd73745012
+GIT binary patch
+literal 469
+zc$@*%0V@89P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0004;Nkl<Zc-rmR
+z%Sr-a7>DuML~SCmMKRC?)Rj1jiWQ2aC`}@rsMHSR!V{5H1g)w~hfUo~(7p>0+PAl7
+z=#_8T+wyZ-{M>zu{{u6Qqw_WxM#qp77!H5uOw711W5|gvEb0OTACnRHnL}6N3>~yB
+z)J1=8-hG9m@DpHq)(s*&%J5_CVH=y4*+C60iJ%Mc{xKLuxRvqiSVI=87RjQ3EfYZ*
+zU=(30;$CyOf*ewa!$Zsh9+Jpo7afV92rwQIJj9Vk0sH7m1Vw<*MKA$E8o>kzX#^8M
+z6TwFoNfW@z2t5<Q1kgmd;BXNc#1XSJLJj8<!30o7XmNN23B)Xmkias0oZ>Qw@Yeus
+z%L8OkLIZtu02zP7p|Zu7Kngij(Ntdo@`!vVPgZ#(;aNJqf+O`!P{!ZO-Lrr+;_xgT
+zf2jBx49j>EAf)3>fRK(i0Tkn{`#GG2kA{p_zYuu{ioutH8Kf<eK@L9ZGG6^k>`7jU
+z9bf|`6fILmRXN@Sknw%=aDqB&7HXiW9gqLl;?C#SaB2ML{}}lOiA$%Wo|#gM00000
+LNkvXXu0mjf#P`Jj
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-middle-selected.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-middle-selected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..c0d13e3efd4f578c6f18281de28e022f8cb7eb35
+GIT binary patch
+literal 472
+zc$@*)0Vn>6P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0004>Nkl<Zc-rmR
+z!Ab%_0Eh9t1a*kg4#nt-m|CWbM1q1Mh)_XgViedxOe4a=py(KNDX0gjmkGM}07Ccf
+z+qXC{-F7;T+u`SJg#QP-xU2O(a>EnI^0=-)YidrsP9Q66XY>MiAJg;Vg+o^u;tV}>
+z4Rnf&#U=3uOT#$8?1JzjJjvmQ*uf_1hS|bCIx>P@fRE47I6_F=$?;{ZBZrJZa@as!
+zMbHcIJHiczt8kEjjR=GRqKG4pZS-UW-vE;mAp#po6tIiFjNlU>kP%dXfJRUO0vbUD
+z@QZNG;R>>dBMM=D1QkFh!lnF@6l@4XBQ$U>Bd7p65oSW7!{JrLAPkET!wSl1W9UWr
+zYk;od0a7TUg@Fv9eF@xhsATXZkbr|4+S-?Zd``HRzpV0zBWmdQDh~8+f@=JOyn7aq
+zgpG*#<5hrwj#mK!I$i|`=y(;tXS|V*!&y|&(t8|M;~%|ZD8oS-%LYlqK^aXsUi+2U
+zGlx#FhboFF7^Z}p=6DrAjvt_pBQ()4Pz%Sp<MIDm-1_=<*CvntA0t1|s^^Gb1i9t_
+O0000<MNUMnLSTY<f6zPt
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-middle.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-middle.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..eb65fffd55e08b8c2a35ce27f66cef676eb257c7
+GIT binary patch
+literal 694
+zc$@*Y0!jUeP)<h;3K|Lk000e1NJLTq002M$000^Y0{{R3Frun`0003sP)t-s0002Y
+z<^SOC|7dlBa(;?|i<WJAg?EFFX?BBddxmOvg>HL@Yj}o<m7$cMsc(FVh?Jjfd53U)
+ziHDP(ZF`7@lAm#Zii41xm!z_8e2H>^i-V4vZ+(k$fQ^HXo1d(@aDI$}kD76Rj)9My
+zbAgY2ikNhQk$sApu)D{rx5F<uK{Go<I6z2sgpz)Ynya_NF*!qjjGK0al&Q7BGdxCj
+zhLwMfo2RqCH9kmqhnA+YzJHFLvAxPSK}&gvm!z=0dWo2TkDWS1O@WV|qp-VASYtd!
+zP=S!2ovOE@uDd-)Qi747ny0itN>!Prv_ec*nWnQuPFa|yv_?=|n5MHxQ(l;+w3w!}
+zN>yN(rnE~|Vwk413KAMjSYw!`v`txMPFiM+p0JUkv<ea$p02-Sa)1pJ8vbWq4*&oF
+zXLM3dQvebkA|fIqBPAv%DJv^0EG;iEFfuYTG&MFiI5|2yJUu@_LPSJINJ&adOG`^j
+zOHEBqPEb)%QBqS=R8&<}R##V8Sy@_JTU=aSU0z{fWMpP%X=-e2Zf|gLa&vQYbas4!
+zi;$G3@5h}m0002VNkl<ZI8U9-S3|*Z7>40rk`Y;D@0~(c*`$=LlueP@_x}h^-}mtO
+zU+4EN&ZH2;uM~73j$733@XrpLXH<914}UdO>xUm!MbztpAC`}(#*8248B}@750eDy
+zY0M9!2r50~hwl(7`Na=|04n;)4}Bjh++&B13*-)d(80SM<nXs?|8fJec$&1Y8bKy!
+zo%RJSNN+9CK6eSynDewxsX*%MEbZ^kK?=hI?eFCv<yDOK@e7phmiBKpl($0ry%eMu
+cGAT%Z0$vZxjl^9|iU0rr07*qoM6N<$f{>y#XaE2J
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-start-pressed.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-start-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..c1a946525817367c186ca1982f7ba308a2d1cddb
+GIT binary patch
+literal 877
+zc$@)k1CsoSP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0009tNkl<ZSi{{}
+zTTc@~6yBNHZRurq>$a4@gBW9s1Q99{ZeGyvBJU>pZu|%S41Wi&CO-IL6p2U)Eu|D1
+zBPzt$7!tyz-EFtKJG-9gO;DhH-971a=3(~X`}Ta_oH>hvN*~8!F;`GH@5DiKG1_<W
+zMjn6@nB^Bw=dSJk*dEX;<(LNuc%{VR-0KgSwi{8Z;3&`LrbfzYaq4n^e^iOaC?Uk+
+z5OO7Q%P@TDrT4wCeAdZ+p8f6pE(|0RiSAgu_b@EU8X>%m5OUl|Kvl2!CT1R2k_&I=
+zJ0YP)fMr?1P*|*lM5!c26b%z%yEXUyfgq0vw(i`W-A#RZ*OmmnDFwm{6k$R+gsE*i
+zt`$FEumXW_S&W!CF*$=X%L^Bh&?10y92+BKJ21Q1{Xn`L@AKQD6e%$*BNGqo_2kEM
+zNoWxO$Za;@A?o%cpg{r+OA*TO43FQpvnz{dlF%Xm;KSzn@IoQL4l%*!qoO1;O!m;&
+zG|jCp{YS#z41j?5Pi^WA0-C|REfkgk6{R;vC+*Gj@+lIU1mK1OJd*(@<-jtbCI`s!
+z!P^t|)>^Vf!pRH(_otN2oCkv!d^7}dV3~enc+B~dU9FLD(gT{|NdoF5_-P<4I#BNO
+zSFR84?0(&vZ%Kdw2M@5oH7&0afHA@lRN#4sjekx7+K>SCWCnm0V7Mm`qoRiOiYjmC
+zvsX_^fU|2NU|B%D3SQS#v3Rr}+ej_nI>Q9(2Iw^pzyRJfOkUSYQt9}hJDd8PIP(}}
+zRX`2ChX}y%Gc1FF7fZ#%?p!)KdTt@)Ag56WctZm4=80)Gz#kvRH!~|^7nZ`!^!Gvr
+zFz|+9lB!me;LXRk)>p^dUxt|f*>xv$dD;`x0?n6;vRXXq$!Akj9bJbJhhXg>foDgh
+zdmAD~RmVnE3#rEk(fr2RbVm&lXo0D^u1Th@0c(UKn5W3KJ;7?1S~^ky{KJl0VzGEn
+z=2u~FlII1^p;U%?$#QE?5R9)YpH1K6I&6xvu5hg_{`|@8qn+>HhD_58df*UvDPK~!
+zH;cKp-vto+Fv7kK1OzS`6gWR(RiXRi=YF}qXh*;w@kZQ4k_geP00000NkvXXu0mjf
+Dbc2>6
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-start-selected-pressed.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-start-selected-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..77d63d1b1196892c14b853b434fc4e6081d0ba77
+GIT binary patch
+literal 452
+zc$@*m0XzPQP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0004tNkl<Zc-rOJ
+zyGue*9Ki7l5)BT)g&qn*Q9-qoyL(!c8l^}+0x?Mp@{v~3Lmd=?pd}(2n(CkFFX#`5
+z8rs}%-y=B*o$Gkc9X{JV!|%&|o@<Ovc>CTzEmI@LfMxwp9OQyIzZwX+r{+4uc-4Sm
+z`j%}6Fg*)v`z(6FJ-TS(MnNrfr)RuxFzo0D7&m>7EWE=NN+{q+K}D2tEh5+s@ORp@
+zQA84Z*i}#rNfd@7$OD`qg9t(hDky|4ByfzTh+sEB4Jm{XR5-u}!bsu-EfK*f0pt<%
+z4<L`Ae*k#|c>s+gv_%AI0F5J*(Gd|O0kn&-i5+Bdfm;#5X#t|hpgMSEcG4xVjX3gX
+zNG<_whtHuVy$NbO{HX&TgYw~}0W=?89zfUOWdZ6)Yw|f9Ll)IhK8G)nLmUx=6%<7r
+zSyaUEcDKYHSkOTUIi!(N&;jy8!^;AA7X1kpJ)@0tR8Uq>6^&6hMO`rcf%QZ8<m{8<
+uw#7NPAK~N2@_hBIrSG1#qCWdSMt%V@o$M6AMU-d&0000<MNUMnLSTYmUbevi
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-start-selected.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-start-selected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..6529b71abd92e5314388880532fb50fc58618875
+GIT binary patch
+literal 445
+zc$@*f0Yd(XP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0004mNkl<Zc-rOJ
+z&q@M89Ki7fi4Gouh5oo@Sgw_pm}n&^f=F0UCQ69?BQ&HEI(6y=dVnCJ2dJ0n33`C2
+zLpSf+cce~2vmR&W@VU(#eqVMMX4V>;a0cE!JX<5yAJ6-rSQLOAO%-;7Qw#URc+r4m
+zhvU8j*dcfQm`zW(!xh>%SI`A|(=*O1EI$ST#_g~e{uZaGVjE=zRd9ea5y5wW-^Zqd
+z3NlC_uAnt!P#%sT570yoE@t5<Xbusiu!FXU;5R@6Sw!I|Y8GL*$YKv25y5}}@(2b5
+zkVh~hfINacfbJ2b0W^+K#ifWK37}nsc`PH37H&iY(*ne>g*vW90Fz#UMI=!|OY#b6
+zJA4rh=||9n;Uxj|9$p$i^Wo(IbRAw6;1HXd9EVp?Kz)?s@Ck}Y!bMa;OGqM*ni$^i
+zmDnR2de}!18^|gshtkmSvH+o2y2YjkbkRf&RRz^?H0q^j0Cu`i=>{hw&&FMgvv?5U
+n{o4zD_Pv#_zL!v+{~sei3f>zNwGA$(00000NkvXXu0mjfg}}3-
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-start.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/ltr-start.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..a4ca858603efc3cf881f74627a453fccf1d4dc8c
+GIT binary patch
+literal 802
+zc$@(u1Ks?IP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0008%Nkl<Zc-r0B
+z$xjne9Ki7=-b~P>ModsK7HKrqw864fae=BJh++{WqDVrbvJ`CTN|#yM=}Kq104;?X
+zTCfdjutE)q1c~urV!V3Rix)5a3H3b<kr0;g*mwBc=JNYy-psr=g8jmxKfeCV2@xXL
+zkjw23UbGJomen*=2#=oX0x`4*5F8WBcn1)cN~>$73Z-$_8NvMQ8=IfaSn^RYnZ?<K
+zHKyQDQ5q2N@HfDL!s0$Gm^5Py_t@->-8Xxp?fHrb&OD5!vRW8{cK~q9=*aL~kI6l8
+z4+S{GJpd6jFaqBIdLlgAZFG&RP=V8I2Z%5PBk&1eAVSG5vupgWff{Q;1x8P|g9vIE
+zVXpv2Je2G-QDe9D&PX##?1AZ45TPGN*e!qw4<<T{&Tx~?5o$z@eKg(@O)d4p2s;HZ
+z<IGH(!4a+>CW1FmWcSB!fji*|jIdn*3(jyVJsG^F#c3s~Z2rl{SZb*UM%Ws_iqYJi
+zVS=fBZVy~VnbjMskEOERFv8{lHjHMQw0Pjskj-C%I;%IToJ?mQ!3Y}xFc6?YgN-T%
+zt-flM!5MLSs&@M2a_8m%I0$fEgZV1e7EcAL;Cuu<c{#bT(z$gB5E#RO_3u4DFybyl
+z5uA;r;}>Q#D;?WC1WB-oxH4q*$ofq#DQe(cWFTHOmsxGw={4viLW!C|i|1^gk&>VU
+z&O|a(^3>u7)ovd`6d6h=)FbXQy$0uLRKR(t5LcF7T5H+sQ`qGQCo0t=l=zvREJXpF
+z#T8~{^Y1=3^Vtl!9pPE|fZ18{R7Z&N9h}1*;m*BU{?y2KJM8g9({ckDDACxwqI?Et
+z@QfuSVECK74@3$M7h81%qohKt8262f@>ztNmt<BxH~iO;*hxuwlSm>rT746B(HDyq
+z6LX8@`G|Y{{^Hx!FReU>hyERl%M^932alY<!E*2+Kp>V@@jDiW7sCkOe&q_kujh{c
+gSkDzBfcKA)-({=+(`r7&KL7v#07*qoM6N<$f{N#FlK=n!
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-end-pressed.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-end-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..1077cfb7b7d6350b2acd1d6dd1e913a729e14a08
+GIT binary patch
+literal 923
+zc$@*717!S(P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj000AGNkl<Zc-rOI
+zO;gi&0LO7>_T<9|Dph8Ruqg5rAceMR^U$ZXP1-y(q;1lq&m?ULAj?C+f{Tt7(JHz-
+z&gj8$XIA&L<NMGz;P?vmvKM^|*@m5A#$^`4Tf*TplS>Z2Z~p&FPU*V7=fhw6#gpjN
+zJ6-?5co+m>sMBUIo$c(ZpCo%<-hLgxZT9{xU<&>f3A0bJDA&SB3yLNl!y)PyClY=+
+zH12$7ocz52=Pq<FfFA#IoD%ObnacWfPOJ0zxm7Dk$XcCBl{bR1<n{>Y`O_G`AK+|9
+z*E)j7TeMiIOS8AM!rad_E0MLvY(`zVnGn^@2^aR(82+CCmu{g^Zikj@%aXQPwUYhu
+zvbs45`TqEK_`v`TERxvfB<-j62~aIVYgEO`@&YTV4TszJW`Fp>0JaS{%r==!?WR=S
+zC|iQIu87Kt#)|41=th4x#vT@66AsaL=}cu#s@4l;C)esFQCX@oLV0z<3IApcJv6|X
+z4%=;SklLb!N=;B#vSub$R`YyuQK3@Br7<V++8Fum0OxI6P=LHm3yLbtEM?3}oLQFn
+z;zB8&EG`05@GE2B5d(DHfv{*JmMoOp@21UaIzKOye6BhIx?dRMjuYUn3yrLke7?vP
+z7kIOxGgWEW;oUKY9XG%|ClXqXaJej3m}kw3OqEiDfV=rU0h&&ae<{pJ874bRnN>_E
+zB`}i9_76?$9yh@KNhq)wWP~)G)kw3V1T{u*1=bs6a{U9NPmdm;^U}7%jm-yQ0#A$8
+zh?!ABB^pZPX($kr`>q2|juxQ9wgXP0nvYC#WKs#49l_7wK}wFfQBv$37-=0Pz{Bw=
+zq=peZLnKwd6-1`X!2l&hT}UK#_1f^mLj#=duss@^gjE!ujz^Ov)GESU-sdL-d<w>S
+zd;idb!veHML5~856R|K~gsmi$$e~yy9dvj?oW1YH_WuOvdJH%`H80M_<Lz>cpukoU
+zPnNv|mq*(7!av~+usuHxHV*_i*LnHQjnT0+7ZR2N1RKZWX~Js!QI>#w5gKqn+3uce
+zt*-)H=^bV+*z7yQV~#Z!?4O0upz6Uwiq*8Ysh|_mMgVZd-Z${f2(bTKd;oBz&tL3r
+xwy(qPNn#v>y$J9B)-QkjtY7`~MejXH{sCTNC{%?WltKUi002ovPDHLkV1g!7w=n<!
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-end-selected-pressed.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-end-selected-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..ab1040ba8cde1fb7eb225a854cbbe79b73119d89
+GIT binary patch
+literal 529
+zc$@(d0`C2ZP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0005lNkl<Zc-rNd
+zyGjE=6ov!h?#AqH(47fxVdVu8Qu_)fqA_?Q#He@!Z+HnBEz|^&h=`Czqlm`F!UwVP
+z9Yiec^Z~~IgzSQ(*xH%mXO`>~`998E_Jo8G^}K$H4iyu65u$}2I=kbENV{9sO!ll&
+zLIls;o~&l^nr`xnVexakC?Q43QUcqVZm~-Wo}Z}l>jI2utcoA6FzHyg*^X{HYsjiR
+z;p@81w=~NsG(<cSyf2_$4z_cOi5nPaG?Pyv6Ov>~vso6<3nam?*$sg=3$XYBCe6Xp
+z7$zo=p?@A?NTRYwAz|9E*m4+E?!z|=aQ0hmCx<a5Ief4H$>D<qNDdz?KsI<~1OR@7
+zc71H-iypj60+RUeX<`8U1;HsMfDLPAY#itO34y6Bpy<IVxdgEO=fgIyc!26{f)SR{
+zO}>d!psJjJMir#!dj?Bl8xn365D+Xu0Rh1h6c7+BAxJ<00%pC>VO1pf0+1uRKhr&$
+zBp@kCk|rj)9^;hQ!}!o7ARLWd<3*X;VI+Yn0m;b{YV?3>iTD~VvDzO2tgANzJNMKU
+z(=2|7=RC42S@P8NB1UTbdJ_D$cwc;QrLEn)Q?4ye7D&R|mvG;|MgPZ-7*Hv{K4=Ry
+TS{tQn00000NkvXXu0mjfkvruG
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-end-selected.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-end-selected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..8b0905d0f094c9e83c85e107f8b9eaaffa75c3ef
+GIT binary patch
+literal 570
+zc$@(`0>%A_P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj00063Nkl<Zc-rNd
+z%WBn76ow0ueM$D(@no-+_NYh1UZ}MP5w$HSPQ)8t5Tq@lmexX{wp8#k5kx0ibSjkM
+z132(O9Qh6+4xQ-(Y_kG6AZL)Vdk=n+Ne17Sm1N}~@!r?@`qLLNX5@?a2l!-cynj9G
+zba#cp&oQOG^VprZF9G)j&`W9DrUH6YWi_lY6K+UDJJQk<4fug4zZRhKa$f>IPpo@b
+z9dFC5xU4dFDU`^pydo{$5QY|6L<;nd;RgbE6co_9wB^+#$1}ndGs3tNVWcygq;y(C
+zd7dRGi?0}bNI+$0IkClpv^1f$JDjF?=zk6~XkGMFK6+eaqkU!Qq6U06fFBl6-c52m
+zEAw(ZaQJosfy1{82pqm$Kxpuh2q=!IgJZ{pDNbsj3l;oR28>BSPg<H}25o7Z;UW{z
+zIV!+SE9+JmELs5>&}su0<s-n$oCbW+07mx`OtSJ+CE}X0__~3N>NCize9ZxPvy$*8
+z0s-w3A`s9nAp!yI5?Tb%Vq)D~^E({6gkb^JJ>dPB_h`O|Cn1OcPB9Y~B0S|O(Ayya
+zIxqL6p)Cn`izOu1onvdk#JYLrs`-G{G~oMx1YmFSUM1iomxkO732=9~8w@GTRIx49
+z)t_;X8wrD2e5yack#@SDqN~N(0!#Sz%Xh#3_R~N9_?ejU7g*aksjYX;F#rGn07*qo
+IM6N<$f|)7%8UO$Q
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-end.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-end.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..88cc61b0bcf073ca15af49a023231268da8ddaa1
+GIT binary patch
+literal 679
+zc$@*J0$BZtP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0007RNkl<Zc-rOI
+z%T5|m0LF2Xu38(R3f9!rG=Kz(1R}R`ZHruLpn`%$D0jKYWq<((0cR$Ij$%_0L>FCl
+z(Qf)4?F%%0f^NELUt#L7z|=$n-Emm_lG%R$b7pfUD2nR(_LG_(M-yKt>JI(Em#CFY
+z_IzlP$tsPL?#a({MMj=jQ3)68MD_F|egy^HdI-9tZ+<tx{ReXy2<y}!tQn5)oopqM
+zh6iMNtGi5(?**7-u#f_A8A~AKCg`*l_bxsBMu3@eu6_}TBcuytI<vFX8-F9fUJgGG
+zB}>N}ahO~Ok=EpZ>A|-IU{|t4+aH5TN3?jj1{(FsTAm);FF+N-Ti$q)ux}UYHjt=|
+z_AEWLZ-9FYb}fgUz1fC|SCKq!1%=}IYN|K3Z-6N_n#Y^2SROYAA=Cr{h0c<o2M!p3
+zg=Nu}Gg2Uo!8HDI)XB8w7(H&70C)y%+C%w$gFjW(kFsTrDMAk$HUN>Wov!+G`x<Yu
+zsvcz$l`-%?0qPKXW(j1fD&J07IqJj;!`op49Awd!F_fyv{0U?k1R}Y9Yw!TfnZp9n
+zdf`hWQctod0mW0PZga2z4E7O(b@YLq-6d}v7J)<{dA2b~fa4r-t_h^eLT{oZ01aQP
+zboLE!m%(o258A3=yvTQjbBiG2i4?E<1vr6;3%MtOa9vTD11gSCX1gT->s^`rAWuLj
+zH=3$&K(@Ga9pU;(j5&)%A;MH7ntZs@;DAmjRoeau@Nhw3fAmC9$&`;)$j)bFqy0$%
+zI)l~WqXYDw#d#vRdun>Fe)T)NA1CxR=tlVZi<<rZn|l1?54A8({sP@Z6GtffTZ;ey
+N002ovPDHLkV1oIzFINBn
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-middle-pressed.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-middle-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4a3a5beef555419b8a9e1c456f624a4dd61cd5f
+GIT binary patch
+literal 923
+zc$@*717!S(P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj000AGNkl<Zc-q~T
+z%W~UP7=YO_EMPKOFq6`d5}Kw4+l}LkY)Q86vSdk?WJ#86S+Zm~vg6>`PLpOB7)nW-
+zQeXuO24=WyV0e(eL7#v<uV5TzsJQfEEl(ET_Kdzy=bZn%GM~?v=JD_ImCHt~0I$8V
+zI=gHvEx)p|`U`|{U%`xY4lI=T@WLTeB)-{tKl9s#*V6I`C7*Gsdq-{$rXV7k;q2o3
+zE39&FJC*<SZ?~o7OL*-8ulq+vFdN!~5Bs2Dh9`T5KN*R-f12EdfBL82OXUmY>O-n-
+zA1m&7*xWnrH^b8aB%aEf{^_k8^7DTkUnrkP*$1T5K2n{7fziL+TLkcdB0LH7-r>H`
+z^iR@R<i}@uK36`6FlVG>P3rcjZ}g73&ESp;6ya@8_a>pRIJ&89>4)e2=x54jOT?#y
+zXpQUk&~Nmnon|nzLBj0M9NilSHO-wSGtl=hI_CeA-!0;w;5B0;SfSf+4qKW(u|Pua
+zP1|zkz~j`;_`OW=yO&+^|B}x@*vI9nHV~SDExR8yweHve3B7x0%AI|us&oz#JJ7ew
+zjQFSWxAMqGD68yons3SWNL#GY0F8QkXfkpu*iL1?UiN|am;B9i_I|#??X#+5iq=q(
+zI{Pw+@J7(QkuID?f=dQS?i9~pLKrftr!TgUB-uj&L>SdkuP3s1V+DwAe(aRwb&ofC
+ziqHycHEWLp4OVkRn31fFt>mLv0ixMY9230maE-1cv<6k)3K@{#G@qp<TPRd&t&Po_
+zU&ILzz5Yu05zZ)fRdofy=+nF&kRZWnJqi=se6Gxz>+d8!j}ssohed3PGLpqgHdkx-
+z1fzHuNYHW@uW%-tEiwAl&F%9z0ip*HR5?Ux$si@0;q}F$ijRT>S$8XCPNQ~<r25vi
+z8~5V`h;~Aud{CxDjg%~sRveU4oDxV7QX4^O4c~!qd2M6svls!Q2s=4sgph)Y3nos=
+z9hi_i5J+HRs|1scN;;28YwPdcixVJ<kcazaS`ui{LTj1_fkaht3$)ZOqO^i03uWQT
+z+t=^L2@pjnATCPrB3^CKAc9f?okK`Ik<M9fUb%K2CqQ&3<l$i+#yn8jg-}10$%WgA
+x)MRaa^UEl}lDzu*>Z8j>tN>5`m|wkY{0TOC@o7AgRE7Wm002ovPDHLkV1oR}!kYj9
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-middle-selected-pressed.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-middle-selected-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..d66acb42eb2e10481299a94912511da1825458d7
+GIT binary patch
+literal 537
+zc$@(l0_OdRP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0005tNkl<Zc-rll
+zNlwE+6hzrzC&Kn3?&c7jgaknpKtu=-h(U-+KoSPQA_GD}fRI=L8-@+sgnJ;4zyVAZ
+z*eJ;+?d7*wR3{sM{d#WyE_)yd0%N^@2Dzju768jpuSt`!`CLxDWn6uMi&{`apql9a
+z+;-J9h5s+~Wo#Y=>bS6CJ9^u8{0&*sTehcnE!RH^K|Dp?jLoCarsetbmZN8&X)$8I
+zo|=Q{WkSe!>aNqDiTNf7?pQ-=7CT@ZMe@+70I|;kdY%A;a>i9_Sy$ckdhBPuWqWFm
+zcOKiP$bu}K6!TQ7%~Pp1Po>&C)ny*0&xD$%@*L8f`k44DCg!QmkkjTlFVs9$K;NZ7
+z&tHJ~OVfb&V;;t@ELWe9oaGEpVi$}_GEcE*^ge}iz8)vu|3zFtsNr{!6omt5!~xJT
+z{Pd~qsC5ny4ic%40B+(^*3-AK07MW_;E>ZZf*^4SGO;qb!pD6a08}&&4unF;hr6K2
+zLC(_*J|0W}q#6R3R72pBY6x8VL8vhwFku<I4vT}p#RNh%giz*D!=i#zV&CllcSq~T
+zUI4}rm=k!;GHyx|10L@FDt5ts_(|+J4uGz(#76?E2viku|Cld)Oui9>|Igxa0DOD}
+bBT3UY(2^TS7>&j@00000NkvXXu0mjf4B778
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-middle-selected.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-middle-selected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..9b77579e94d356079ae1c8cb9d02539abaed2c0e
+GIT binary patch
+literal 566
+zc$@(?0?GY}P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0005~Nkl<Zc-rll
+z$x6jA7=_*3G-;DuZIdcai1Ubuf`TH5pn@Zcf-b}f5tS<_E=4yA`XKryzK8e-K0wV`
+z6fbUWx-+edlV$kN*W~|CT9+h=wcbCIFmK8PfN=GiH(8qxL-poyeL;mfp+X-xs3TMR
+zsqs+pq`qQ8y}*~X`I3zGiHO!c886Zxns-TF5HEOAEfcP{0m2vhDfMP;9vhX)YMk(f
+zVZx&USA=>?z8+&Do(2Re)m^o}n&v^wlX|HX#G|ynse`ew)%R8NUl(Ihi>bAZmK!@s
+z&^SW5o@GMa{PtMO{IMt0iuv*r20}MB#Kw6s4;9)xRA}>1q0K|NFb|<Qqe&AU4l$u;
+zjQMMu5nmN@)R{5A=AwBB^_seSP(PFU(l+3w39mu|wToG4AoMZT(C(6X2sINC^;45s
+zU@Rkm=$!C)(*&MLP;?nUU}A4-F4Gmj37}lfp@E>0IC}+TIK_mz%>v*D0*|-QJyQrS
+zHbEp-Bv&fcy)A%TKuE_R8aNsurkR28U<07g5U>;)0+vEUz)}msCXy8rmc?_}IS5#4
+zLlDshLK04b*{Ihm$6c-n^`dUnj}z?+{rDSzH3Z}Y%vlh1NeFnj$_B<N75b0~^_&Gj
+zby(WNmB5?9HQ@siu6OX@L-I`_{Qnlu0^s8-8O)o$0iMfOEw8YC7ytkO07*qoM6N<$
+Eg06=7zW@LL
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-middle.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-middle.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..63b62015417910d7744fcf61fea4f272d19a1350
+GIT binary patch
+literal 656
+zc$@){0&o3^P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj00074Nkl<Zc-r0A
+z-A__+9LMo)TWz-Hbr+aULIwjt5zs{_8Ho}Yfq+4B@EkeF0S^y5NNUtkAz=xtY&o1f
+z%=O@wZFSSS>p$o(=)Qk}9ya&ui9El{FBh*r;Pd{Sr=3&HW>c_FUz+FJ4OW0N=Q?BU
+zM)3Hv9i5H*?osh>vA&whSJKc~XX(<9U4qBoFV|z?Ou-Xmc?WcQlRbXCP0;uUrFxX+
+z3Nr+oorX?3W?%YspOEnpn#(%_Y}N*yZgeX4=f)Gp*TNz0p(DU#t<Y(Wlgz(%wj9rw
+zYauF?xBH{_EYNALSQc9ybc^v-YJtmH??hJ3&}j_UL;t(Y|Gw<Y^&pkVP52fwCg@Zn
+z<K#&X`QJ~zv_D5C*3DizZG=vx8zY3g;?c=(*L@VrU-eR%%g`ycqjN$(@P3Y8FW0<e
+zk~g}^lpZ?8kkN+*3Jj2Ya^Mc7a|U;q8*&Cy8pvb=1`isDaSIf858d?g=7?t@HQ<_$
+zt09xBhG(z>97lLmdFhNSZ)#`Bq|!~W3dkh=`db(QP=r$D@Me_T7<5sr+!2h*AiE^j
+zO=AQ=5w`c=*cfi3-!s3|=L|3s$a-aiH!uRA2#>2r*2qdh;i2MUClTv~tVgPz!U%vO
+z>@?n5*p-6Z8;JJUZil-eyC_jjU<5!Bo;Kc_6Kh*i2f=pP{EP@PkyvTQ2!J9yJ9u~P
+zdjttVr@Q=QQUqCdABuqWOKk7Ohw-(o9SM`<MbL@mYBNp%6yeoJd;a-r9bc@fpc^(#
+qx=;XtPIq+X+6`8K&tIDt+RZmlw9;NbgJEL;0000<MNUMnLSTY$Kr?dy
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-start-pressed.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-start-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..bfff8e95d8f1619e72e0c664380dfcdc547aeae2
+GIT binary patch
+literal 874
+zc$@)h1C{)VP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj00009a7bBm000XU
+z000XU0RWnu7ytkR97#k$R9M5^*w1boRTKvB@6Ozru|4Cloy(LziUMilBvzURseoX?
+zW3b>kcnn?wvGIZ}3)lb>B2`sYAc0y@pj4;`XzaR89Lx61IUkEA6=_4AEN9MoHs?3z
+zo^$RsByrZbb{|WqNW8a<hX7#C1CVsGkIJ5S5JZCuudUqv<n!HM?=R!=nE{;3`Wrj%
+z{N;ziyp)+MpsM!qXy8Bi=kH-yYwUjZ%}+nrvnIcF_5Hiev~>{G>!k!BX^NuoYEeD5
+zL6H4+=S~m6VgTo|e(%k9@1>okQPOHpLR%}!TK>7_9tn-72Q_NZ006rv`StC$|7fJ0
+zQPfB##`BAu%F;Ff;|qLGj2{X>^FjdUvVQmSTlbQ-8>X%Hp$)?v06{5r6SVZykP6`c
+z0i4VFYg<?EHakm$ByAtsAj%DWf+&3mRfSZ*I~~BetbeJu^GmbihDq8U+bGP9A%VOS
+z^Pf<Gs+?K@&Sm|Jn^%5rc3v7Zl5}jnFgGNHL}fxDB$dwsIG6QTH@0ubEw>jZ>DY!x
+ze_kt;{1X9Dih}T-0yvlTU+?yA#jVbRI7ts|5amWmLDiB6L~?<s0Q3RCI+yidSy}x(
+ztT!Jv;^w{$qL~^J6-@qUAyR#I3Ro{-;QJ(e@vV`g4=Nd=EJzXH=m-pldmlQN^)J=8
+z$F*sFI=5coSu3n40!0KOC#S$M!rIo(_f0^edi=<bYL%=6fr!#PzX%;8bbD8BvM4kn
+zA6XmDs)oP<LW;mUWfeX~Sl!&d5ksU=OT`A^EZ6EFD5)%{py!>s2_7R{+_-!lgoH>X
+zih_Aw7^y@BP(;mwyTH>*Sl`-xa&bsTo*xJSDgP0mkQBZM;J*lOto6Q&Ne$}B$g_c#
+z9YKv!Rf$CaClI=uUpGB(ZcSW-QLVH9BH|sA#u(Uz?*Y#ttoObo3sdCtX?X!=eleZ2
+z=JUhUH{SS604I7vck^2tOiBqr(x|E(AM7^=d!tUAE?oo8`7GXOXCIfn2?oBMTzGZ)
+z$4|ew@zuGW#R1^f2rK2^1Hk<pvp-+P@B={p1u)jSHzh#!fdBvi07*qoM6N<$f{&Jw
+AZU6uP
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-start-selected-pressed.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-start-selected-pressed.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..2ce094819032e6cde812e8d2185170637e8e95b1
+GIT binary patch
+literal 532
+zc$@(g0_**WP)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0005oNkl<Zc-rNd
+zyGjE=6ov(HHkzG;WM_g~Sb0H&)V_jI)F_$|)F_CGqM$L}@se0X5Cj_$v9MC`L9BcS
+z5lcILfbsmq5K_&ioJsLBfn|sJzRcz9v?-+m=j}_yZAp!(DFMtC&!#6F^DEuG$rL2K
+zD%BnsJ{}h@Aug||lQQMPz?3k4$CbB?%O~OY%|Sw7c<SKX;i5ntY&x#DZeTW?h}a>H
+zGvc@jMHBZB5EvdEu!uL$T$!QF7?@d%AAcaVmsk!E5CpzNFKw}~$dS2mCn8gn5d)KA
+z+)L9kSY%ut)&%I_%QS7aVUAv&q)tXn6@Y-DBjPPkyI&JvKfGRm{qTAL_QUH103N%e
+z2Hrve^&+Q&b6x{)p8&uU_%-A5m?SJSH!)4KU`zvVmjINAB%xS6BfY7X5>Vg#<cZ^o
+zHEOdYV?wh8?A!$LAjHLrMuOePAc5~`B-krJFTs8RdI|Om&`YpQfKEcOS|7-a4WGj#
+zAW!W<qX4~x-G2#L)Cn+YVA2?Wbw-QR1_41OpiUqWOPEFmCJ%UAi=piAj3(}a3TP;n
+zup}r21GCGxJi-Sb{eBcZ{W%C|xoh#RnEx=49A0huS{(WORYRud<3|m?e=8sGVEO}|
+W+XxW>dKF{<0000<MNUMnLSTaXV&eJ$
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-start-selected.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-start-selected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..e7c848ac3cbcaf9ecfb197fbfc08aa1aef125a77
+GIT binary patch
+literal 561
+zc$@(-0?z%3P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj0005_Nkl<Zc-rNd
+z-Add*6vqY0d~9YCH!~A=)fLfITkX;dt6NY65mCV}EJgf8Y7w>Il~=xi4^R;411R_)
+zUiBS{^wK+hfN{=3VDBb-Ihl(;frNzoemRqzoGz_(?mYe1Nl}t9btC{WdGC6{a`mP%
+z(pUuvk6L%<hEEdtfSLM5xco`DI(9HWFcas9t82{VovhaPK|*f$AQDH2i%lG*%On(w
+zt_6q5k^$c^9EWCmMdI`h1muQ?iv+QpLah7=G4av8BolD|tp~`}2`mQ?V1;j$PNY_X
+zF#Sw=Dnpbe1ErGeb1jsLe#21@qU0-LY9|w5gFnGst{HP*;A8_|gA2JR0D|Lm1XvJD
+zzhweEfVT+n0Nx_N2Y9;xJA8o!WKE7dgYTpTzHkDv4(}3$a+mUS)<_tqv^<!>dm=zw
+zn4Q}}B$_x<qh1NfmH<=$VR8Y5y$urg4qKK$F<*jkfG{<0kx)bdb_pH`uuJejfL($I
+z0_+lsCcq|Pn{qXWSTb3R-(fL>nEKu>z%GG{EohRU5-^uzVA8b!Jlub)q9bw8E+DrA
+z=o4U|0A=J{A~6l{n9FsTZPGZs%`2e2S=xgo0sjoH1s)(wf(VzVM!;`b8{Gu~-i^ge
+z<?5fYM)S1eu{h-UO;5O<f3Nz(-xpm4cwl-5{k1alIr`R300000NkvXXu0mjf?)L8~
+
+diff --git a/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-start.png b/browser/themes/winstripe/browser/devtools/breadcrumbs/rtl-start.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..b8f67974c6bafa0be521296063a7c8904405b95f
+GIT binary patch
+literal 815
+zc$@(*1JL}5P)<h;3K|Lk000e1NJLTq002M$000^Y1^@s62Ygyj00009a7bBm000XU
+z000XU0RWnu7ytkQ;Ymb6R9M5^*xygnP!tF7b8cH9K(!Eykr4h0U;IOS@bB<R@WBU|
+zCPe2JNQf99KvETriDD!e4T(R9VxmzaMt(@Uv94odz*yIIz4!XC48t5a9^3QUzI;FT
+z-g8eba?YXAT1-L*grqKZ!!`f_o&=z+UA+?Y;F8po?d<AVo|t{Vn(T(%h5=+n)via!
+zt-@Ym*Ymw{K=TtbrIWWWXPuI5f1FwP{-q%RSy8pCk@zRevNCST@q)Vgj373jl9~ae
+zuJNJB?)+C%6B`NNI}l$oQ<mj=MK8$P9~pq__{EmirVM9(I{<*#K===)nX(+u@gO9{
+zkW&DT#{yKs#}-qjX}NZI!V^LeC}RL{G=QwAT3;mgE|E0Tj$867zlNhYW5@`n0Hi)Z
+zCH$Q?$yCa8OSTuH?3F%1I3nY;?hcR@RqKt!7ZS#1s^k<r2xD=A$T{V;0J5TLeFM=~
+zhGCdRd*6kSmH>c=oB{`O03a)>*4rPSPw2W?ES6lTd<$h!fgok%?=2uJs&*|Bd!Z-v
+zRAGNFv@3tm12{nr%s<ov1VLniC^C=;r7q*47T{2Af|Vms*x9-)E2`EX9euv`dnK{6
+zop&gup+!Inh=d%z1*!;<*vQj$SU2+7?a(3+<j4X2f3CqQ!p+#|lXdpXNawSmL|_Og
+ziok%>8HK9|H-^R@@t@0jHn-*YAwv+5Bc%cbPDtHJu!=A^JpPccuIjmrS@Qi5ArOKn
+z95D&jBHSLC&{hBpYcpXN%YG;jB+d~@ok{R0gj*xi(}ZwiBWc>cAAAHC1td&3eh1Vd
+zMDI>b0f3(0+IE7DAc`VLq6Gha52!^LzV~2KZ(B3+nOrH*b3pScA#0@-0m*(t0EZC9
+zW*)bkIh!sQ>_CpplpvbP4SDX_{R^$9J3d!N;}blKw<zjh;G3Wz+MVaSzfI09y*|;i
+tH~_$pJoE&95aPi1%HVFEgWM$m`Ul+Euk$s}W!wM&002ovPDHLkV1h}7ZH@o{
+
+diff --git a/browser/themes/winstripe/browser/jar.mn b/browser/themes/winstripe/browser/jar.mn
+--- a/browser/themes/winstripe/browser/jar.mn
++++ b/browser/themes/winstripe/browser/jar.mn
+@@ -108,6 +108,31 @@
+         skin/classic/browser/tabview/tabview.css                    (tabview/tabview.css)
+         skin/classic/browser/devtools/arrows.png                    (devtools/arrows.png)
+         skin/classic/browser/devtools/csshtmltree.css               (devtools/csshtmltree.css)
++        skin/classic/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
++        skin/classic/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
++        skin/classic/browser/devtools/breadcrumbs/ltr-end-selected.png             (devtools/breadcrumbs/ltr-end-selected.png)
++        skin/classic/browser/devtools/breadcrumbs/ltr-end.png                      (devtools/breadcrumbs/ltr-end.png)
++        skin/classic/browser/devtools/breadcrumbs/ltr-middle-pressed.png           (devtools/breadcrumbs/ltr-middle-pressed.png)
++        skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png  (devtools/breadcrumbs/ltr-middle-selected-pressed.png)
++        skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected.png          (devtools/breadcrumbs/ltr-middle-selected.png)
++        skin/classic/browser/devtools/breadcrumbs/ltr-middle.png                   (devtools/breadcrumbs/ltr-middle.png)
++        skin/classic/browser/devtools/breadcrumbs/ltr-start-pressed.png            (devtools/breadcrumbs/ltr-start-pressed.png)
++        skin/classic/browser/devtools/breadcrumbs/ltr-start-selected-pressed.png   (devtools/breadcrumbs/ltr-start-selected-pressed.png)
++        skin/classic/browser/devtools/breadcrumbs/ltr-start.png                    (devtools/breadcrumbs/ltr-start.png)
++        skin/classic/browser/devtools/breadcrumbs/ltr-start-selected.png           (devtools/breadcrumbs/ltr-start-selected.png)
++        skin/classic/browser/devtools/breadcrumbs/rtl-end-pressed.png              (devtools/breadcrumbs/rtl-end-pressed.png)
++        skin/classic/browser/devtools/breadcrumbs/rtl-end-selected-pressed.png     (devtools/breadcrumbs/rtl-end-selected-pressed.png)
++        skin/classic/browser/devtools/breadcrumbs/rtl-end-selected.png             (devtools/breadcrumbs/rtl-end-selected.png)
++        skin/classic/browser/devtools/breadcrumbs/rtl-end.png                      (devtools/breadcrumbs/rtl-end.png)
++        skin/classic/browser/devtools/breadcrumbs/rtl-middle-pressed.png           (devtools/breadcrumbs/rtl-middle-pressed.png)
++        skin/classic/browser/devtools/breadcrumbs/rtl-middle-selected-pressed.png  (devtools/breadcrumbs/rtl-middle-selected-pressed.png)
++        skin/classic/browser/devtools/breadcrumbs/rtl-middle-selected.png          (devtools/breadcrumbs/rtl-middle-selected.png)
++        skin/classic/browser/devtools/breadcrumbs/rtl-middle.png                   (devtools/breadcrumbs/rtl-middle.png)
++        skin/classic/browser/devtools/breadcrumbs/rtl-start-pressed.png            (devtools/breadcrumbs/rtl-start-pressed.png)
++        skin/classic/browser/devtools/breadcrumbs/rtl-start-selected-pressed.png   (devtools/breadcrumbs/rtl-start-selected-pressed.png)
++        skin/classic/browser/devtools/breadcrumbs/rtl-start.png                    (devtools/breadcrumbs/rtl-start.png)
++        skin/classic/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
++
+ #ifdef MOZ_SERVICES_SYNC
+         skin/classic/browser/sync-throbber.png
+         skin/classic/browser/sync-16.png
+@@ -228,6 +253,31 @@
+         skin/classic/aero/browser/tabview/tabview.png                (tabview/tabview.png)
+         skin/classic/aero/browser/tabview/tabview-inverted.png       (tabview/tabview-inverted.png)
+         skin/classic/aero/browser/tabview/tabview.css                (tabview/tabview.css)
++        skin/classic/aero/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/ltr-end-selected.png             (devtools/breadcrumbs/ltr-end-selected.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/ltr-end.png                      (devtools/breadcrumbs/ltr-end.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/ltr-middle-pressed.png           (devtools/breadcrumbs/ltr-middle-pressed.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png  (devtools/breadcrumbs/ltr-middle-selected-pressed.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/ltr-middle-selected.png          (devtools/breadcrumbs/ltr-middle-selected.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/ltr-middle.png                   (devtools/breadcrumbs/ltr-middle.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/ltr-start-pressed.png            (devtools/breadcrumbs/ltr-start-pressed.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/ltr-start-selected-pressed.png   (devtools/breadcrumbs/ltr-start-selected-pressed.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/ltr-start.png                    (devtools/breadcrumbs/ltr-start.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/ltr-start-selected.png           (devtools/breadcrumbs/ltr-start-selected.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/rtl-end-pressed.png              (devtools/breadcrumbs/rtl-end-pressed.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/rtl-end-selected-pressed.png     (devtools/breadcrumbs/rtl-end-selected-pressed.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/rtl-end-selected.png             (devtools/breadcrumbs/rtl-end-selected.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/rtl-end.png                      (devtools/breadcrumbs/rtl-end.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/rtl-middle-pressed.png           (devtools/breadcrumbs/rtl-middle-pressed.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/rtl-middle-selected-pressed.png  (devtools/breadcrumbs/rtl-middle-selected-pressed.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/rtl-middle-selected.png          (devtools/breadcrumbs/rtl-middle-selected.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/rtl-middle.png                   (devtools/breadcrumbs/rtl-middle.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/rtl-start-pressed.png            (devtools/breadcrumbs/rtl-start-pressed.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/rtl-start-selected-pressed.png   (devtools/breadcrumbs/rtl-start-selected-pressed.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/rtl-start.png                    (devtools/breadcrumbs/rtl-start.png)
++        skin/classic/aero/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
++
+ #ifdef MOZ_SERVICES_SYNC
+         skin/classic/aero/browser/sync-throbber.png
+         skin/classic/aero/browser/sync-16.png

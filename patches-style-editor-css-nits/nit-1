@@ -1,0 +1,124 @@
+# HG changeset patch
+# Parent 7b66794634ecc7f2c7e5cc46eba0b9ee82f588c0
+Bug 712930 - Improve the look of the Style Editor -  Item 1
+
+diff --git a/browser/themes/gnomestripe/devtools/splitview.css b/browser/themes/gnomestripe/devtools/splitview.css
+--- a/browser/themes/gnomestripe/devtools/splitview.css
++++ b/browser/themes/gnomestripe/devtools/splitview.css
+@@ -97,34 +97,34 @@
+                     -moz-linear-gradient(hsl(206,61%,40%), hsl(206,61%,31%));
+   background-repeat: no-repeat, no-repeat, repeat-x;
+   background-position: center left, top left, top right;
+ }
+ 
+ /* Toolbars */
+ 
+ .devtools-toolbar {
+-  height: 26px;
++  height: 30px;
+   background-origin: border-box;
+   background-clip: border-box;
+   border-top: 1px solid hsla(210,8%,5%,.5);
+   border-bottom: 1px solid hsla(210,8%,5%,.65);
+   padding: 3px;
+ }
+ 
+ .splitview-main > toolbar:-moz-locale-dir(ltr) {
+   border-right: 1px solid hsla(210,8%,5%,.5);
+ }
+ 
+ .splitview-main > toolbar:-moz-locale-dir(rtl) {
+   border-left: 1px solid hsla(210,8%,5%,.5);
+ }
+ 
+ .devtools-toolbarbutton {
+-  font-size: 11px;
++  font-size: 12px;
+   padding: 0 8px;
+   width: auto;
+   min-width: 48px;
+   min-height: 0;
+ }
+ 
+ 
+ /* Resizers */
+diff --git a/browser/themes/pinstripe/devtools/splitview.css b/browser/themes/pinstripe/devtools/splitview.css
+--- a/browser/themes/pinstripe/devtools/splitview.css
++++ b/browser/themes/pinstripe/devtools/splitview.css
+@@ -97,34 +97,34 @@
+                     -moz-linear-gradient(hsl(206,61%,40%), hsl(206,61%,31%));
+   background-repeat: no-repeat, no-repeat, repeat-x;
+   background-position: center left, top left, top right;
+ }
+ 
+ /* Toolbars */
+ 
+ .devtools-toolbar {
+-  height: 26px;
++  height: 30px;
+   background-origin: border-box;
+   background-clip: border-box;
+   border-top: 1px solid hsla(210,8%,5%,.5);
+   border-bottom: 1px solid hsla(210,8%,5%,.65);
+   padding: 3px;
+ }
+ 
+ .splitview-main > toolbar:-moz-locale-dir(ltr) {
+   border-right: 1px solid hsla(210,8%,5%,.5);
+ }
+ 
+ .splitview-main > toolbar:-moz-locale-dir(rtl) {
+   border-left: 1px solid hsla(210,8%,5%,.5);
+ }
+ 
+ .devtools-toolbarbutton {
+-  font-size: 11px;
++  font-size: 12px;
+   padding: 0 8px;
+   width: auto;
+   min-width: 48px;
+   min-height: 0;
+ }
+ 
+ 
+ /* Resizers */
+diff --git a/browser/themes/winstripe/devtools/splitview.css b/browser/themes/winstripe/devtools/splitview.css
+--- a/browser/themes/winstripe/devtools/splitview.css
++++ b/browser/themes/winstripe/devtools/splitview.css
+@@ -97,34 +97,34 @@
+                     -moz-linear-gradient(hsl(200,100%,33%), hsl(200,100%,25%));
+   background-repeat: no-repeat, no-repeat, repeat-x;
+   background-position: center left, top left, top right;
+ }
+ 
+ /* Toolbars */
+ 
+ .devtools-toolbar {
+-  height: 26px;
++  height: 30px;
+   background-origin: border-box;
+   background-clip: border-box;
+   border-top: 1px solid hsla(210,8%,5%,.5);
+   border-bottom: 1px solid hsla(210,8%,5%,.65);
+   padding: 3px;
+ }
+ 
+ .splitview-main > toolbar:-moz-locale-dir(ltr) {
+   border-right: 1px solid hsla(210,8%,5%,.5);
+ }
+ 
+ .splitview-main > toolbar:-moz-locale-dir(rtl) {
+   border-left: 1px solid hsla(210,8%,5%,.5);
+ }
+ 
+ .devtools-toolbarbutton {
+-  font-size: 11px;
++  font-size: 12px;
+   padding: 0 8px;
+   width: auto;
+   min-width: 48px;
+   min-height: 0;
+ }
+ 
+ 
+ /* Resizers */

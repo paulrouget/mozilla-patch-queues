@@ -1,0 +1,2501 @@
+Bug 683954 - [Layout] Implement an abstract view of the layout of the selected node
+
+diff --git a/browser/devtools/Makefile.in b/browser/devtools/Makefile.in
+--- a/browser/devtools/Makefile.in
++++ b/browser/devtools/Makefile.in
+@@ -49,12 +49,13 @@ include $(topsrcdir)/config/config.mk
+ DIRS = \
+   highlighter \
+   webconsole \
+   sourceeditor \
+   styleeditor \
+   styleinspector \
+   tilt \
+   scratchpad \
++  layoutview \
+   shared \
+   $(NULL)
+ 
+ include $(topsrcdir)/config/rules.mk
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -48,16 +48,17 @@ const Cr = Components.results;
+ 
+ var EXPORTED_SYMBOLS = ["InspectorUI"];
+ 
+ Cu.import("resource://gre/modules/Services.jsm");
+ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+ Cu.import("resource:///modules/TreePanel.jsm");
+ Cu.import("resource:///modules/devtools/CssRuleView.jsm");
+ Cu.import("resource:///modules/highlighter.jsm");
++Cu.import("resource:///modules/devtools/LayoutView.jsm");
+ Cu.import("resource:///modules/devtools/LayoutHelpers.jsm");
+ 
+ // Inspector notifications dispatched through the nsIObserverService.
+ const INSPECTOR_NOTIFICATIONS = {
+   // Fires once the Inspector completes the initialization and opens up on
+   // screen.
+   OPENED: "inspector-opened",
+ 
+@@ -273,16 +274,19 @@ InspectorUI.prototype = {
+     }
+ 
+     this.toolbar.hidden = false;
+     this.inspectMenuitem.setAttribute("checked", true);
+ 
+     // initialize the HTML Breadcrumbs
+     this.breadcrumbs = new HTMLBreadcrumbs(this);
+ 
++    // initialize the LayoutView
++    this.layoutview = new LayoutView(this);
++
+     this.isDirty = false;
+ 
+     this.progressListener = new InspectorProgressListener(this);
+ 
+     this.chromeWin.addEventListener("keypress", this, false);
+ 
+     // initialize the highlighter
+     this.highlighter = new Highlighter(this.chromeWin);
+@@ -412,16 +416,18 @@ InspectorUI.prototype = {
+       this.highlighter = null;
+     }
+ 
+     if (this.breadcrumbs) {
+       this.breadcrumbs.destroy();
+       this.breadcrumbs = null;
+     }
+ 
++    this.layoutview.destroy();
++
+     this.inspectMenuitem.setAttribute("checked", false);
+     this.browser = this.win = null; // null out references to browser and window
+     this.winID = null;
+     this.selection = null;
+     this.closing = false;
+     this.isDirty = false;
+ 
+     delete this.treePanel;
+@@ -1936,9 +1942,8 @@ XPCOMUtils.defineLazyGetter(InspectorUI.
+             "chrome://browser/locale/devtools/inspector.properties");
+   });
+ 
+ XPCOMUtils.defineLazyGetter(this, "StyleInspector", function () {
+   var obj = {};
+   Cu.import("resource:///modules/devtools/StyleInspector.jsm", obj);
+   return obj.StyleInspector;
+ });
+-
+diff --git a/browser/devtools/jar.mn b/browser/devtools/jar.mn
+--- a/browser/devtools/jar.mn
++++ b/browser/devtools/jar.mn
+@@ -7,10 +7,12 @@ browser.jar:
+     content/browser/splitview.css                 (styleeditor/splitview.css)
+     content/browser/styleeditor.css               (styleeditor/styleeditor.css)
+     content/browser/devtools/csshtmltree.xul      (styleinspector/csshtmltree.xul)
+     content/browser/devtools/cssruleview.xul      (styleinspector/cssruleview.xul)
+     content/browser/devtools/styleinspector.css   (styleinspector/styleinspector.css)
+     content/browser/orion.js                      (sourceeditor/orion/orion.js)
+     content/browser/orion.css                     (sourceeditor/orion/orion.css)
+     content/browser/orion-mozilla.css             (sourceeditor/orion/mozilla.css)
++*   content/browser/layoutview.xhtml              (layoutview/layoutview.xhtml)
++    content/browser/layoutview.css                (layoutview/layoutview.css)
+     content/browser/source-editor-overlay.xul     (sourceeditor/source-editor-overlay.xul)
+ 
+diff --git a/browser/devtools/layoutview/LayoutView.jsm b/browser/devtools/layoutview/LayoutView.jsm
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/layoutview/LayoutView.jsm
+@@ -0,0 +1,78 @@
++const Cu = Components.utils;
++const Ci = Components.interfaces;
++
++Cu.import("resource://gre/modules/Services.jsm");
++Cu.import("resource://gre/modules/XPCOMUtils.jsm");
++
++var EXPORTED_SYMBOLS = ["LayoutView"];
++
++/*
++ * The Layout View builds an abstract representation
++ * of a node that includes its dimensions and its orientation.
++ */
++
++function LayoutView(aInspector)
++{
++  this.IUI = aInspector;
++  this.highlighter = this.IUI.highlighter;
++  this._init();
++}
++
++LayoutView.prototype = {
++  _init: function LayoutView_init() {
++    this.buildUI();
++  },
++
++  buildUI: function LayoutView_buildUI() {
++    this.sidebar = this.IUI.chromeDoc.getElementById("devtools-sidebar-box");
++
++    this.toggleView = this.toggleView.bind(this);
++    this.onViewReady = this.onViewReady.bind(this);
++
++    this.open = false;
++
++    this.container = this.IUI.chromeDoc.createElement("vbox");
++    this.container.id = "layoutview-container";
++
++    this.button = this.IUI.chromeDoc.createElement("button");
++    this.button.id = "layoutview-toggle-button";
++    this.button.onclick = this.toggleView;
++
++    this.container.appendChild(this.button);
++    this.sidebar.appendChild(this.container);
++  },
++
++  destroy: function LayoutView_destroy() {
++    if (this.open)
++      this.closeView();
++    this.container.parentNode.removeChild(this.container);
++  },
++
++  toggleView: function LayoutView_toggleView() {
++    this.open ? this.closeView() : this.openView();
++  },
++
++  openView: function LayoutView_openView() {
++    this.open = true;
++    this.button.setAttribute("checked", true);
++
++    let iframe = this.IUI.chromeDoc.createElement("iframe");
++    iframe.id = "layoutview-iframe"
++    iframe.setAttribute("src", "chrome://browser/content/layoutview.xhtml");
++    iframe.setAttribute("flex", "1");
++    iframe.onload = this.onViewReady;
++
++    this.iframe = iframe;
++
++    this.container.insertBefore(iframe, this.button);
++  },
++
++  closeView: function LayoutView_closeView() {
++    this.open = false;
++    this.button.removeAttribute("checked", true);
++    this.iframe.parentNode.removeChild(this.iframe);
++  },
++
++  onViewReady: function LayoutView_onViewReady() {
++  }
++}
+diff --git a/browser/devtools/layoutview/Makefile.in b/browser/devtools/layoutview/Makefile.in
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/layoutview/Makefile.in
+@@ -0,0 +1,54 @@
++#
++# ***** BEGIN LICENSE BLOCK *****
++# Version: MPL 1.1/GPL 2.0/LGPL 2.1
++#
++# The contents of this file are subject to the Mozilla Public License Version
++# 1.1 (the "License"); you may not use this file except in compliance with
++# the License. You may obtain a copy of the License at
++# http://www.mozilla.org/MPL/
++#
++# Software distributed under the License is distributed on an "AS IS" basis,
++# WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++# for the specific language governing rights and limitations under the
++# License.
++#
++# The Original Code is Mozilla Layout View
++#
++# The Initial Developer of the Original Code is Mozilla Corporation.
++# 
++# Portions created by the Initial Developer are Copyright (C) 2010
++# the Initial Developer. All Rights Reserved.
++#
++# Contributor(s):
++#     Paul Rouget <paul@mozilla.com>  (Original author)
++#
++# Alternatively, the contents of this file may be used under the terms of
++# either the GNU General Public License Version 2 or later (the "GPL"), or
++# the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++# in which case the provisions of the GPL or the LGPL are applicable instead
++# of those above. If you wish to allow use of your version of this file only
++# under the terms of either the GPL or the LGPL, and not to allow others to
++# use your version of this file under the terms of the MPL, indicate your
++# decision by deleting the provisions above and replace them with the notice
++# and other provisions required by the GPL or the LGPL. If you do not delete
++# the provisions above, a recipient may use your version of this file under
++# the terms of any one of the MPL, the GPL or the LGPL.
++#
++# ***** END LICENSE BLOCK *****
++
++DEPTH		= ../../..
++topsrcdir	= @top_srcdir@
++srcdir		= @srcdir@
++VPATH		= @srcdir@
++
++include $(DEPTH)/config/autoconf.mk
++
++ifdef ENABLE_TESTS
++	DIRS += test
++endif
++
++include $(topsrcdir)/config/rules.mk
++
++libs::
++	$(NSINSTALL) $(srcdir)/*.jsm $(FINAL_TARGET)/modules/devtools
++
+diff --git a/browser/devtools/layoutview/layoutview.css b/browser/devtools/layoutview/layoutview.css
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/layoutview/layoutview.css
+@@ -0,0 +1,42 @@
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * The Original Code is Layout Abstract View
++ *
++ * The Initial Developer of the Original Code is
++ * Mozilla Foundation
++ * Portions created by the Initial Developer are Copyright (C) 1998-1999
++ * the Initial Developer. All Rights Reserved.
++ *
++ * Contributor(s):
++ *   Paul Rouget (paul@mozilla.com)
++ *   Pavel Ivanov (me@pivanov.com)
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++
++body {
++  width: 300px;
++  height: 300px;
++}
+diff --git a/browser/devtools/layoutview/layoutview.js b/browser/devtools/layoutview/layoutview.js
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/layoutview/layoutview.js
+@@ -0,0 +1,109 @@
++/* If no node selected, hide the layout overview */
++window.hideView = function LayoutViewDocument_hideView() {
++  document.body.setAttribute("nonode", "true");
++}
++
++/* Update the different layout values */
++window.setLayoutValues =
++function LayoutViewDocument_setLayoutValues(aLayout) {
++  var layout = [
++    {selector: "#inner-width",        value: aLayout.content.width},
++    {selector: "#inner-height",       value: aLayout.content.height},
++    {selector: "#boundingbox-width",  value: aLayout.boundingbox.width},
++    {selector: "#boundingbox-height", value: aLayout.boundingbox.height},
++    {selector: "#boundingbox-left",   value: aLayout.boundingbox.left},
++    {selector: "#boundingbox-top",    value: aLayout.boundingbox.top},
++    {selector: ".margin.top",         value: aLayout.margin.top},
++    {selector: ".margin.left",        value: aLayout.margin.left},
++    {selector: ".margin.bottom",      value: aLayout.margin.bottom},
++    {selector: ".margin.right",       value: aLayout.margin.right},
++    {selector: ".padding.top",        value: aLayout.padding.top},
++    {selector: ".padding.left",       value: aLayout.padding.left},
++    {selector: ".padding.bottom",     value: aLayout.padding.bottom},
++    {selector: ".padding.right",      value: aLayout.padding.right},
++    {selector: ".border.top",         value: aLayout.border.top},
++    {selector: ".border.left",        value: aLayout.border.left},
++    {selector: ".border.bottom",      value: aLayout.border.bottom},
++    {selector: ".border.right",       value: aLayout.border.right},
++  ];
++
++  var ratio = aLayout.boundingbox.width / aLayout.boundingbox.height;
++
++  for (var i = 0; i < layout.length; i++) {
++    var l = layout[i];
++    var elt = document.querySelector(l.selector);
++    elt.textContent = l.value;
++  }
++
++  // We consider that an element with a width/height ratio near to 1
++  // is a square. RATIO_THRESHOLD defines when we consider to ratio as being
++  // too small or too big to be a square:
++  //  * ratio < 1 - RATIO_THRESHOLD // Vertical
++  //  * ratio > 1 + RATIO_THRESHOLD // Horizontal
++  const RATIO_THRESHOLD = 0.2; //FIXME: ratio net equivalient if < or >
++
++  if (ratio < 1 - RATIO_THRESHOLD) {
++    document.body.className = "vertical";
++  } else if (ratio > 1 + RATIO_THRESHOLD) {
++    document.body.className = "horizontal";
++  } else {
++    document.body.className = "square";
++  }
++
++  document.body.removeAttribute("nonode");
++};
++
++
++  /**
++   * Compute the different layout values of a node.
++   * @param aNode Node to compute the layout values from.
++   * @returns object Object storing all the computed values.
++   */
++  _computeLayout: function LayoutView_computeLayout(aNode)
++  {
++    let win = aNode.ownerDocument.defaultView;
++    let style = win.getComputedStyle(aNode, null);
++    let rect = aNode.getBoundingClientRect();
++
++    let layout = {
++      margin:  {top: null, right: null, bottom: null, left: null},
++      border:  {top: null, right: null, bottom: null, left: null},
++      padding: {top: null, right: null, bottom: null, left: null},
++      // Bounding box of the node
++      boundingbox: {top: null, left: null, width: null, height: null},
++      // Node with node padding and borders
++      content: {width: null, height: null},
++    }
++
++    function getSize(l, property)
++    {
++      let valueleft = style.getPropertyValue(property.replace("%s", "left"));
++      let valuetop = style.getPropertyValue(property.replace("%s", "top"));
++      let valueright = style.getPropertyValue(property.replace("%s", "right"));
++      let valuebottom = style.getPropertyValue(property.replace("%s", "bottom"));
++      l.top = parseInt(valuetop);
++      l.right = parseInt(valueright);
++      l.bottom = parseInt(valuebottom);
++      l.left = parseInt(valueleft);
++    }
++
++    getSize(layout.margin, "margin-%s");
++    getSize(layout.border, "border-%s-width");
++    getSize(layout.padding, "padding-%s");
++
++    layout.boundingbox.width = Math.round(rect.width);
++    layout.boundingbox.height = Math.round(rect.height);
++    layout.boundingbox.top = Math.round(rect.top);
++    layout.boundingbox.left = Math.round(rect.left);
++
++    layout.content.width = Math.round(rect.width) -
++      (layout.border.left + layout.border.right +
++      layout.padding.left + layout.padding.right);
++
++    layout.content.height = Math.round(rect.height) -
++      (layout.border.top + layout.border.bottom +
++      layout.padding.top + layout.padding.bottom);
++
++    return layout; 
++  },
++
+diff --git a/browser/devtools/layoutview/layoutview.xhtml b/browser/devtools/layoutview/layoutview.xhtml
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/layoutview/layoutview.xhtml
+@@ -0,0 +1,108 @@
++<?xml version="1.0"?>
++<!DOCTYPE html [
++  <!ENTITY % layoutDTD SYSTEM "chrome://browser/locale/devtools/layoutview.dtd">
++  %layoutDTD;
++]>
++
++<!--#ifdef 0-->
++<!-- ***** BEGIN LICENSE BLOCK *****
++   - Version: MPL 1.1/GPL 2.0/LGPL 2.1
++   -
++   - The contents of this file are subject to the Mozilla Public License Version
++   - 1.1 (the "License"); you may not use this file except in compliance with
++   - the License. You may obtain a copy of the License at
++   - http://www.mozilla.org/MPL/
++   -
++   - Software distributed under the License is distributed on an "AS IS" basis,
++   - WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++   - for the specific language governing rights and limitations under the
++   - License.
++   -
++   - The Original Code is Mozilla Layout View
++   -
++   - The Initial Developer of the Original Code is
++   - The Mozilla Foundation.
++   - Portions created by the Initial Developer are Copyright (C) 2011
++   - the Initial Developer. All Rights Reserved.
++   -
++   - Contributor(s):
++   -   Paul Rouget <paul@mozilla.com> (original author)
++   -
++   - Alternatively, the contents of this file may be used under the terms of
++   - either the GNU General Public License Version 2 or later (the "GPL"), or
++   - the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++   - in which case the provisions of the GPL or the LGPL are applicable instead
++   - of those above. If you wish to allow use of your version of this file only
++   - under the terms of either the GPL or the LGPL, and not to allow others to
++   - use your version of this file under the terms of the MPL, indicate your
++   - decision by deleting the provisions above and replace them with the notice
++   - and other provisions required by the GPL or the LGPL. If you do not delete
++   - the provisions above, a recipient may use your version of this file under
++   - the terms of any one of the MPL, the GPL or the LGPL.
++   -
++   - ***** END LICENSE BLOCK ***** -->
++<!--#endif-->
++
++<html xmlns="http://www.w3.org/1999/xhtml">
++  <link rel="stylesheet" href="layoutview.css" type="text/css"/>
++  <link rel="stylesheet" href="chrome://browser/skin/devtools/layoutview.css" type="text/css"/>
++  <script src="layoutview.js"/>
++
++  <body class="square" nonode="true">
++
++    <div id="marginbox" class="layoutbox">
++      <div id="borderbox" class="layoutbox">
++        <div id="paddingbox" class="layoutbox">
++          <div id="contentbox" class="layoutbox">
++
++            <p id="dimension-label" class="label">&dimension;</p>
++            <p id="margin-label" class="label">&margins;</p>
++            <p id="border-label" class="label">&borders;</p>
++            <p id="padding-label" class="label">&padding;</p>
++            <p id="content-label" class="label">&content;</p>
++
++          </div>
++        </div>
++      </div>
++    </div>
++
++    <div id="textbox">
++      <p class="margin top"></p>
++      <p class="margin right"></p>
++      <p class="margin bottom"></p>
++      <p class="margin left"></p>
++
++      <p class="border top"></p>
++      <p class="border right"></p>
++      <p class="border bottom"></p>
++      <p class="border left"></p>
++
++      <p class="padding top"></p>
++      <p class="padding right"></p>
++      <p class="padding bottom"></p>
++      <p class="padding left"></p>
++
++      <p class="center">
++      <span id="inner-width"></span>
++      <span id="x">x</span>
++      <span id="inner-height"></span>
++      </p>
++
++      <p id="nonodemessage">&noNodeSelected;</p>
++
++      <p id="boundingbox-top"></p>
++      <p id="boundingbox-left"></p>
++      <p id="boundingbox-width"></p>
++      <p id="boundingbox-height"></p>
++
++    </div>
++
++    <div id="arrowbox">
++      <div class="horizontal left"/>
++      <div class="horizontal width"/>
++      <div class="vertical top"/>
++      <div class="vertical height"/>
++    </div>
++
++  </body>
++</html>
+diff --git a/browser/devtools/layoutview/test/Makefile.in b/browser/devtools/layoutview/test/Makefile.in
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/layoutview/test/Makefile.in
+@@ -0,0 +1,52 @@
++#
++# ***** BEGIN LICENSE BLOCK *****
++# Version: MPL 1.1/GPL 2.0/LGPL 2.1
++#
++# The contents of this file are subject to the Mozilla Public License Version
++# 1.1 (the "License"); you may not use this file except in compliance with
++# the License. You may obtain a copy of the License at
++# http://www.mozilla.org/MPL/
++#
++# Software distributed under the License is distributed on an "AS IS" basis,
++# WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++# for the specific language governing rights and limitations under the
++# License.
++#
++# The Original Code is Mozilla Layout View
++#
++# The Initial Developer of the Original Code is
++# Mozilla Corporation.
++# Portions created by the Initial Developer are Copyright (C) 2010
++# the Initial Developer. All Rights Reserved.
++#
++# Contributor(s):
++#     Paul Rouget <paul@mozilla.com>  (Original author)
++#
++# Alternatively, the contents of this file may be used under the terms of
++# either of the GNU General Public License Version 2 or later (the "GPL"),
++# or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++# in which case the provisions of the GPL or the LGPL are applicable instead
++# of those above. If you wish to allow use of your version of this file only
++# under the terms of either the GPL or the LGPL, and not to allow others to
++# use your version of this file under the terms of the MPL, indicate your
++# decision by deleting the provisions above and replace them with the notice
++# and other provisions required by the GPL or the LGPL. If you do not delete
++# the provisions above, a recipient may use your version of this file under
++# the terms of any one of the MPL, the GPL or the LGPL.
++#
++# ***** END LICENSE BLOCK *****
++
++DEPTH     = ../../../..
++topsrcdir = @top_srcdir@
++srcdir    = @srcdir@
++VPATH     = @srcdir@
++relativesrcdir = browser/devtools/layoutview/test
++
++include $(DEPTH)/config/autoconf.mk
++include $(topsrcdir)/config/rules.mk
++
++_BROWSER_TEST_FILES = \
++		browser_layoutview.js \
++
++libs:: $(_BROWSER_TEST_FILES)
++	$(INSTALL) $(foreach f,$^,"$f") $(DEPTH)/_tests/testing/mochitest/browser/$(relativesrcdir)
+diff --git a/browser/devtools/layoutview/test/browser_layoutview.js b/browser/devtools/layoutview/test/browser_layoutview.js
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/layoutview/test/browser_layoutview.js
+@@ -0,0 +1,103 @@
++/* Any copyright is dedicated to the Public Domain.
++   http://creativecommons.org/publicdomain/zero/1.0/ */
++
++function test() {
++  waitForExplicitFinish();
++
++  let doc;
++  let node;
++
++  // Expected values:
++  let res = [
++        {selector: "#inner-width",        value: 100},
++        {selector: "#inner-height",       value: 100},
++        {selector: "#boundingbox-width",  value: 160},
++        {selector: "#boundingbox-height", value: 160},
++        {selector: "#boundingbox-left",   value: 72},
++        {selector: "#boundingbox-top",    value: 72},
++        {selector: ".margin.top",         value: 30},
++        {selector: ".margin.left",        value: 30},
++        {selector: ".margin.bottom",      value: 30},
++        {selector: ".margin.right",       value: 30},
++        {selector: ".padding.top",        value: 20},
++        {selector: ".padding.left",       value: 20},
++        {selector: ".padding.bottom",     value: 20},
++        {selector: ".padding.right",      value: 20},
++        {selector: ".border.top",         value: 10},
++        {selector: ".border.left",        value: 10},
++        {selector: ".border.bottom",      value: 10},
++        {selector: ".border.right",       value: 10},
++  ];
++
++  gBrowser.selectedTab = gBrowser.addTab();
++  gBrowser.selectedBrowser.addEventListener("load", function onload() {
++    gBrowser.selectedBrowser.removeEventListener("load", onload, true);
++    doc = content.document;
++    waitForFocus(setupTest, content);
++  }, true);
++
++  let style = "div { position: absolute; top: 42px; left: 42px; height: 100px; width: 100px; border: 10px solid black; padding: 20px; margin: 30px; }";
++  let html = "<style>" + style + "</style><div></div>"
++  content.location = "data:text/html," + encodeURIComponent(html);
++
++  function setupTest() {
++    node = doc.querySelector("div");
++    ok(node, "node found");
++
++    Services.obs.addObserver(openLayoutView,
++      InspectorUI.INSPECTOR_NOTIFICATIONS.OPENED, false);
++    InspectorUI.toggleInspectorUI();
++  }
++
++  function openLayoutView() {
++    Services.obs.removeObserver(openLayoutView,
++      InspectorUI.INSPECTOR_NOTIFICATIONS.OPENED);
++
++    executeSoon(function() {
++      Services.obs.addObserver(nodeSelected,
++        InspectorUI.INSPECTOR_NOTIFICATIONS.HIGHLIGHTING, false);
++
++      InspectorUI.inspectNode(node);
++
++    });
++ }
++
++  function nodeSelected()
++  {
++    InspectorUI.stopInspecting(true);
++
++    Services.obs.removeObserver(nodeSelected,
++      InspectorUI.INSPECTOR_NOTIFICATIONS.HIGHLIGHTING);
++
++    Services.obs.addObserver(viewReady, "layout-view-ready", false);
++    InspectorUI.toolShow(InspectorUI.tools["layoutview"]);
++  }
++
++  function viewReady() {
++    info("Layout view ready");
++
++    Services.obs.removeObserver(viewReady, "layout-view-ready");
++
++    let panel = InspectorUI.tools["layoutview"].panel;
++    let toolDoc = panel.firstChild.contentDocument;
++
++    for (let i = 0; i < res.length; i++) {
++      let elt = toolDoc.querySelector(res[i].selector);
++      is(elt.textContent, res[i].value, res[i].selector + " has the right value.");
++    }
++
++    executeSoon(function() {
++      Services.obs.addObserver(finishUp,
++        InspectorUI.INSPECTOR_NOTIFICATIONS.CLOSED, false);
++      InspectorUI.closeInspectorUI();
++    });
++  }
++
++  function finishUp() {
++    Services.obs.removeObserver(finishUp, InspectorUI.INSPECTOR_NOTIFICATIONS.CLOSED);
++    doc = node = null;
++    gBrowser.removeCurrentTab();
++    finish();
++  }
++}
++
+diff --git a/browser/locales/en-US/chrome/browser/devtools/layoutview.dtd b/browser/locales/en-US/chrome/browser/devtools/layoutview.dtd
+new file mode 100644
+--- /dev/null
++++ b/browser/locales/en-US/chrome/browser/devtools/layoutview.dtd
+@@ -0,0 +1,15 @@
++<!-- LOCALIZATION NOTE : FILE This file contains the Layout window strings -->
++
++<!-- LOCALIZATION NOTE (noNodeSelected): This is the label that is show when
++  -  no node is select in the highlighter. -->
++<!ENTITY noNodeSelected     "No node selected">
++
++<!-- LOCALIZATION NOTE : FILE Dimension, margins, borders, padding and content
++  -  are labels displayed when the user hover the corresponding boxes. Margins,
++  -  borders and padding don't need to be translated since these terms are used
++  -  in the user's CSS file as well. -->
++<!ENTITY dimension          "dimension">
++<!ENTITY margins            "margins">
++<!ENTITY borders            "borders">
++<!ENTITY padding            "padding">
++<!ENTITY content            "content">
+diff --git a/browser/locales/en-US/chrome/browser/devtools/layoutview.properties b/browser/locales/en-US/chrome/browser/devtools/layoutview.properties
+new file mode 100644
+--- /dev/null
++++ b/browser/locales/en-US/chrome/browser/devtools/layoutview.properties
+@@ -0,0 +1,5 @@
++panel.title=Node Layout
++panel.accesskey=L
++button.title=Layout
++button.tooltip=See margins, padding and borders values
++
+diff --git a/browser/locales/jar.mn b/browser/locales/jar.mn
+--- a/browser/locales/jar.mn
++++ b/browser/locales/jar.mn
+@@ -21,16 +21,18 @@
+     locale/browser/devtools/inspector.properties      (%chrome/browser/devtools/inspector.properties)
+     locale/browser/devtools/tilt.properties           (%chrome/browser/devtools/tilt.properties)
+     locale/browser/devtools/scratchpad.properties     (%chrome/browser/devtools/scratchpad.properties)
+     locale/browser/devtools/scratchpad.dtd            (%chrome/browser/devtools/scratchpad.dtd)
+     locale/browser/devtools/styleeditor.properties    (%chrome/browser/devtools/styleeditor.properties)
+     locale/browser/devtools/styleeditor.dtd           (%chrome/browser/devtools/styleeditor.dtd)
+     locale/browser/devtools/styleinspector.properties (%chrome/browser/devtools/styleinspector.properties)
+     locale/browser/devtools/styleinspector.dtd        (%chrome/browser/devtools/styleinspector.dtd)
++    locale/browser/devtools/layoutview.properties     (%chrome/browser/devtools/layoutview.properties)
++    locale/browser/devtools/layoutview.dtd            (%chrome/browser/devtools/layoutview.dtd)
+     locale/browser/devtools/webConsole.dtd            (%chrome/browser/devtools/webConsole.dtd)
+     locale/browser/devtools/sourceeditor.properties   (%chrome/browser/devtools/sourceeditor.properties)
+     locale/browser/openLocation.dtd                (%chrome/browser/openLocation.dtd)
+     locale/browser/openLocation.properties         (%chrome/browser/openLocation.properties)
+ *   locale/browser/pageInfo.dtd                    (%chrome/browser/pageInfo.dtd)
+     locale/browser/pageInfo.properties             (%chrome/browser/pageInfo.properties)
+     locale/browser/quitDialog.properties           (%chrome/browser/quitDialog.properties)
+ *   locale/browser/safeMode.dtd                    (%chrome/browser/safeMode.dtd)
+diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
+--- a/browser/themes/gnomestripe/browser.css
++++ b/browser/themes/gnomestripe/browser.css
+@@ -2265,8 +2265,21 @@ panel[dimmed="true"] {
+ .inspector-breadcrumbs-button:last-of-type[checked]:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-selected.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button[siblings-menu-open]:last-of-type[checked]:-moz-locale-dir(rtl),
+ .inspector-breadcrumbs-button:last-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-selected-pressed.png") 1 13 2 13 fill stretch;
+ }
++
++/* Layout View - Sidebar elements */
++
++#layoutview-container {
++}
++
++#layoutview-iframe {
++  height: 300px;
++}
++
++#layoutview-toggle-button {
++  list-style-image: url("http://i.imgur.com/kHB32.png");
++}
+diff --git a/browser/themes/gnomestripe/devtools/layoutview.css b/browser/themes/gnomestripe/devtools/layoutview.css
+new file mode 100644
+--- /dev/null
++++ b/browser/themes/gnomestripe/devtools/layoutview.css
+@@ -0,0 +1,546 @@
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * The Original Code is Layout Abstract View
++ *
++ * The Initial Developer of the Original Code is
++ * Mozilla Foundation
++ * Portions created by the Initial Developer are Copyright (C) 1998-1999
++ * the Initial Developer. All Rights Reserved.
++ *
++ * Contributor(s):
++ *   Paul Rouget (paul@mozilla.com)
++ *   Pavel Ivanov (me@pivanov.com)
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++
++body {
++  margin: 0;
++
++  background-color: #269;
++  background-image:
++    -moz-linear-gradient(rgba(255,255,255,.3) 1px, transparent 1px),
++    -moz-linear-gradient(0, rgba(255,255,255,.2) 1px, transparent 1px),
++    -moz-linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px),
++    -moz-linear-gradient(0, rgba(255,255,255,.1) 1px, transparent 1px);
++  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
++  background-position: -1px -1px, -1px -1px, -1px -1px, -1px -1px;
++
++  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.6);
++
++  display: -moz-box;
++}
++
++#textbox,
++#arrowbox {
++  pointer-events: none;
++  position: absolute;
++  top: 0; left: 0;
++  width: 300px;
++  height: 300px;
++}
++
++/*************** Layout Boxes ****************/
++.layoutbox {
++  display: -moz-box;
++  -moz-box-flex: 1;
++}
++
++#marginbox {
++  padding: 29px;
++  border: 1px dashed rgba(255, 255, 255, 0.8);
++  box-shadow: 0 0 30px rgba(0, 0, 0, 0.2);
++}
++.square > #marginbox { margin: 39px 40px 40px 39px; }
++.vertical > #marginbox { margin: 39px 60px 40px 59px; }
++.horizontal > #marginbox { margin: 59px 40px 60px 39px; }
++
++#borderbox {
++  padding: 19px;
++  background: rgba(255, 255, 255, .4);
++  box-shadow:
++    0 0 40px rgba(0, 0, 0, 0.8),
++    inset 0 0 10px rgba(34, 102, 153, 0.3);
++  border: 1px solid rgba(87, 133, 173, 0.5);
++}
++
++#paddingbox {
++  padding: 19px;
++  background: rgba(255, 255, 255, .4);
++  box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
++}
++
++#contentbox {
++  border: 1px dashed white;
++  box-shadow:
++    0 0 20px rgba(0, 0, 0, 0.4),
++    inset 0 0 50px rgba(34, 102, 153, 0.8);
++}
++
++/**************** Arrows ***************/
++
++/* Horizontal arrows */
++
++#arrowbox .horizontal {
++  height: 1px;
++  background-color: #fff;
++  position: absolute;
++}
++
++#arrowbox .horizontal::before,
++#arrowbox .horizontal::after {
++  content: "";
++  display: block;
++  position: absolute;
++  width: 4px;
++  height: 4px;
++  border-top: 1px solid white;
++  border-left: 1px solid white;
++  top: -2px;
++}
++
++#arrowbox .horizontal::before {
++  left: 0px;
++  -moz-transform: rotate(-45deg);
++}
++
++#arrowbox .horizontal::after {
++  right: 0px;
++  -moz-transform: rotate(135deg);
++}
++
++/* Vertical arrows */
++
++#arrowbox .vertical {
++  width: 1px;
++  background-color: #fff;
++  position: absolute;
++}
++
++#arrowbox .vertical::before,
++#arrowbox .vertical::after {
++  content: "";
++  display: block;
++  position: absolute;
++  width: 4px;
++  height: 4px;
++  border-top: 1px solid white;
++  border-left: 1px solid white;
++  left: -2px;
++}
++
++#arrowbox .vertical::before {
++  top: 0px;
++  -moz-transform: rotate(45deg);
++}
++
++#arrowbox .vertical::after {
++  bottom: 0px;
++  -moz-transform: rotate(225deg);
++}
++
++/* Positions and sizes */
++
++/* square */
++
++.square > #arrowbox > .top {
++  top: 8px;
++  left: 39px;
++  height: 24px;
++}
++
++.square > #arrowbox > .left {
++  top: 39px;
++  left: 8px;
++  width: 24px;
++}
++
++.square > #arrowbox > .width {
++  bottom: 27px;
++  left: 70px;
++  width: 160px;
++}
++
++.square > #arrowbox > .height {
++  right: 27px;
++  top: 70px;
++  height: 160px;
++}
++
++/* square */
++
++.square > #arrowbox > .top {
++  top: 8px;
++  left: 39px;
++  height: 24px;
++}
++
++.square > #arrowbox > .left {
++  top: 39px;
++  left: 8px;
++  width: 24px;
++}
++
++.square > #arrowbox > .width {
++  bottom: 27px;
++  left: 70px;
++  width: 160px;
++}
++
++.square > #arrowbox > .height {
++  right: 27px;
++  top: 70px;
++  height: 160px;
++}
++
++/* horizontal */
++
++.horizontal > #arrowbox > .top {
++  top: 28px;
++  left: 39px;
++  height: 24px;
++}
++
++.horizontal > #arrowbox > .left {
++  top: 59px;
++  left: 8px;
++  width: 24px;
++}
++
++.horizontal > #arrowbox > .width {
++  bottom: 47px;
++  left: 70px;
++  width: 160px;
++}
++
++.horizontal > #arrowbox > .height {
++  right: 27px;
++  top: 90px;
++  height: 120px;
++}
++
++/* vertical */
++
++.vertical > #arrowbox > .top {
++  top: 8px;
++  left: 59px;
++  height: 24px;
++}
++
++.vertical > #arrowbox > .left {
++  top: 39px;
++  left: 28px;
++  width: 24px;
++}
++
++.vertical > #arrowbox > .width {
++  bottom: 27px;
++  left: 90px;
++  width: 120px;
++}
++
++.vertical > #arrowbox > .height {
++  right: 47px;
++  top: 70px;
++  height: 160px;
++}
++
++/**************** Text box ***************/
++
++.label,
++#textbox > p {
++  color: #fff;
++  font-size: 12px;
++  font-family: monospace;
++  margin: 0;
++  position: absolute;
++  text-align: center;
++  text-shadow: 1px 1px rgba(0,0,0,0.5);
++}
++
++body[nonode] {
++  background-color: #169;
++}
++
++body[nonode] #marginbox,
++body[nonode] #arrowbox,
++body[nonode] #textbox > p {
++  visibility: hidden;
++}
++body[nonode] #textbox > #nonodemessage {
++  visibility: visible;
++}
++
++/* Labels */
++
++.label {
++  pointer-events: none;
++  opacity: 0;
++  -moz-transition: 0.1s opacity ease-out;
++}
++
++#dimension-label {
++  top: 4px;
++  right: 4px;
++}
++
++#margin-label {
++  top: 40px;
++  right: 45px;
++}
++
++#border-label {
++  top: 70px;
++  right: 75px;
++}
++
++#padding-label {
++  top: 90px;
++  right: 95px;
++}
++
++#content-label {
++  top: 110px;
++  right: 115px;
++}
++
++.horizontal .label:not(#dimension-label) {
++  margin-top: 20px;
++}
++
++.vertical .label:not(#dimension-label) {
++  top: 4px;
++  right: 4px;
++}
++
++body:hover > #marginbox:not(:hover) > #borderbox > #paddingbox > #contentbox > #dimension-label {
++  opacity: 1;
++}
++
++#marginbox:hover > #borderbox:not(:hover) > #paddingbox > #contentbox > #margin-label {
++  opacity: 1;
++}
++
++#borderbox:hover > #paddingbox:not(:hover) > #contentbox > #border-label {
++  opacity: 1;
++}
++
++#paddingbox:hover > #contentbox:not(:hover) > #padding-label {
++  opacity: 1;
++}
++
++#contentbox:hover > #content-label {
++  opacity: 1;
++}
++
++#nonodemessage {
++  width: 300px;
++  line-height: 300px;
++  visibility: hidden;
++}
++
++/* Values */
++
++#boundingbox-top {
++  top: 14px;
++  left: 48px;
++  width: 40px;
++  text-align: left!important;
++}
++
++#boundingbox-left {
++  top: 48px;
++  left: 0px;
++  width: 40px;
++}
++
++#boundingbox-height {
++  width: 25px;
++  right: 0px;
++}
++
++#boundingbox-width {
++  bottom: 8px;
++}
++
++.vertical #boundingbox-height {
++  right: 20px;
++}
++
++.vertical #boundingbox-top {
++  left: 68px;
++}
++
++.vertical #boundingbox-left {
++  left: 20px;
++}
++
++.horizontal #boundingbox-width {
++  bottom: 28px;
++}
++
++.horizontal #boundingbox-top {
++  top: 34px;
++}
++
++.horizontal #boundingbox-left {
++  top: 68px;
++}
++
++#textbox > .left,
++#textbox > .right,
++#textbox > .center,
++#boundingbox-height {
++  line-height: 300px;
++}
++
++#textbox > .top,
++#textbox > .bottom,
++#textbox > #boundingbox-width {
++  line-height: 12px;
++  width: 300px;
++}
++
++/* Margins */
++#textbox > .margin.right,
++#textbox > .margin.left {
++  width: 30px;
++}
++
++.square > #textbox > .margin.left,
++.horizontal > #textbox > .margin.left {
++  left: 40px;
++}
++.vertical > #textbox > .margin.left {
++  left: 60px;
++}
++.square > #textbox > .margin.right,
++.horizontal > #textbox > .margin.right {
++  right: 40px;
++}
++.vertical > #textbox > .margin.right {
++  right: 60px;
++}
++
++.square > #textbox > .margin.top,
++.vertical > #textbox > .margin.top {
++  top: 50px;
++}
++.horizontal> #textbox > .margin.top {
++  top: 70px;
++}
++.square > #textbox > .margin.bottom ,
++.vertical > #textbox > .margin.bottom {
++  bottom: 50px;
++}
++.horizontal> #textbox > .margin.bottom {
++  bottom: 70px;
++}
++
++/* Borders */
++#textbox > .border.right,
++#textbox > .border.left {
++  width: 18px;
++}
++
++.square > #textbox > .border.left,
++.horizontal > #textbox > .border.left {
++  left: 70px;
++}
++.vertical > #textbox > .border.left {
++  left: 90px;
++}
++.square > #textbox > .border.right,
++.horizontal > #textbox > .border.right {
++  right: 70px;
++}
++.vertical > #textbox > .border.right {
++  right: 90px;
++}
++
++.square > #textbox > .border.top,
++.vertical > #textbox > .border.top {
++  top: 73px;
++}
++.horizontal> #textbox > .border.top {
++  top: 93px;
++}
++.square > #textbox > .border.bottom ,
++.vertical > #textbox > .border.bottom {
++  bottom: 73px;
++}
++.horizontal> #textbox > .border.bottom {
++  bottom: 93px;
++}
++
++/* Paddings */
++#textbox > .padding.right,
++#textbox > .padding.left {
++  width: 20px;
++}
++
++.square > #textbox > .padding.left,
++.horizontal > #textbox > .padding.left {
++  left: 88px;
++}
++.vertical > #textbox > .padding.left {
++  left: 108px;
++}
++.square > #textbox > .padding.right,
++.horizontal > #textbox > .padding.right {
++  right: 88px;
++}
++.vertical > #textbox > .padding.right {
++  right: 108px;
++}
++
++.square > #textbox > .padding.top,
++.vertical > #textbox > .padding.top {
++  top: 92px;
++}
++.horizontal> #textbox > .padding.top {
++  top: 112px;
++}
++.square > #textbox > .padding.bottom ,
++.vertical > #textbox > .padding.bottom {
++  bottom: 92px;
++}
++.horizontal> #textbox > .padding.bottom {
++  bottom: 112px;
++}
++
++/* inner dimmensions */
++
++#textbox > .center {
++  width: 300px;
++}
++.vertical > #textbox > .center {
++  height: 34px;
++  top: 132px;
++}
++.vertical > #textbox > .center > span {
++  line-height: 12px;
++  display: block;
++}
+diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
+--- a/browser/themes/gnomestripe/jar.mn
++++ b/browser/themes/gnomestripe/jar.mn
+@@ -81,19 +81,21 @@ browser.jar:
+   skin/classic/browser/tabview/search.png             (tabview/search.png)
+   skin/classic/browser/tabview/stack-expander.png     (tabview/stack-expander.png)
+   skin/classic/browser/tabview/tabview.png            (tabview/tabview.png)
+   skin/classic/browser/tabview/tabview.css            (tabview/tabview.css)
+   skin/classic/browser/devtools/common.css            (devtools/common.css)
+   skin/classic/browser/devtools/arrows.png            (devtools/arrows.png)
+   skin/classic/browser/devtools/goto-mdn.png          (devtools/goto-mdn.png)
+   skin/classic/browser/devtools/csshtmltree.css       (devtools/csshtmltree.css)
++  skin/classic/browser/devtools/layoutview.css        (devtools/layoutview.css)
+   skin/classic/browser/devtools/webconsole.css                  (devtools/webconsole.css)
+   skin/classic/browser/devtools/webconsole_networkpanel.css     (devtools/webconsole_networkpanel.css)
+   skin/classic/browser/devtools/webconsole.png                  (devtools/webconsole.png)
++  skin/classic/browser/devtools/layoutview.css        (devtools/layoutview.css)
+   skin/classic/browser/devtools/gcli.css              (devtools/gcli.css)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-selected.png             (devtools/breadcrumbs/ltr-end-selected.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end.png                      (devtools/breadcrumbs/ltr-end.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-middle-pressed.png           (devtools/breadcrumbs/ltr-middle-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png  (devtools/breadcrumbs/ltr-middle-selected-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected.png          (devtools/breadcrumbs/ltr-middle-selected.png)
+diff --git a/browser/themes/pinstripe/devtools/layoutview.css b/browser/themes/pinstripe/devtools/layoutview.css
+new file mode 100644
+--- /dev/null
++++ b/browser/themes/pinstripe/devtools/layoutview.css
+@@ -0,0 +1,546 @@
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * The Original Code is Layout Abstract View
++ *
++ * The Initial Developer of the Original Code is
++ * Mozilla Foundation
++ * Portions created by the Initial Developer are Copyright (C) 1998-1999
++ * the Initial Developer. All Rights Reserved.
++ *
++ * Contributor(s):
++ *   Paul Rouget (paul@mozilla.com)
++ *   Pavel Ivanov (me@pivanov.com)
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++
++body {
++  margin: 0;
++
++  background-color: #269;
++  background-image:
++    -moz-linear-gradient(rgba(255,255,255,.3) 1px, transparent 1px),
++    -moz-linear-gradient(0, rgba(255,255,255,.2) 1px, transparent 1px),
++    -moz-linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px),
++    -moz-linear-gradient(0, rgba(255,255,255,.1) 1px, transparent 1px);
++  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
++  background-position: -1px -1px, -1px -1px, -1px -1px, -1px -1px;
++
++  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.6);
++
++  display: -moz-box;
++}
++
++#textbox,
++#arrowbox {
++  pointer-events: none;
++  position: absolute;
++  top: 0; left: 0;
++  width: 300px;
++  height: 300px;
++}
++
++/*************** Layout Boxes ****************/
++.layoutbox {
++  display: -moz-box;
++  -moz-box-flex: 1;
++}
++
++#marginbox {
++  padding: 29px;
++  border: 1px dashed rgba(255, 255, 255, 0.8);
++  box-shadow: 0 0 30px rgba(0, 0, 0, 0.2);
++}
++.square > #marginbox { margin: 39px 40px 40px 39px; }
++.vertical > #marginbox { margin: 39px 60px 40px 59px; }
++.horizontal > #marginbox { margin: 59px 40px 60px 39px; }
++
++#borderbox {
++  padding: 19px;
++  background: rgba(255, 255, 255, .4);
++  box-shadow:
++    0 0 40px rgba(0, 0, 0, 0.8),
++    inset 0 0 10px rgba(34, 102, 153, 0.3);
++  border: 1px solid rgba(87, 133, 173, 0.5);
++}
++
++#paddingbox {
++  padding: 19px;
++  background: rgba(255, 255, 255, .4);
++  box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
++}
++
++#contentbox {
++  border: 1px dashed white;
++  box-shadow:
++    0 0 20px rgba(0, 0, 0, 0.4),
++    inset 0 0 50px rgba(34, 102, 153, 0.8);
++}
++
++/**************** Arrows ***************/
++
++/* Horizontal arrows */
++
++#arrowbox .horizontal {
++  height: 1px;
++  background-color: #fff;
++  position: absolute;
++}
++
++#arrowbox .horizontal::before,
++#arrowbox .horizontal::after {
++  content: "";
++  display: block;
++  position: absolute;
++  width: 4px;
++  height: 4px;
++  border-top: 1px solid white;
++  border-left: 1px solid white;
++  top: -2px;
++}
++
++#arrowbox .horizontal::before {
++  left: 0px;
++  -moz-transform: rotate(-45deg);
++}
++
++#arrowbox .horizontal::after {
++  right: 0px;
++  -moz-transform: rotate(135deg);
++}
++
++/* Vertical arrows */
++
++#arrowbox .vertical {
++  width: 1px;
++  background-color: #fff;
++  position: absolute;
++}
++
++#arrowbox .vertical::before,
++#arrowbox .vertical::after {
++  content: "";
++  display: block;
++  position: absolute;
++  width: 4px;
++  height: 4px;
++  border-top: 1px solid white;
++  border-left: 1px solid white;
++  left: -2px;
++}
++
++#arrowbox .vertical::before {
++  top: 0px;
++  -moz-transform: rotate(45deg);
++}
++
++#arrowbox .vertical::after {
++  bottom: 0px;
++  -moz-transform: rotate(225deg);
++}
++
++/* Positions and sizes */
++
++/* square */
++
++.square > #arrowbox > .top {
++  top: 8px;
++  left: 39px;
++  height: 24px;
++}
++
++.square > #arrowbox > .left {
++  top: 39px;
++  left: 8px;
++  width: 24px;
++}
++
++.square > #arrowbox > .width {
++  bottom: 27px;
++  left: 70px;
++  width: 160px;
++}
++
++.square > #arrowbox > .height {
++  right: 27px;
++  top: 70px;
++  height: 160px;
++}
++
++/* square */
++
++.square > #arrowbox > .top {
++  top: 8px;
++  left: 39px;
++  height: 24px;
++}
++
++.square > #arrowbox > .left {
++  top: 39px;
++  left: 8px;
++  width: 24px;
++}
++
++.square > #arrowbox > .width {
++  bottom: 27px;
++  left: 70px;
++  width: 160px;
++}
++
++.square > #arrowbox > .height {
++  right: 27px;
++  top: 70px;
++  height: 160px;
++}
++
++/* horizontal */
++
++.horizontal > #arrowbox > .top {
++  top: 28px;
++  left: 39px;
++  height: 24px;
++}
++
++.horizontal > #arrowbox > .left {
++  top: 59px;
++  left: 8px;
++  width: 24px;
++}
++
++.horizontal > #arrowbox > .width {
++  bottom: 47px;
++  left: 70px;
++  width: 160px;
++}
++
++.horizontal > #arrowbox > .height {
++  right: 27px;
++  top: 90px;
++  height: 120px;
++}
++
++/* vertical */
++
++.vertical > #arrowbox > .top {
++  top: 8px;
++  left: 59px;
++  height: 24px;
++}
++
++.vertical > #arrowbox > .left {
++  top: 39px;
++  left: 28px;
++  width: 24px;
++}
++
++.vertical > #arrowbox > .width {
++  bottom: 27px;
++  left: 90px;
++  width: 120px;
++}
++
++.vertical > #arrowbox > .height {
++  right: 47px;
++  top: 70px;
++  height: 160px;
++}
++
++/**************** Text box ***************/
++
++.label,
++#textbox > p {
++  color: #fff;
++  font-size: 12px;
++  font-family: Arial;
++  margin: 0;
++  position: absolute;
++  text-align: center;
++  text-shadow: 1px 1px rgba(0,0,0,0.5);
++}
++
++body[nonode] {
++  background-color: #169;
++}
++
++body[nonode] #marginbox,
++body[nonode] #arrowbox,
++body[nonode] #textbox > p {
++  visibility: hidden;
++}
++body[nonode] #textbox > #nonodemessage {
++  visibility: visible;
++}
++
++/* Labels */
++
++.label {
++  pointer-events: none;
++  opacity: 0;
++  -moz-transition: 0.1s opacity ease-out;
++}
++
++#dimension-label {
++  top: 4px;
++  right: 4px;
++}
++
++#margin-label {
++  top: 40px;
++  right: 45px;
++}
++
++#border-label {
++  top: 70px;
++  right: 75px;
++}
++
++#padding-label {
++  top: 90px;
++  right: 95px;
++}
++
++#content-label {
++  top: 110px;
++  right: 115px;
++}
++
++.horizontal .label:not(#dimension-label) {
++  margin-top: 20px;
++}
++
++.vertical .label:not(#dimension-label) {
++  top: 4px;
++  right: 4px;
++}
++
++body:hover > #marginbox:not(:hover) > #borderbox > #paddingbox > #contentbox > #dimension-label {
++  opacity: 1;
++}
++
++#marginbox:hover > #borderbox:not(:hover) > #paddingbox > #contentbox > #margin-label {
++  opacity: 1;
++}
++
++#borderbox:hover > #paddingbox:not(:hover) > #contentbox > #border-label {
++  opacity: 1;
++}
++
++#paddingbox:hover > #contentbox:not(:hover) > #padding-label {
++  opacity: 1;
++}
++
++#contentbox:hover > #content-label {
++  opacity: 1;
++}
++
++#nonodemessage {
++  width: 300px;
++  line-height: 300px;
++  visibility: hidden;
++}
++
++/* Values */
++
++#boundingbox-top {
++  top: 14px;
++  left: 48px;
++  width: 40px;
++  text-align: left!important;
++}
++
++#boundingbox-left {
++  top: 48px;
++  left: 0px;
++  width: 40px;
++}
++
++#boundingbox-height {
++  width: 25px;
++  right: 0px;
++}
++
++#boundingbox-width {
++  bottom: 8px;
++}
++
++.vertical #boundingbox-height {
++  right: 20px;
++}
++
++.vertical #boundingbox-top {
++  left: 68px;
++}
++
++.vertical #boundingbox-left {
++  left: 20px;
++}
++
++.horizontal #boundingbox-width {
++  bottom: 28px;
++}
++
++.horizontal #boundingbox-top {
++  top: 34px;
++}
++
++.horizontal #boundingbox-left {
++  top: 68px;
++}
++
++#textbox > .left,
++#textbox > .right,
++#textbox > .center,
++#boundingbox-height {
++  line-height: 300px;
++}
++
++#textbox > .top,
++#textbox > .bottom,
++#textbox > #boundingbox-width {
++  line-height: 12px;
++  width: 300px;
++}
++
++/* Margins */
++#textbox > .margin.right,
++#textbox > .margin.left {
++  width: 30px;
++}
++
++.square > #textbox > .margin.left,
++.horizontal > #textbox > .margin.left {
++  left: 40px;
++}
++.vertical > #textbox > .margin.left {
++  left: 60px;
++}
++.square > #textbox > .margin.right,
++.horizontal > #textbox > .margin.right {
++  right: 40px;
++}
++.vertical > #textbox > .margin.right {
++  right: 60px;
++}
++
++.square > #textbox > .margin.top,
++.vertical > #textbox > .margin.top {
++  top: 50px;
++}
++.horizontal> #textbox > .margin.top {
++  top: 70px;
++}
++.square > #textbox > .margin.bottom ,
++.vertical > #textbox > .margin.bottom {
++  bottom: 50px;
++}
++.horizontal> #textbox > .margin.bottom {
++  bottom: 70px;
++}
++
++/* Borders */
++#textbox > .border.right,
++#textbox > .border.left {
++  width: 18px;
++}
++
++.square > #textbox > .border.left,
++.horizontal > #textbox > .border.left {
++  left: 70px;
++}
++.vertical > #textbox > .border.left {
++  left: 90px;
++}
++.square > #textbox > .border.right,
++.horizontal > #textbox > .border.right {
++  right: 70px;
++}
++.vertical > #textbox > .border.right {
++  right: 90px;
++}
++
++.square > #textbox > .border.top,
++.vertical > #textbox > .border.top {
++  top: 73px;
++}
++.horizontal> #textbox > .border.top {
++  top: 93px;
++}
++.square > #textbox > .border.bottom ,
++.vertical > #textbox > .border.bottom {
++  bottom: 73px;
++}
++.horizontal> #textbox > .border.bottom {
++  bottom: 93px;
++}
++
++/* Paddings */
++#textbox > .padding.right,
++#textbox > .padding.left {
++  width: 20px;
++}
++
++.square > #textbox > .padding.left,
++.horizontal > #textbox > .padding.left {
++  left: 88px;
++}
++.vertical > #textbox > .padding.left {
++  left: 108px;
++}
++.square > #textbox > .padding.right,
++.horizontal > #textbox > .padding.right {
++  right: 88px;
++}
++.vertical > #textbox > .padding.right {
++  right: 108px;
++}
++
++.square > #textbox > .padding.top,
++.vertical > #textbox > .padding.top {
++  top: 92px;
++}
++.horizontal> #textbox > .padding.top {
++  top: 112px;
++}
++.square > #textbox > .padding.bottom ,
++.vertical > #textbox > .padding.bottom {
++  bottom: 92px;
++}
++.horizontal> #textbox > .padding.bottom {
++  bottom: 112px;
++}
++
++/* inner dimmensions */
++
++#textbox > .center {
++  width: 300px;
++}
++.vertical > #textbox > .center {
++  height: 34px;
++  top: 132px;
++}
++.vertical > #textbox > .center > span {
++  line-height: 12px;
++  display: block;
++}
+diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
+--- a/browser/themes/pinstripe/jar.mn
++++ b/browser/themes/pinstripe/jar.mn
+@@ -120,16 +120,17 @@ browser.jar:
+   skin/classic/browser/tabview/search.png                   (tabview/search.png)
+   skin/classic/browser/tabview/stack-expander.png           (tabview/stack-expander.png)
+   skin/classic/browser/tabview/tabview.png                  (tabview/tabview.png)
+   skin/classic/browser/tabview/tabview.css                  (tabview/tabview.css)
+ * skin/classic/browser/devtools/common.css                  (devtools/common.css)
+   skin/classic/browser/devtools/arrows.png                  (devtools/arrows.png)
+   skin/classic/browser/devtools/goto-mdn.png                (devtools/goto-mdn.png)
+   skin/classic/browser/devtools/csshtmltree.css             (devtools/csshtmltree.css)
++  skin/classic/browser/devtools/layoutview.css              (devtools/layoutview.css)
+   skin/classic/browser/devtools/gcli.css                    (devtools/gcli.css)
+   skin/classic/browser/devtools/toolbarbutton-close.png     (devtools/toolbarbutton-close.png)
+ * skin/classic/browser/devtools/webconsole.css                  (devtools/webconsole.css)
+   skin/classic/browser/devtools/webconsole_networkpanel.css     (devtools/webconsole_networkpanel.css)
+   skin/classic/browser/devtools/webconsole.png                  (devtools/webconsole.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-selected.png             (devtools/breadcrumbs/ltr-end-selected.png)
+diff --git a/browser/themes/winstripe/devtools/layoutview.css b/browser/themes/winstripe/devtools/layoutview.css
+new file mode 100644
+--- /dev/null
++++ b/browser/themes/winstripe/devtools/layoutview.css
+@@ -0,0 +1,546 @@
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * The Original Code is Layout Abstract View
++ *
++ * The Initial Developer of the Original Code is
++ * Mozilla Foundation
++ * Portions created by the Initial Developer are Copyright (C) 1998-1999
++ * the Initial Developer. All Rights Reserved.
++ *
++ * Contributor(s):
++ *   Paul Rouget (paul@mozilla.com)
++ *   Pavel Ivanov (me@pivanov.com)
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++
++body {
++  margin: 0;
++
++  background-color: #269;
++  background-image:
++    -moz-linear-gradient(rgba(255,255,255,.3) 1px, transparent 1px),
++    -moz-linear-gradient(0, rgba(255,255,255,.2) 1px, transparent 1px),
++    -moz-linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px),
++    -moz-linear-gradient(0, rgba(255,255,255,.1) 1px, transparent 1px);
++  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
++  background-position: -1px -1px, -1px -1px, -1px -1px, -1px -1px;
++
++  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.6);
++
++  display: -moz-box;
++}
++
++#textbox,
++#arrowbox {
++  pointer-events: none;
++  position: absolute;
++  top: 0; left: 0;
++  width: 300px;
++  height: 300px;
++}
++
++/*************** Layout Boxes ****************/
++.layoutbox {
++  display: -moz-box;
++  -moz-box-flex: 1;
++}
++
++#marginbox {
++  padding: 29px;
++  border: 1px dashed rgba(255, 255, 255, 0.8);
++  box-shadow: 0 0 30px rgba(0, 0, 0, 0.2);
++}
++.square > #marginbox { margin: 39px 40px 40px 39px; }
++.vertical > #marginbox { margin: 39px 60px 40px 59px; }
++.horizontal > #marginbox { margin: 59px 40px 60px 39px; }
++
++#borderbox {
++  padding: 19px;
++  background: rgba(255, 255, 255, .4);
++  box-shadow:
++    0 0 40px rgba(0, 0, 0, 0.8),
++    inset 0 0 10px rgba(34, 102, 153, 0.3);
++  border: 1px solid rgba(87, 133, 173, 0.5);
++}
++
++#paddingbox {
++  padding: 19px;
++  background: rgba(255, 255, 255, .4);
++  box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
++}
++
++#contentbox {
++  border: 1px dashed white;
++  box-shadow:
++    0 0 20px rgba(0, 0, 0, 0.4),
++    inset 0 0 50px rgba(34, 102, 153, 0.8);
++}
++
++/**************** Arrows ***************/
++
++/* Horizontal arrows */
++
++#arrowbox .horizontal {
++  height: 1px;
++  background-color: #fff;
++  position: absolute;
++}
++
++#arrowbox .horizontal::before,
++#arrowbox .horizontal::after {
++  content: "";
++  display: block;
++  position: absolute;
++  width: 4px;
++  height: 4px;
++  border-top: 1px solid white;
++  border-left: 1px solid white;
++  top: -2px;
++}
++
++#arrowbox .horizontal::before {
++  left: 0px;
++  -moz-transform: rotate(-45deg);
++}
++
++#arrowbox .horizontal::after {
++  right: 0px;
++  -moz-transform: rotate(135deg);
++}
++
++/* Vertical arrows */
++
++#arrowbox .vertical {
++  width: 1px;
++  background-color: #fff;
++  position: absolute;
++}
++
++#arrowbox .vertical::before,
++#arrowbox .vertical::after {
++  content: "";
++  display: block;
++  position: absolute;
++  width: 4px;
++  height: 4px;
++  border-top: 1px solid white;
++  border-left: 1px solid white;
++  left: -2px;
++}
++
++#arrowbox .vertical::before {
++  top: 0px;
++  -moz-transform: rotate(45deg);
++}
++
++#arrowbox .vertical::after {
++  bottom: 0px;
++  -moz-transform: rotate(225deg);
++}
++
++/* Positions and sizes */
++
++/* square */
++
++.square > #arrowbox > .top {
++  top: 8px;
++  left: 39px;
++  height: 24px;
++}
++
++.square > #arrowbox > .left {
++  top: 39px;
++  left: 8px;
++  width: 24px;
++}
++
++.square > #arrowbox > .width {
++  bottom: 27px;
++  left: 70px;
++  width: 160px;
++}
++
++.square > #arrowbox > .height {
++  right: 27px;
++  top: 70px;
++  height: 160px;
++}
++
++/* square */
++
++.square > #arrowbox > .top {
++  top: 8px;
++  left: 39px;
++  height: 24px;
++}
++
++.square > #arrowbox > .left {
++  top: 39px;
++  left: 8px;
++  width: 24px;
++}
++
++.square > #arrowbox > .width {
++  bottom: 27px;
++  left: 70px;
++  width: 160px;
++}
++
++.square > #arrowbox > .height {
++  right: 27px;
++  top: 70px;
++  height: 160px;
++}
++
++/* horizontal */
++
++.horizontal > #arrowbox > .top {
++  top: 28px;
++  left: 39px;
++  height: 24px;
++}
++
++.horizontal > #arrowbox > .left {
++  top: 59px;
++  left: 8px;
++  width: 24px;
++}
++
++.horizontal > #arrowbox > .width {
++  bottom: 47px;
++  left: 70px;
++  width: 160px;
++}
++
++.horizontal > #arrowbox > .height {
++  right: 27px;
++  top: 90px;
++  height: 120px;
++}
++
++/* vertical */
++
++.vertical > #arrowbox > .top {
++  top: 8px;
++  left: 59px;
++  height: 24px;
++}
++
++.vertical > #arrowbox > .left {
++  top: 39px;
++  left: 28px;
++  width: 24px;
++}
++
++.vertical > #arrowbox > .width {
++  bottom: 27px;
++  left: 90px;
++  width: 120px;
++}
++
++.vertical > #arrowbox > .height {
++  right: 47px;
++  top: 70px;
++  height: 160px;
++}
++
++/**************** Text box ***************/
++
++.label,
++#textbox > p {
++  color: #fff;
++  font-size: 12px;
++  font-family: Arial;
++  margin: 0;
++  position: absolute;
++  text-align: center;
++  text-shadow: 1px 1px rgba(0,0,0,0.5);
++}
++
++body[nonode] {
++  background-color: #169;
++}
++
++body[nonode] #marginbox,
++body[nonode] #arrowbox,
++body[nonode] #textbox > p {
++  visibility: hidden;
++}
++body[nonode] #textbox > #nonodemessage {
++  visibility: visible;
++}
++
++/* Labels */
++
++.label {
++  pointer-events: none;
++  opacity: 0;
++  -moz-transition: 0.1s opacity ease-out;
++}
++
++#dimension-label {
++  top: 4px;
++  right: 4px;
++}
++
++#margin-label {
++  top: 40px;
++  right: 45px;
++}
++
++#border-label {
++  top: 70px;
++  right: 75px;
++}
++
++#padding-label {
++  top: 90px;
++  right: 95px;
++}
++
++#content-label {
++  top: 110px;
++  right: 115px;
++}
++
++.horizontal .label:not(#dimension-label) {
++  margin-top: 20px;
++}
++
++.vertical .label:not(#dimension-label) {
++  top: 4px;
++  right: 4px;
++}
++
++body:hover > #marginbox:not(:hover) > #borderbox > #paddingbox > #contentbox > #dimension-label {
++  opacity: 1;
++}
++
++#marginbox:hover > #borderbox:not(:hover) > #paddingbox > #contentbox > #margin-label {
++  opacity: 1;
++}
++
++#borderbox:hover > #paddingbox:not(:hover) > #contentbox > #border-label {
++  opacity: 1;
++}
++
++#paddingbox:hover > #contentbox:not(:hover) > #padding-label {
++  opacity: 1;
++}
++
++#contentbox:hover > #content-label {
++  opacity: 1;
++}
++
++#nonodemessage {
++  width: 300px;
++  line-height: 300px;
++  visibility: hidden;
++}
++
++/* Values */
++
++#boundingbox-top {
++  top: 14px;
++  left: 48px;
++  width: 40px;
++  text-align: left!important;
++}
++
++#boundingbox-left {
++  top: 48px;
++  left: 0px;
++  width: 40px;
++}
++
++#boundingbox-height {
++  width: 25px;
++  right: 0px;
++}
++
++#boundingbox-width {
++  bottom: 8px;
++}
++
++.vertical #boundingbox-height {
++  right: 20px;
++}
++
++.vertical #boundingbox-top {
++  left: 68px;
++}
++
++.vertical #boundingbox-left {
++  left: 20px;
++}
++
++.horizontal #boundingbox-width {
++  bottom: 28px;
++}
++
++.horizontal #boundingbox-top {
++  top: 34px;
++}
++
++.horizontal #boundingbox-left {
++  top: 68px;
++}
++
++#textbox > .left,
++#textbox > .right,
++#textbox > .center,
++#boundingbox-height {
++  line-height: 300px;
++}
++
++#textbox > .top,
++#textbox > .bottom,
++#textbox > #boundingbox-width {
++  line-height: 12px;
++  width: 300px;
++}
++
++/* Margins */
++#textbox > .margin.right,
++#textbox > .margin.left {
++  width: 30px;
++}
++
++.square > #textbox > .margin.left,
++.horizontal > #textbox > .margin.left {
++  left: 40px;
++}
++.vertical > #textbox > .margin.left {
++  left: 60px;
++}
++.square > #textbox > .margin.right,
++.horizontal > #textbox > .margin.right {
++  right: 40px;
++}
++.vertical > #textbox > .margin.right {
++  right: 60px;
++}
++
++.square > #textbox > .margin.top,
++.vertical > #textbox > .margin.top {
++  top: 50px;
++}
++.horizontal> #textbox > .margin.top {
++  top: 70px;
++}
++.square > #textbox > .margin.bottom ,
++.vertical > #textbox > .margin.bottom {
++  bottom: 50px;
++}
++.horizontal> #textbox > .margin.bottom {
++  bottom: 70px;
++}
++
++/* Borders */
++#textbox > .border.right,
++#textbox > .border.left {
++  width: 18px;
++}
++
++.square > #textbox > .border.left,
++.horizontal > #textbox > .border.left {
++  left: 70px;
++}
++.vertical > #textbox > .border.left {
++  left: 90px;
++}
++.square > #textbox > .border.right,
++.horizontal > #textbox > .border.right {
++  right: 70px;
++}
++.vertical > #textbox > .border.right {
++  right: 90px;
++}
++
++.square > #textbox > .border.top,
++.vertical > #textbox > .border.top {
++  top: 73px;
++}
++.horizontal> #textbox > .border.top {
++  top: 93px;
++}
++.square > #textbox > .border.bottom ,
++.vertical > #textbox > .border.bottom {
++  bottom: 73px;
++}
++.horizontal> #textbox > .border.bottom {
++  bottom: 93px;
++}
++
++/* Paddings */
++#textbox > .padding.right,
++#textbox > .padding.left {
++  width: 20px;
++}
++
++.square > #textbox > .padding.left,
++.horizontal > #textbox > .padding.left {
++  left: 88px;
++}
++.vertical > #textbox > .padding.left {
++  left: 108px;
++}
++.square > #textbox > .padding.right,
++.horizontal > #textbox > .padding.right {
++  right: 88px;
++}
++.vertical > #textbox > .padding.right {
++  right: 108px;
++}
++
++.square > #textbox > .padding.top,
++.vertical > #textbox > .padding.top {
++  top: 92px;
++}
++.horizontal> #textbox > .padding.top {
++  top: 112px;
++}
++.square > #textbox > .padding.bottom ,
++.vertical > #textbox > .padding.bottom {
++  bottom: 92px;
++}
++.horizontal> #textbox > .padding.bottom {
++  bottom: 112px;
++}
++
++/* inner dimmensions */
++
++#textbox > .center {
++  width: 300px;
++}
++.vertical > #textbox > .center {
++  height: 34px;
++  top: 132px;
++}
++.vertical > #textbox > .center > span {
++  line-height: 12px;
++  display: block;
++}
+diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
+--- a/browser/themes/winstripe/jar.mn
++++ b/browser/themes/winstripe/jar.mn
+@@ -104,16 +104,17 @@ browser.jar:
+         skin/classic/browser/tabview/stack-expander.png             (tabview/stack-expander.png)
+         skin/classic/browser/tabview/tabview.png                    (tabview/tabview.png)
+         skin/classic/browser/tabview/tabview-inverted.png           (tabview/tabview-inverted.png)
+         skin/classic/browser/tabview/tabview.css                    (tabview/tabview.css)
+         skin/classic/browser/devtools/common.css                    (devtools/common.css)
+         skin/classic/browser/devtools/arrows.png                    (devtools/arrows.png)
+         skin/classic/browser/devtools/goto-mdn.png                  (devtools/goto-mdn.png)
+         skin/classic/browser/devtools/csshtmltree.css               (devtools/csshtmltree.css)
++        skin/classic/browser/devtools/layoutview.css                (devtools/layoutview.css)
+         skin/classic/browser/devtools/gcli.css                      (devtools/gcli.css)
+         skin/classic/browser/devtools/toolbarbutton-close.png       (devtools/toolbarbutton-close.png)
+         skin/classic/browser/devtools/webconsole.css                  (devtools/webconsole.css)
+         skin/classic/browser/devtools/webconsole_networkpanel.css     (devtools/webconsole_networkpanel.css)
+         skin/classic/browser/devtools/webconsole.png                  (devtools/webconsole.png)
+         skin/classic/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
+         skin/classic/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
+         skin/classic/browser/devtools/breadcrumbs/ltr-end-selected.png             (devtools/breadcrumbs/ltr-end-selected.png)
+@@ -263,16 +264,17 @@ browser.jar:
+         skin/classic/aero/browser/tabview/stack-expander.png         (tabview/stack-expander.png)
+         skin/classic/aero/browser/tabview/tabview.png                (tabview/tabview.png)
+         skin/classic/aero/browser/tabview/tabview-inverted.png       (tabview/tabview-inverted.png)
+         skin/classic/aero/browser/tabview/tabview.css                (tabview/tabview.css)
+         skin/classic/aero/browser/devtools/common.css                (devtools/common.css)
+         skin/classic/aero/browser/devtools/arrows.png                (devtools/arrows.png)
+         skin/classic/aero/browser/devtools/goto-mdn.png              (devtools/goto-mdn.png)
+         skin/classic/aero/browser/devtools/csshtmltree.css           (devtools/csshtmltree.css)
++        skin/classic/aero/browser/devtools/layoutview.css            (devtools/layoutview.css)
+         skin/classic/aero/browser/devtools/gcli.css                  (devtools/gcli.css)
+         skin/classic/aero/browser/devtools/toolbarbutton-close.png   (devtools/toolbarbutton-close.png)
+         skin/classic/aero/browser/devtools/webconsole.css                  (devtools/webconsole.css)
+         skin/classic/aero/browser/devtools/webconsole_networkpanel.css     (devtools/webconsole_networkpanel.css)
+         skin/classic/aero/browser/devtools/webconsole.png                  (devtools/webconsole.png)
+         skin/classic/aero/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
+         skin/classic/aero/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
+         skin/classic/aero/browser/devtools/breadcrumbs/ltr-end-selected.png             (devtools/breadcrumbs/ltr-end-selected.png)

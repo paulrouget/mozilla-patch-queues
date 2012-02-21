@@ -1,0 +1,161 @@
+# HG changeset patch
+# Parent dca03760edeac743ec6e38de7c8dffe7afb9c1f5
+Bug 717916 - Add an Inspect button to the infobar
+
+diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlighter.css
+--- a/browser/base/content/highlighter.css
++++ b/browser/base/content/highlighter.css
+@@ -58,27 +58,33 @@
+ }
+ 
+ #highlighter-nodeinfobar {
+   display: block;
+   white-space: nowrap;
+   direction: ltr;
+   overflow: hidden;
+   text-overflow: ellipsis;
++  vertical-align: middle;
++}
++
++#highlighter-nodeinfobar > toolbarbutton {
++  vertical-align: middle;
+ }
+ 
+ #highlighter-nodeinfobar-container[locked] > #highlighter-nodeinfobar {
+   pointer-events: auto;
+ }
+ 
+ html|*#highlighter-nodeinfobar-id,
+ html|*#highlighter-nodeinfobar-classes,
+ html|*#highlighter-nodeinfobar-tagname {
+   -moz-user-select: text;
+   cursor: text;
++  vertical-align: middle;
+ }
+ 
+ .highlighter-nodeinfobar-arrow {
+   display: none;
+ }
+ 
+ #highlighter-nodeinfobar-container[position="top"]:not([hide-arrow]) > #highlighter-nodeinfobar-arrow-bottom {
+   display: block;
+diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/highlighter/highlighter.jsm
+--- a/browser/devtools/highlighter/highlighter.jsm
++++ b/browser/devtools/highlighter/highlighter.jsm
+@@ -405,19 +405,21 @@ Highlighter.prototype = {
+   },
+ 
+   /**
+    * Build the node Infobar.
+    *
+    * <box id="highlighter-nodeinfobar-container">
+    *   <box id="Highlighter-nodeinfobar-arrow-top"/>
+    *   <hbox id="highlighter-nodeinfobar">
++   *     <toolbarbutton class="highlighter-nodeinfobar-button" id="highlighter-nodeinfobar-inspectbutton"/>
+    *     <xhtml:span id="highlighter-nodeinfobar-tagname"/>
+    *     <xhtml:span id="highlighter-nodeinfobar-id"/>
+    *     <xhtml:span id="highlighter-nodeinfobar-classes"/>
++   *     <toolbarbutton class="highlighter-nodeinfobar-button" id="highlighter-nodeinfobar-menu"/>
+    *   </hbox>
+    *   <box id="Highlighter-nodeinfobar-arrow-bottom"/>
+    * </box>
+    *
+    * @param nsIDOMElement aParent
+    *        The container of the infobar.
+    */
+   buildInfobar: function Highlighter_buildInfobar(aParent)
+@@ -444,19 +446,35 @@ Highlighter.prototype = {
+     let idLabel = this.chromeDoc.createElementNS("http://www.w3.org/1999/xhtml", "span");
+     idLabel.id = "highlighter-nodeinfobar-id";
+ 
+     let classesBox = this.chromeDoc.createElementNS("http://www.w3.org/1999/xhtml", "span");
+     classesBox.id = "highlighter-nodeinfobar-classes";
+     // Add some content to force a better boundingClientRect down below.
+     classesBox.textContent = "&nbsp;";
+ 
++    // Create buttons
++
++    let inspect = this.chromeDoc.createElement("toolbarbutton");
++    inspect.id = "highlighter-nodeinfobar-inspectbutton";
++    inspect.className = "highlighter-nodeinfobar-button"
++    inspect.onclick = (function() {
++      this.locked ? this.unlock() : this.lock();
++    }).bind(this);
++
++    let nodemenu = this.chromeDoc.createElement("toolbarbutton");
++    nodemenu.id = "highlighter-nodeinfobar-menu";
++    nodemenu.className = "highlighter-nodeinfobar-button"
++
++    nodeInfobar.appendChild(inspect);
+     nodeInfobar.appendChild(tagNameLabel);
+     nodeInfobar.appendChild(idLabel);
+     nodeInfobar.appendChild(classesBox);
++    nodeInfobar.appendChild(nodemenu);
++
+     container.appendChild(arrowBoxTop);
+     container.appendChild(nodeInfobar);
+     container.appendChild(arrowBoxBottom);
+ 
+     aParent.appendChild(container);
+ 
+     let barHeight = container.getBoundingClientRect().height;
+ 
+diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
+--- a/browser/themes/gnomestripe/browser.css
++++ b/browser/themes/gnomestripe/browser.css
+@@ -2022,23 +2022,54 @@ panel[dimmed="true"] {
+ html|*#highlighter-nodeinfobar-tagname {
+   color: white;
+ }
+ 
+ html|*#highlighter-nodeinfobar-id {
+   color: hsl(90, 79%, 52%);
+ }
+ 
++/* Highlighter - Node Infobar - buttons */
++
++.highlighter-nodeinfobar-button {
++  -moz-appearance: none;
++  border-style: solid;
++  border-color: hsla(210,8%,5%,.45);
++  padding: 0;
++  width: 26px;
++  height: 28px;
++  list-style-image: url("moz-icon://stock/gtk-copy?size=menu");
++}
++
++.highlighter-nodeinfobar-button > .toolbarbutton-text {
++  display: none;
++}
++
++#highlighter-nodeinfobar-container:not([locked]) >  #highlighter-nodeinfobar > .highlighter-nodeinfobar-button {
++  visibility: hidden;
++}
++
++#highlighter-nodeinfobar-inspectbutton {
++  border-width: 0 1px 0 0;
++  box-shadow: 1px 0 0 hsla(210,16%,76%,.15), -1px 0 0 hsla(210,16%,76%,.15) inset;
++  margin-right: 3px;
++}
++
++#highlighter-nodeinfobar-menu {
++  border-width: 0 0 0 1px;
++  box-shadow: -1px 0 0 hsla(210,16%,76%,.15), 1px 0 0 hsla(210,16%,76%,.15) inset;
++  margin-left: 3px;
++}
++
+ /* Highlighter - Node Infobar - box & arrow */
+ 
+ #highlighter-nodeinfobar {
+   color: hsl(200, 100%, 65%);
+   border: 1px solid hsla(210, 19%, 63%, .5);
+   border-radius: 3px;
+-  padding: 8px 16px;
+   background: -moz-linear-gradient(hsl(209, 18%, 30%), hsl(210, 24%, 16%)) no-repeat padding-box;
+ }
+ 
+ .highlighter-nodeinfobar-arrow {
+   width: 14px;
+   height: 14px;
+   -moz-margin-start: -moz-calc(50% - 7px);
+   -moz-transform: rotate(-45deg);

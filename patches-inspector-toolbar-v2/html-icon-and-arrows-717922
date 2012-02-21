@@ -1,0 +1,1029 @@
+# HG changeset patch
+# Parent c6158d757dcbf32e760f924a2cfc2da7b0d4b0c6
+Bug 717922 - In the PageInspector toolbar, move the HTML Tree button in front of the breadcrumbs display
+
+diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul
++++ b/browser/base/content/browser.xul
+@@ -999,17 +999,16 @@
+ #endif
+       <toolbarbutton id="inspector-inspect-toolbutton"
+                      class="devtools-toolbarbutton"
+                      accesskey="&inspectButton.accesskey;"
+                      tooltiptext="&inspectButton.tooltiptext;"
+                      command="Inspector:Inspect"/>
+       <toolbarbutton id="inspector-treepanel-toolbutton"
+                      class="devtools-toolbarbutton"
+-                     label="&htmlPanel.label;"
+                      accesskey="&htmlPanel.accesskey;"
+                      tooltiptext="&htmlPanel.tooltiptext;"
+                      command="Inspector:HTMLPanel"/>
+       <arrowscrollbox id="inspector-breadcrumbs"
+                       flex="1" orient="horizontal"
+                       clicktoscroll="true"/>
+       <hbox id="inspector-tools">
+         <toolbarbutton id="inspector-3D-button"
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -1630,16 +1630,22 @@ HTMLBreadcrumbs.prototype = {
+ 
+     // Siblings menu
+     this.menu = this.IUI.chromeDoc.createElement("menupopup");
+     this.menu.id = "inspector-breadcrumbs-menu";
+ 
+     let popupSet = this.IUI.chromeDoc.getElementById("mainPopupSet");
+     popupSet.appendChild(this.menu);
+ 
++    // By default, hide the arrows. We let the <scrollbox> show them
++    // in case of overflow.
++    this.container.removeAttribute("overflows");
++    this.container._scrollButtonUp.collapsed = true;
++    this.container._scrollButtonDown.collapsed = true;
++
+     this.menu.addEventListener("popuphiding", (function() {
+       while (this.menu.hasChildNodes()) {
+         this.menu.removeChild(this.menu.firstChild);
+       }
+       let button = this.container.querySelector("button[siblings-menu-open]");
+       button.removeAttribute("siblings-menu-open");
+     }).bind(this), false);
+   },
+diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/en-US/chrome/browser/browser.dtd
+--- a/browser/locales/en-US/chrome/browser/browser.dtd
++++ b/browser/locales/en-US/chrome/browser/browser.dtd
+@@ -595,19 +595,15 @@ just addresses the organization to follo
+ <!ENTITY syncSetup.accesskey          "Y">
+ <!ENTITY syncSyncNowItem.label        "Sync Now">
+ <!ENTITY syncSyncNowItem.accesskey    "S">
+ <!ENTITY syncToolbarButton.label      "Sync">
+ 
+ <!ENTITY addonBarCloseButton.tooltip  "Close Add-on Bar">
+ <!ENTITY toggleAddonBarCmd.key        "/">
+ 
+-<!-- LOCALIZATION NOTE (htmlPanel.label): This is a label for a button that
+-activates the Web Developer->Inspect UI's HTML Tree Panel. -->
+-<!ENTITY htmlPanel.label              "HTML">
+-
+ <!-- LOCALIZATION NOTE (htmlPanel.tooltiptext): The text that appears when a user
+ hovers over the HTML panel's toolbar button. -->
+-<!ENTITY htmlPanel.tooltiptext        "HTML panel">
++<!ENTITY htmlPanel.tooltiptext        "HTML panel (&htmlPanel.accesskey;)">
+ 
+ <!-- LOCALIZATION NOTE (htmlPanel.accesskey): The key bound to the HTML panel's
+ toolbar button -->
+ <!ENTITY htmlPanel.accesskey          "H">
+diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
+--- a/browser/themes/gnomestripe/browser.css
++++ b/browser/themes/gnomestripe/browser.css
+@@ -2086,36 +2086,81 @@ html|*#highlighter-nodeinfobar-id {
+   -moz-transition-property: background-color;
+   -moz-transition-duration: 500ms;
+   background-color: rgba(0,0,0,0);
+ }
+ 
+ /* Highlighter toolbar - breadcrumbs */
+ 
+ #inspector-breadcrumbs {
+-  padding: 0 3px;
++  -moz-margin-end: 3px;
+   /* A fake 1px-shadow is included in the border-images of the
+      inspector-breadcrumbs-buttons, to match toolbar-buttons style.
+      This negative margin compensate the extra row of pixels created
+      by the shadow.*/
+   margin-bottom: -1px;
+ }
+ 
++#inspector-breadcrumbs > .scrollbutton-up:-moz-locale-dir(ltr) {
++  border-left-width: 0;
++}
++
++#inspector-breadcrumbs > .scrollbutton-up:-moz-locale-dir(rtl) {
++  border-right-width: 0;
++}
++
+ #inspector-breadcrumbs > .scrollbutton-up,
+ #inspector-breadcrumbs > .scrollbutton-down {
+   -moz-appearance: none;
++  border: 1px solid hsla(210,8%,5%,.45);
++  background: -moz-linear-gradient(hsla(212,7%,57%,.35), hsla(212,7%,57%,.1)) padding-box;
++  box-shadow: 0 1px 0 hsla(210,16%,76%,.15) inset, 0 0 0 1px hsla(210,16%,76%,.15) inset, 0 1px 0 hsla(210,16%,76%,.15);
++  margin: 0 0 1px;
++}
++
++#inspector-breadcrumbs > .scrollbutton-up:not([disabled]):active:hover,
++#inspector-breadcrumbs > .scrollbutton-down:not([disabled]):active:hover {
++  border-color: hsla(210,8%,5%,.6);
++  background: -moz-linear-gradient(hsla(220,6%,10%,.3), hsla(212,7%,57%,.15) 65%, hsla(212,7%,57%,.3));
++  box-shadow: 0 0 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
++}
++
++#inspector-breadcrumbs > .scrollbutton-up:not([disabled]):active:hover > .toolbarbutton-icon,
++#inspector-breadcrumbs > .scrollbutton-down:not([disabled]):active:hover > .toolbarbutton-icon {
++  -moz-image-region: rect(0px 14px 16px 7px);
++}
++
++#inspector-breadcrumbs > .scrollbutton-up > .toolbarbutton-icon,
++#inspector-breadcrumbs > .scrollbutton-down > .toolbarbutton-icon {
++  -moz-appearance: none;
++  list-style-image: url("chrome://browser/skin/devtools/breadcrumbs-scrollbutton.png");
++  -moz-image-region: rect(0px 7px 16px 0px);
++  margin: 0 5px;
++}
++
++#inspector-breadcrumbs > .scrollbutton-up[disabled] > .toolbarbutton-icon,
++#inspector-breadcrumbs > .scrollbutton-down[disabled] > .toolbarbutton-icon {
++  opacity: 0.5;
++}
++
++#inspector-breadcrumbs > .scrollbutton-down > .toolbarbutton-icon:-moz-locale-dir(ltr) {
++  -moz-transform: scaleX(-1);
++}
++
++#inspector-breadcrumbs > .scrollbutton-up > .toolbarbutton-icon:-moz-locale-dir(rtl) {
++  -moz-transform: scaleX(-1);
+ }
+ 
+ .inspector-breadcrumbs-button {
+   -moz-appearance: none;
+   background-color: transparent;
+   border-style: solid;
+   border-width: 1px 13px 2px 13px;
+   color: hsl(210,30%,85%);
+-  max-width: 85px;
++  width: 85px; /* Can't use min-width. See bug 723132 */
+   /* The content of the button can be larger than the button */
+   overflow: hidden;
+   min-height: 25px;
+ 
+   margin: 0 -11px 0 0;
+   padding: 0 9px;
+ }
+ 
+@@ -2131,16 +2176,17 @@ html|*#highlighter-nodeinfobar-id {
+ .inspector-breadcrumbs-classes {
+   color: #8d99a6;
+ }
+ 
+ /* Highlighter toolbar - breadcrumbs - LTR */
+ 
+ .inspector-breadcrumbs-button:-moz-locale-dir(ltr):first-of-type {
+   margin-left: 0;
++  border-left-width: 0;
+ }
+ 
+ .inspector-breadcrumbs-button {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-middle.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button[siblings-menu-open]:not([checked]),
+ .inspector-breadcrumbs-button:not([checked]):hover:active {
+@@ -2173,16 +2219,20 @@ html|*#highlighter-nodeinfobar-id {
+ .inspector-breadcrumbs-button:first-of-type[checked]:hover:active {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start-selected-pressed.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button:last-of-type {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end.png") 1 13 2 13 fill stretch;
+ }
+ 
++#inspector-breadcrumbs[overflows] > .inspector-breadcrumbs-button:-moz-locale-dir(ltr):last-of-type {
++  border-right-width: 0;
++}
++
+ .inspector-breadcrumbs-button[siblings-menu-open]:last-of-type:not([checked]),
+ .inspector-breadcrumbs-button:last-of-type:not([checked]):hover:active {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-pressed.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button:last-of-type[checked] {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected.png") 1 13 2 13 fill stretch;
+ }
+@@ -2191,16 +2241,17 @@ html|*#highlighter-nodeinfobar-id {
+ .inspector-breadcrumbs-button:last-of-type[checked]:hover:active {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected-pressed.png") 1 13 2 13 fill stretch;
+ }
+ 
+ /* Highlighter toolbar - breadcrumbs - RTL */
+ 
+ .inspector-breadcrumbs-button:-moz-locale-dir(rtl):first-of-type {
+   margin-right: 0;
++  border-right-width: 0;
+ }
+ 
+ .inspector-breadcrumbs-button:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-middle.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button[siblings-menu-open]:not([checked]):-moz-locale-dir(rtl),
+ .inspector-breadcrumbs-button:not([checked]):hover:active:-moz-locale-dir(rtl) {
+@@ -2233,31 +2284,55 @@ html|*#highlighter-nodeinfobar-id {
+ .inspector-breadcrumbs-button:first-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start-selected-pressed.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button:last-of-type:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end.png") 1 13 2 13 fill stretch;
+ }
+ 
++#inspector-breadcrumbs[overflows] > .inspector-breadcrumbs-button:last-of-type:-moz-locale-dir(rtl) {
++  border-left-width: 0;
++}
++
+ .inspector-breadcrumbs-button[siblings-menu-open]:last-of-type:not([checked]):-moz-locale-dir(rtl),
+ .inspector-breadcrumbs-button:last-of-type:not([checked]):hover:active:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-pressed.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button:last-of-type[checked]:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-selected.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button[siblings-menu-open]:last-of-type[checked]:-moz-locale-dir(rtl),
+ .inspector-breadcrumbs-button:last-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-selected-pressed.png") 1 13 2 13 fill stretch;
+ }
+ 
+ /* Highlighter toolbar - HTML Tree */
+ 
++#inspector-treepanel-toolbutton {
++  list-style-image: url("chrome://browser/skin/devtools/treepanel-button.png");
++  -moz-margin-end: 0;
++  -moz-image-region: rect(0px 18px 16px 0px);
++}
++
++#inspector-treepanel-toolbutton[checked] {
++  -moz-image-region: rect(0px 36px 16px 18px);
++}
++
++#inspector-breadcrumbs > .scrollbutton-down:-moz-locale-dir(rtl),
++#inspector-treepanel-toolbutton:-moz-locale-dir(ltr) {
++  border-radius: 3px 0 0 3px;
++}
++
++#inspector-breadcrumbs > .scrollbutton-down:-moz-locale-dir(ltr),
++#inspector-treepanel-toolbutton:-moz-locale-dir(rtl) {
++  border-radius: 0 3px 3px 0;
++}
++
+ #inspector-tree-splitter {
+   -moz-appearance: none;
+   height: 4px;
+   border-top: 1px solid hsla(210,8%,5%,.45);
+   border-bottom: 1px solid hsla(210,8%,5%,.45);
+   background: -moz-linear-gradient(top, hsl(210,11%,36%), hsl(210,11%,18%));
+ }
+diff --git a/browser/themes/gnomestripe/devtools/breadcrumbs-scrollbutton.png b/browser/themes/gnomestripe/devtools/breadcrumbs-scrollbutton.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..722438060a89a64789e73bfd79b7a50546c61b4b
+GIT binary patch
+literal 545
+zc$@(t0^a?JP)<h;3K|Lk000e1NJLTq000gE000mO1^@s6CX`M(0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBUz!%0LzRCwB)lTAwkQ51&H9VZPW#Uf3k
+z0yBsTLaA0l1V$}dN2?YQ^cVUQZQIx?ceSWZP_zpAqS^$~hmE1un5m`tQ8+WsbnfVo
+zO|2X_+~J&g=DqKIXNaOG(9A`e23xEyea~F4vKZvcx|tEngjHewfkydQWDQs6AE=n^
+zneBoC;qPqBKhTO)m5X@au7{@GHZJv91;`}YSRJ&4P@Xo>d8HAW>TTnaC9&4Y#AUVt
+zTGXK4{=o}eUNp$>Y~}c(pfcR{dVst><|*hzXaS-3Iuu2@b5wjsFC7zZ2lrg4iO2Ug
+z=g9rpE#WQ;6f|j&ddvU?g}?`zm*hm)^we(oaq4jA6l-T*Ufq=#d~*g>ZlLC=l8i@u
+z2oF;W<od9b+7AUPf&jFJyuK5~J4;X7NDLMiix0X`%AbhdsS&iW*zFq#$qK|2&$t~t
+zV<YCt`2#w0npt?r30(|BKtk0d`Z`8sdLW`GRo`eF)eT-kKWX5u!sVl_8Br7=k^fTT
+zP;=D5Sqf`$G{VB^jtbK_etmMdwc566_ym$tkWXtf!*VyPZrf_N03qo=-ztT1p(RnZ
+j#u<gRS<`>Vw*UhG3c2M}ko?5#00000NkvXXu0mjfohkL*
+
+diff --git a/browser/themes/gnomestripe/devtools/treepanel-button.png b/browser/themes/gnomestripe/devtools/treepanel-button.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..2a8802216bf178bc05813fc592df30d91cd49415
+GIT binary patch
+literal 805
+zc$@(x1KRwFP)<h;3K|Lk000e1NJLTq001Na000mO1^@s6e(T*M0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBU!$4Nv%RCwCVR$FTmK@^_Z-89vNv{qwm
+zODndik(x^}`U{GbLJ)lr5%fv)L45Of_%7H-U%enj2$F&~P-`(Ips`Au*oIzAYMV46
+zo88&*oRE}pd&&6Lz{d=kbG|)u_M2~(a?Z&?`cX$mPdkjq03LwSBHjWN0eL`GTreKx
+z95A>5$VXf7@J4<aQ^f@h;7i0O@1F^rJ|eS&^!K?xqhqlLFwOq6u=3M08XAZ@R3$3I
+zV=!wbk(wVPC;SC_L7hWGLr#-fB^e@&#T<J<^!G1!$v73Q=}hX?v?(NtIowu|0=?5e
+zewyBdxhVsT#he{a$feolW-)1+CXoTgV$Kc?X`Y@g+&H}T?ncM3104YOE}Aky9IG%c
+z05(KTv1rUmsM1HYw&TF15T{Gy9`7O2?sgJIwP}ho(ssB&y8TPsf1xO9imIL-wNV6$
+zl2S_g;*-yAgo0;XGOhpmEnT`ee(9mb$&$#!$M1EWyLS7j!{La?@R$~#na<|NG=&mu
+zTSZtqIXpaUf~MAGhysBCZm5$@<gy|UO-*&ISFK2`QkB#ct!qlz<vi+d-@UIij$=z;
+z>|UBGmWoNkFo+B=7IV;tniNex>IV$MLwpTQ?d3;XfCB6w1LF^KBG>F_-H+(p2QOJ&
+z=qI(xQRtVtI}78ax~0>Nl`T>!E)#AoiVyU?eDUP^NF>}Y)8d&gNiBBy>KiD0o`@X+
+zKN@h;xZ3NDl3s619>&;gX6pGB`uZ^*7F{f;GZYN!hRMn@1&xHm8XO%J4nbWvOz@*T
+z@kMnecO^Mh8sUTIEo&lI=TSuM#9t*0SwF(qy|hy<SET(2V?{sG1U0YSx^s70@S}ZC
+zDa0?sxMsh#XlAy=v#FcgezgCMW)ZWtM!8ku_JZIKbn6sM(vp`Wc2l<p($AA9cGT74
+j|L|<*AGFVpzXA*Z|5Kl~6^V5Y00000NkvXXu0mjflR<IX
+
+diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
+--- a/browser/themes/gnomestripe/jar.mn
++++ b/browser/themes/gnomestripe/jar.mn
+@@ -89,16 +89,17 @@ browser.jar:
+   skin/classic/browser/devtools/arrows.png            (devtools/arrows.png)
+   skin/classic/browser/devtools/goto-mdn.png          (devtools/goto-mdn.png)
+   skin/classic/browser/devtools/csshtmltree.css       (devtools/csshtmltree.css)
+   skin/classic/browser/devtools/webconsole.css                  (devtools/webconsole.css)
+   skin/classic/browser/devtools/webconsole_networkpanel.css     (devtools/webconsole_networkpanel.css)
+   skin/classic/browser/devtools/webconsole.png                  (devtools/webconsole.png)
+   skin/classic/browser/devtools/gcli.css              (devtools/gcli.css)
+   skin/classic/browser/devtools/orion.css             (devtools/orion.css)
++  skin/classic/browser/devtools/breadcrumbs-scrollbutton.png                 (devtools/breadcrumbs-scrollbutton.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-selected.png             (devtools/breadcrumbs/ltr-end-selected.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end.png                      (devtools/breadcrumbs/ltr-end.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-middle-pressed.png           (devtools/breadcrumbs/ltr-middle-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png  (devtools/breadcrumbs/ltr-middle-selected-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected.png          (devtools/breadcrumbs/ltr-middle-selected.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-middle.png                   (devtools/breadcrumbs/ltr-middle.png)
+@@ -120,16 +121,17 @@ browser.jar:
+   skin/classic/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
+   skin/classic/browser/devtools/splitview.css         (devtools/splitview.css)
+   skin/classic/browser/devtools/styleeditor.css       (devtools/styleeditor.css)
+   skin/classic/browser/devtools/magnifying-glass.png  (devtools/magnifying-glass.png)
+   skin/classic/browser/devtools/itemToggle.png        (devtools/itemToggle.png)
+   skin/classic/browser/devtools/itemArrow-rtl.png     (devtools/itemArrow-rtl.png)
+   skin/classic/browser/devtools/itemArrow-ltr.png     (devtools/itemArrow-ltr.png)
+   skin/classic/browser/devtools/inspect-button.png    (devtools/inspect-button.png)
++  skin/classic/browser/devtools/treepanel-button.png  (devtools/treepanel-button.png)
+ #ifdef MOZ_SERVICES_SYNC
+   skin/classic/browser/sync-16-throbber.png
+   skin/classic/browser/sync-16.png
+   skin/classic/browser/sync-24-throbber.png
+   skin/classic/browser/sync-32.png
+   skin/classic/browser/sync-bg.png
+   skin/classic/browser/sync-128.png
+   skin/classic/browser/sync-desktopIcon.png
+diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
+--- a/browser/themes/pinstripe/browser.css
++++ b/browser/themes/pinstripe/browser.css
+@@ -2833,30 +2833,80 @@ html|*#highlighter-nodeinfobar-id {
+   -moz-transition-property: background-color;
+   -moz-transition-duration: 500ms;
+   background-color: rgba(0,0,0,0);
+ }
+ 
+ /* Highlighter toolbar - breadcrumbs */
+ 
+ #inspector-breadcrumbs {
+-  padding: 0 6px;
++  -moz-margin-end: 3px;
+   /* A fake 1px-shadow is included in the border-images of the
+      inspector-breadcrumbs-buttons, to match toolbar-buttons style.
+      This negative margin compensate the extra row of pixels created
+      by the shadow.*/
+   margin-bottom: -1px;
+ }
+ 
++#inspector-breadcrumbs > .scrollbutton-up:-moz-locale-dir(ltr) {
++  border-left-width: 0;
++}
++
++#inspector-breadcrumbs > .scrollbutton-up:-moz-locale-dir(rtl) {
++  border-right-width: 0;
++}
++
++#inspector-breadcrumbs > .scrollbutton-up,
++#inspector-breadcrumbs > .scrollbutton-down {
++  -moz-appearance: none;
++  border: 1px solid hsla(210,8%,5%,.45);
++  background: -moz-linear-gradient(hsla(212,7%,57%,.35), hsla(212,7%,57%,.1)) padding-box;
++  box-shadow: 0 1px 0 hsla(210,16%,76%,.15) inset, 0 0 0 1px hsla(210,16%,76%,.15) inset, 0 1px 0 hsla(210,16%,76%,.15);
++  margin: 0 0 1px;
++}
++
++#inspector-breadcrumbs > .scrollbutton-up:not([disabled]):active:hover,
++#inspector-breadcrumbs > .scrollbutton-down:not([disabled]):active:hover {
++  border-color: hsla(210,8%,5%,.6);
++  background: -moz-linear-gradient(hsla(220,6%,10%,.3), hsla(212,7%,57%,.15) 65%, hsla(212,7%,57%,.3));
++  box-shadow: 0 0 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
++}
++
++#inspector-breadcrumbs > .scrollbutton-up > .toolbarbutton-icon,
++#inspector-breadcrumbs > .scrollbutton-down > .toolbarbutton-icon {
++  -moz-appearance: none;
++  list-style-image: url("chrome://browser/skin/devtools/breadcrumbs-scrollbutton.png");
++  -moz-image-region: rect(0px 7px 16px 0px);
++  margin: 0 5px;
++}
++
++#inspector-breadcrumbs > .scrollbutton-up[disabled] > .toolbarbutton-icon,
++#inspector-breadcrumbs > .scrollbutton-down[disabled] > .toolbarbutton-icon {
++  opacity: 0.5;
++}
++
++#inspector-breadcrumbs > .scrollbutton-up:not([disabled]):active:hover > .toolbarbutton-icon,
++#inspector-breadcrumbs > .scrollbutton-down:not([disabled]):active:hover > .toolbarbutton-icon {
++  -moz-image-region: rect(0px 14px 16px 7px);
++}
++
++#inspector-breadcrumbs > .scrollbutton-down > .toolbarbutton-icon:-moz-locale-dir(ltr) {
++  -moz-transform: scaleX(-1);
++}
++
++#inspector-breadcrumbs > .scrollbutton-up > .toolbarbutton-icon:-moz-locale-dir(rtl) {
++  -moz-transform: scaleX(-1);
++}
++
+ .inspector-breadcrumbs-button {
+   -moz-appearance: none;
+   border-style: solid;
+   border-width: 1px 13px 2px 13px;
+   color: hsl(210,30%,85%);
+-  max-width: 85px;
++  width: 85px; /* Can't use min-width. See bug 723132 */
+   /* The content of the button can be larger than the button */
+   overflow: hidden;
+   min-height: 25px;
+ 
+   margin: 0 -11px 0 0;
+   padding: 0 9px;
+ }
+ 
+@@ -2872,16 +2922,17 @@ html|*#highlighter-nodeinfobar-id {
+ .inspector-breadcrumbs-classes {
+   color: #8d99a6;
+ }
+ 
+ /* Highlighter toolbar - breadcrumbs - LTR */
+ 
+ .inspector-breadcrumbs-button:-moz-locale-dir(ltr):first-of-type {
+   margin-left: 0;
++  border-left-width: 0;
+ }
+ 
+ .inspector-breadcrumbs-button {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-middle.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button[siblings-menu-open]:not([checked]),
+ .inspector-breadcrumbs-button:not([checked]):hover:active {
+@@ -2914,16 +2965,20 @@ html|*#highlighter-nodeinfobar-id {
+ .inspector-breadcrumbs-button:first-of-type[checked]:hover:active {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start-selected-pressed.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button:last-of-type {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end.png") 1 13 2 13 fill stretch;
+ }
+ 
++#inspector-breadcrumbs[overflows] > .inspector-breadcrumbs-button:-moz-locale-dir(ltr):last-of-type {
++  border-right-width: 0;
++}
++
+ .inspector-breadcrumbs-button[siblings-menu-open]:last-of-type:not([checked]),
+ .inspector-breadcrumbs-button:last-of-type:not([checked]):hover:active {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-pressed.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button:last-of-type[checked] {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected.png") 1 13 2 13 fill stretch;
+ }
+@@ -2932,16 +2987,17 @@ html|*#highlighter-nodeinfobar-id {
+ .inspector-breadcrumbs-button:last-of-type[checked]:hover:active {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected-pressed.png") 1 13 2 13 fill stretch;
+ }
+ 
+ /* Highlighter toolbar - breadcrumbs - RTL */
+ 
+ .inspector-breadcrumbs-button:-moz-locale-dir(rtl):first-of-type {
+   margin-right: 0;
++  border-right-width: 0;
+ }
+ 
+ .inspector-breadcrumbs-button:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-middle.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button[siblings-menu-open]:not([checked]):-moz-locale-dir(rtl),
+ .inspector-breadcrumbs-button:not([checked]):hover:active:-moz-locale-dir(rtl) {
+@@ -2974,32 +3030,56 @@ html|*#highlighter-nodeinfobar-id {
+ .inspector-breadcrumbs-button:first-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start-selected-pressed.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button:last-of-type:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end.png") 1 13 2 13 fill stretch;
+ }
+ 
++#inspector-breadcrumbs[overflows] > .inspector-breadcrumbs-button:last-of-type:-moz-locale-dir(rtl) {
++  border-left-width: 0;
++}
++
+ .inspector-breadcrumbs-button[siblings-menu-open]:last-of-type:not([checked]):-moz-locale-dir(rtl),
+ .inspector-breadcrumbs-button:last-of-type:not([checked]):hover:active:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-pressed.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button:last-of-type[checked]:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-selected.png") 1 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button[siblings-menu-open]:last-of-type[checked]:-moz-locale-dir(rtl),
+ .inspector-breadcrumbs-button:last-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-selected-pressed.png") 1 13 2 13 fill stretch;
+ }
+ 
+ /* Highlighter toolbar - HTML Tree */
+ 
++#inspector-treepanel-toolbutton {
++  list-style-image: url("chrome://browser/skin/devtools/treepanel-button.png");
++  -moz-margin-end: 0;
++  -moz-image-region: rect(0px 18px 16px 0px);
++}
++
++#inspector-treepanel-toolbutton[checked] {
++  -moz-image-region: rect(0px 36px 16px 18px);
++}
++
++#inspector-breadcrumbs > .scrollbutton-down:-moz-locale-dir(rtl),
++#inspector-treepanel-toolbutton:-moz-locale-dir(ltr) {
++  border-radius: @toolbarbuttonCornerRadius@ 0 0 @toolbarbuttonCornerRadius@;
++}
++
++#inspector-breadcrumbs > .scrollbutton-down:-moz-locale-dir(ltr),
++#inspector-treepanel-toolbutton:-moz-locale-dir(rtl) {
++  border-radius: 0 @toolbarbuttonCornerRadius@ @toolbarbuttonCornerRadius@ 0;
++}
++
+ #inspector-tree-splitter {
+   -moz-appearance: none;
+   height: 4px;
+   min-height: 4px;
+   border-top: 1px solid hsla(210,8%,5%,.45);
+   border-bottom: 1px solid hsla(210,8%,5%,.45);
+   background: url(devtools/background-noise-toolbar.png), -moz-linear-gradient(top, hsl(210,11%,36%), hsl(210,11%,18%));
+ }
+diff --git a/browser/themes/pinstripe/devtools/breadcrumbs-scrollbutton.png b/browser/themes/pinstripe/devtools/breadcrumbs-scrollbutton.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..722438060a89a64789e73bfd79b7a50546c61b4b
+GIT binary patch
+literal 545
+zc$@(t0^a?JP)<h;3K|Lk000e1NJLTq000gE000mO1^@s6CX`M(0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBUz!%0LzRCwB)lTAwkQ51&H9VZPW#Uf3k
+z0yBsTLaA0l1V$}dN2?YQ^cVUQZQIx?ceSWZP_zpAqS^$~hmE1un5m`tQ8+WsbnfVo
+zO|2X_+~J&g=DqKIXNaOG(9A`e23xEyea~F4vKZvcx|tEngjHewfkydQWDQs6AE=n^
+zneBoC;qPqBKhTO)m5X@au7{@GHZJv91;`}YSRJ&4P@Xo>d8HAW>TTnaC9&4Y#AUVt
+zTGXK4{=o}eUNp$>Y~}c(pfcR{dVst><|*hzXaS-3Iuu2@b5wjsFC7zZ2lrg4iO2Ug
+z=g9rpE#WQ;6f|j&ddvU?g}?`zm*hm)^we(oaq4jA6l-T*Ufq=#d~*g>ZlLC=l8i@u
+z2oF;W<od9b+7AUPf&jFJyuK5~J4;X7NDLMiix0X`%AbhdsS&iW*zFq#$qK|2&$t~t
+zV<YCt`2#w0npt?r30(|BKtk0d`Z`8sdLW`GRo`eF)eT-kKWX5u!sVl_8Br7=k^fTT
+zP;=D5Sqf`$G{VB^jtbK_etmMdwc566_ym$tkWXtf!*VyPZrf_N03qo=-ztT1p(RnZ
+j#u<gRS<`>Vw*UhG3c2M}ko?5#00000NkvXXu0mjfohkL*
+
+diff --git a/browser/themes/pinstripe/devtools/treepanel-button.png b/browser/themes/pinstripe/devtools/treepanel-button.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..2a8802216bf178bc05813fc592df30d91cd49415
+GIT binary patch
+literal 805
+zc$@(x1KRwFP)<h;3K|Lk000e1NJLTq001Na000mO1^@s6e(T*M0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBU!$4Nv%RCwCVR$FTmK@^_Z-89vNv{qwm
+zODndik(x^}`U{GbLJ)lr5%fv)L45Of_%7H-U%enj2$F&~P-`(Ips`Au*oIzAYMV46
+zo88&*oRE}pd&&6Lz{d=kbG|)u_M2~(a?Z&?`cX$mPdkjq03LwSBHjWN0eL`GTreKx
+z95A>5$VXf7@J4<aQ^f@h;7i0O@1F^rJ|eS&^!K?xqhqlLFwOq6u=3M08XAZ@R3$3I
+zV=!wbk(wVPC;SC_L7hWGLr#-fB^e@&#T<J<^!G1!$v73Q=}hX?v?(NtIowu|0=?5e
+zewyBdxhVsT#he{a$feolW-)1+CXoTgV$Kc?X`Y@g+&H}T?ncM3104YOE}Aky9IG%c
+z05(KTv1rUmsM1HYw&TF15T{Gy9`7O2?sgJIwP}ho(ssB&y8TPsf1xO9imIL-wNV6$
+zl2S_g;*-yAgo0;XGOhpmEnT`ee(9mb$&$#!$M1EWyLS7j!{La?@R$~#na<|NG=&mu
+zTSZtqIXpaUf~MAGhysBCZm5$@<gy|UO-*&ISFK2`QkB#ct!qlz<vi+d-@UIij$=z;
+z>|UBGmWoNkFo+B=7IV;tniNex>IV$MLwpTQ?d3;XfCB6w1LF^KBG>F_-H+(p2QOJ&
+z=qI(xQRtVtI}78ax~0>Nl`T>!E)#AoiVyU?eDUP^NF>}Y)8d&gNiBBy>KiD0o`@X+
+zKN@h;xZ3NDl3s619>&;gX6pGB`uZ^*7F{f;GZYN!hRMn@1&xHm8XO%J4nbWvOz@*T
+z@kMnecO^Mh8sUTIEo&lI=TSuM#9t*0SwF(qy|hy<SET(2V?{sG1U0YSx^s70@S}ZC
+zDa0?sxMsh#XlAy=v#FcgezgCMW)ZWtM!8ku_JZIKbn6sM(vp`Wc2l<p($AA9cGT74
+j|L|<*AGFVpzXA*Z|5Kl~6^V5Y00000NkvXXu0mjflR<IX
+
+diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
+--- a/browser/themes/pinstripe/jar.mn
++++ b/browser/themes/pinstripe/jar.mn
+@@ -129,16 +129,17 @@ browser.jar:
+   skin/classic/browser/devtools/goto-mdn.png                (devtools/goto-mdn.png)
+   skin/classic/browser/devtools/csshtmltree.css             (devtools/csshtmltree.css)
+   skin/classic/browser/devtools/gcli.css                    (devtools/gcli.css)
+   skin/classic/browser/devtools/orion.css                   (devtools/orion.css)
+   skin/classic/browser/devtools/toolbarbutton-close.png     (devtools/toolbarbutton-close.png)
+ * skin/classic/browser/devtools/webconsole.css                  (devtools/webconsole.css)
+   skin/classic/browser/devtools/webconsole_networkpanel.css     (devtools/webconsole_networkpanel.css)
+   skin/classic/browser/devtools/webconsole.png                  (devtools/webconsole.png)
++  skin/classic/browser/devtools/breadcrumbs-scrollbutton.png                 (devtools/breadcrumbs-scrollbutton.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-selected.png             (devtools/breadcrumbs/ltr-end-selected.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end.png                      (devtools/breadcrumbs/ltr-end.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-middle-pressed.png           (devtools/breadcrumbs/ltr-middle-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png  (devtools/breadcrumbs/ltr-middle-selected-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected.png          (devtools/breadcrumbs/ltr-middle-selected.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-middle.png                   (devtools/breadcrumbs/ltr-middle.png)
+@@ -161,16 +162,17 @@ browser.jar:
+   skin/classic/browser/devtools/splitview.css               (devtools/splitview.css)
+   skin/classic/browser/devtools/styleeditor.css             (devtools/styleeditor.css)
+   skin/classic/browser/devtools/magnifying-glass.png	    (devtools/magnifying-glass.png)
+   skin/classic/browser/devtools/itemToggle.png		    (devtools/itemToggle.png)
+   skin/classic/browser/devtools/itemArrow-rtl.png	    (devtools/itemArrow-rtl.png)
+   skin/classic/browser/devtools/itemArrow-ltr.png	    (devtools/itemArrow-ltr.png)
+   skin/classic/browser/devtools/background-noise-toolbar.png (devtools/background-noise-toolbar.png)
+   skin/classic/browser/devtools/inspect-button.png    (devtools/inspect-button.png)
++  skin/classic/browser/devtools/treepanel-button.png  (devtools/treepanel-button.png)
+ #ifdef MOZ_SERVICES_SYNC
+   skin/classic/browser/sync-throbber.png
+   skin/classic/browser/sync-16.png
+   skin/classic/browser/sync-32.png
+   skin/classic/browser/sync-bg.png
+   skin/classic/browser/sync-128.png
+   skin/classic/browser/sync-desktopIcon.png
+   skin/classic/browser/sync-mobileIcon.png
+diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/browser.css
+--- a/browser/themes/winstripe/browser.css
++++ b/browser/themes/winstripe/browser.css
+@@ -2766,37 +2766,82 @@ html|*#highlighter-nodeinfobar-id {
+   -moz-transition-property: background-color;
+   -moz-transition-duration: 500ms;
+   background-color: rgba(0,0,0,0);
+ }
+ 
+ /* Highlighter toolbar - breadcrumbs */
+ 
+ #inspector-breadcrumbs {
+-  padding: 0 6px;
++  -moz-margin-end: 3px;
+   /* A fake 1px-shadow is included in the border-images of the
+      inspector-breadcrumbs-buttons, to match toolbar-buttons style.
+      This negative margin compensate the extra row of pixels created
+      by the shadow.*/
+   margin: -1px 0;
+ }
+ 
++#inspector-breadcrumbs > .scrollbutton-up:-moz-locale-dir(ltr) {
++  border-left-width: 0;
++}
++
++#inspector-breadcrumbs > .scrollbutton-up:-moz-locale-dir(rtl) {
++  border-right-width: 0;
++}
++
+ #inspector-breadcrumbs > .scrollbutton-up,
+ #inspector-breadcrumbs > .scrollbutton-down {
+   -moz-appearance: none;
++  border: 1px solid hsla(210,8%,5%,.45);
++  background: -moz-linear-gradient(hsla(212,7%,57%,.35), hsla(212,7%,57%,.1)) padding-box;
++  box-shadow: 0 1px 0 hsla(210,16%,76%,.15) inset, 0 0 0 1px hsla(210,16%,76%,.15) inset, 0 1px 0 hsla(210,16%,76%,.15);
++  margin: 0 0 1px;
++}
++
++#inspector-breadcrumbs > .scrollbutton-up:not([disabled]):active:hover,
++#inspector-breadcrumbs > .scrollbutton-down:not([disabled]):active:hover {
++  border-color: hsla(210,8%,5%,.6);
++  background: -moz-linear-gradient(hsla(220,6%,10%,.3), hsla(212,7%,57%,.15) 65%, hsla(212,7%,57%,.3));
++  box-shadow: 0 0 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
++}
++
++#inspector-breadcrumbs > .scrollbutton-up > .toolbarbutton-icon,
++#inspector-breadcrumbs > .scrollbutton-down > .toolbarbutton-icon {
++  -moz-appearance: none;
++  list-style-image: url("chrome://browser/skin/devtools/breadcrumbs-scrollbutton.png");
++  -moz-image-region: rect(0px 7px 16px 0px);
++  margin: 0 5px;
++}
++
++#inspector-breadcrumbs > .scrollbutton-up[disabled] > .toolbarbutton-icon,
++#inspector-breadcrumbs > .scrollbutton-down[disabled] > .toolbarbutton-icon {
++  opacity: 0.5;
++}
++
++#inspector-breadcrumbs > .scrollbutton-up:not([disabled]):active:hover > .toolbarbutton-icon,
++#inspector-breadcrumbs > .scrollbutton-down:not([disabled]):active:hover > .toolbarbutton-icon {
++  -moz-image-region: rect(0px 14px 16px 7px);
++}
++
++#inspector-breadcrumbs > .scrollbutton-down > .toolbarbutton-icon:-moz-locale-dir(ltr) {
++  -moz-transform: scaleX(-1);
++}
++
++#inspector-breadcrumbs > .scrollbutton-up > .toolbarbutton-icon:-moz-locale-dir(rtl) {
++  -moz-transform: scaleX(-1);
+ }
+ 
+ .inspector-breadcrumbs-button {
+   -moz-appearance: none;
+   background-color: transparent;
+   border-style: solid;
+   border-width: 2px 13px;
+   outline: none;
+   color: hsl(210,30%,85%);
+-  max-width: 85px;
++  width: 85px; /* Can't use min-width. See bug 723132 */
+   /* The content of the button can be larger than the button */
+   overflow: hidden;
+   min-height: 25px;
+   margin: 0 -11px 0 0;
+   padding: 0 9px;
+ }
+ 
+ .inspector-breadcrumbs-button[checked] > .inspector-breadcrumbs-tag {
+@@ -2811,16 +2856,17 @@ html|*#highlighter-nodeinfobar-id {
+ .inspector-breadcrumbs-classes {
+   color: #8d99a6;
+ }
+ 
+ /* Highlighter toolbar - breadcrumbs - LTR */
+ 
+ .inspector-breadcrumbs-button:-moz-locale-dir(ltr):first-of-type {
+   margin-left: 0;
++  border-left-width: 0;
+ }
+ 
+ .inspector-breadcrumbs-button {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-middle.png") 2 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button[siblings-menu-open]:not([checked]),
+ .inspector-breadcrumbs-button:not([checked]):hover:active {
+@@ -2853,16 +2899,20 @@ html|*#highlighter-nodeinfobar-id {
+ .inspector-breadcrumbs-button:first-of-type[checked]:hover:active {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start-selected-pressed.png") 2 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button:last-of-type {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end.png") 2 13 2 13 fill stretch;
+ }
+ 
++#inspector-breadcrumbs[overflows] > .inspector-breadcrumbs-button:-moz-locale-dir(ltr):last-of-type {
++  border-right-width: 0;
++}
++
+ .inspector-breadcrumbs-button[siblings-menu-open]:last-of-type:not([checked]),
+ .inspector-breadcrumbs-button:last-of-type:not([checked]):hover:active {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-pressed.png") 2 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button:last-of-type[checked] {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected.png") 2 13 2 13 fill stretch;
+ }
+@@ -2871,16 +2921,17 @@ html|*#highlighter-nodeinfobar-id {
+ .inspector-breadcrumbs-button:last-of-type[checked]:hover:active {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected-pressed.png") 2 13 2 13 fill stretch;
+ }
+ 
+ /* Highlighter toolbar - breadcrumbs - RTL */
+ 
+ .inspector-breadcrumbs-button:-moz-locale-dir(rtl):first-of-type {
+   margin-right: 0;
++  border-right-width: 0;
+ }
+ 
+ .inspector-breadcrumbs-button:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-middle.png") 2 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button[siblings-menu-open]:not([checked]):-moz-locale-dir(rtl),
+ .inspector-breadcrumbs-button:not([checked]):hover:active:-moz-locale-dir(rtl) {
+@@ -2913,32 +2964,56 @@ html|*#highlighter-nodeinfobar-id {
+ .inspector-breadcrumbs-button:first-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start-selected-pressed.png") 2 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button:last-of-type:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end.png") 2 13 2 13 fill stretch;
+ }
+ 
++#inspector-breadcrumbs[overflows] > .inspector-breadcrumbs-button:last-of-type:-moz-locale-dir(rtl) {
++  border-left-width: 0;
++}
++
+ .inspector-breadcrumbs-button[siblings-menu-open]:last-of-type:not([checked]):-moz-locale-dir(rtl),
+ .inspector-breadcrumbs-button:last-of-type:not([checked]):hover:active:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-pressed.png") 2 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button:last-of-type[checked]:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-selected.png") 2 13 2 13 fill stretch;
+ }
+ 
+ .inspector-breadcrumbs-button[siblings-menu-open]:last-of-type[checked]:-moz-locale-dir(rtl),
+ .inspector-breadcrumbs-button:last-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
+   -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-end-selected-pressed.png") 2 13 2 13 fill stretch;
+ }
+ 
+ /* Highlighter toolbar - HTML Tree */
+ 
++#inspector-treepanel-toolbutton {
++  list-style-image: url("chrome://browser/skin/devtools/treepanel-button.png");
++  -moz-margin-end: 0;
++  -moz-image-region: rect(0px 18px 16px 0px);
++}
++
++#inspector-treepanel-toolbutton[checked] {
++  -moz-image-region: rect(0px 36px 16px 18px);
++}
++
++#inspector-breadcrumbs > .scrollbutton-down:-moz-locale-dir(rtl),
++#inspector-treepanel-toolbutton:-moz-locale-dir(ltr) {
++  border-radius: 3px 0 0 3px;
++}
++
++#inspector-breadcrumbs > .scrollbutton-down:-moz-locale-dir(ltr),
++#inspector-treepanel-toolbutton:-moz-locale-dir(rtl) {
++  border-radius: 0 3px 3px 0;
++}
++
+ #inspector-tree-splitter {
+   -moz-appearance: none;
+   height: 4px;
+   min-height: 4px;
+   border-top: 1px solid hsla(211,68%,6%,.5);
+   border-bottom: 1px solid hsla(211,68%,6%,.5);
+   background: -moz-linear-gradient(top, hsl(209,18%,34%), hsl(210,24%,16%));
+ }
+diff --git a/browser/themes/winstripe/devtools/breadcrumbs-scrollbutton.png b/browser/themes/winstripe/devtools/breadcrumbs-scrollbutton.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..722438060a89a64789e73bfd79b7a50546c61b4b
+GIT binary patch
+literal 545
+zc$@(t0^a?JP)<h;3K|Lk000e1NJLTq000gE000mO1^@s6CX`M(0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBUz!%0LzRCwB)lTAwkQ51&H9VZPW#Uf3k
+z0yBsTLaA0l1V$}dN2?YQ^cVUQZQIx?ceSWZP_zpAqS^$~hmE1un5m`tQ8+WsbnfVo
+zO|2X_+~J&g=DqKIXNaOG(9A`e23xEyea~F4vKZvcx|tEngjHewfkydQWDQs6AE=n^
+zneBoC;qPqBKhTO)m5X@au7{@GHZJv91;`}YSRJ&4P@Xo>d8HAW>TTnaC9&4Y#AUVt
+zTGXK4{=o}eUNp$>Y~}c(pfcR{dVst><|*hzXaS-3Iuu2@b5wjsFC7zZ2lrg4iO2Ug
+z=g9rpE#WQ;6f|j&ddvU?g}?`zm*hm)^we(oaq4jA6l-T*Ufq=#d~*g>ZlLC=l8i@u
+z2oF;W<od9b+7AUPf&jFJyuK5~J4;X7NDLMiix0X`%AbhdsS&iW*zFq#$qK|2&$t~t
+zV<YCt`2#w0npt?r30(|BKtk0d`Z`8sdLW`GRo`eF)eT-kKWX5u!sVl_8Br7=k^fTT
+zP;=D5Sqf`$G{VB^jtbK_etmMdwc566_ym$tkWXtf!*VyPZrf_N03qo=-ztT1p(RnZ
+j#u<gRS<`>Vw*UhG3c2M}ko?5#00000NkvXXu0mjfohkL*
+
+diff --git a/browser/themes/winstripe/devtools/treepanel-button.png b/browser/themes/winstripe/devtools/treepanel-button.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..2a8802216bf178bc05813fc592df30d91cd49415
+GIT binary patch
+literal 805
+zc$@(x1KRwFP)<h;3K|Lk000e1NJLTq001Na000mO1^@s6e(T*M0000PbVXQnQ*UN;
+zcVTj606}DLVr3vnZDD6+Qe|Oed2z{QJOBU!$4Nv%RCwCVR$FTmK@^_Z-89vNv{qwm
+zODndik(x^}`U{GbLJ)lr5%fv)L45Of_%7H-U%enj2$F&~P-`(Ips`Au*oIzAYMV46
+zo88&*oRE}pd&&6Lz{d=kbG|)u_M2~(a?Z&?`cX$mPdkjq03LwSBHjWN0eL`GTreKx
+z95A>5$VXf7@J4<aQ^f@h;7i0O@1F^rJ|eS&^!K?xqhqlLFwOq6u=3M08XAZ@R3$3I
+zV=!wbk(wVPC;SC_L7hWGLr#-fB^e@&#T<J<^!G1!$v73Q=}hX?v?(NtIowu|0=?5e
+zewyBdxhVsT#he{a$feolW-)1+CXoTgV$Kc?X`Y@g+&H}T?ncM3104YOE}Aky9IG%c
+z05(KTv1rUmsM1HYw&TF15T{Gy9`7O2?sgJIwP}ho(ssB&y8TPsf1xO9imIL-wNV6$
+zl2S_g;*-yAgo0;XGOhpmEnT`ee(9mb$&$#!$M1EWyLS7j!{La?@R$~#na<|NG=&mu
+zTSZtqIXpaUf~MAGhysBCZm5$@<gy|UO-*&ISFK2`QkB#ct!qlz<vi+d-@UIij$=z;
+z>|UBGmWoNkFo+B=7IV;tniNex>IV$MLwpTQ?d3;XfCB6w1LF^KBG>F_-H+(p2QOJ&
+z=qI(xQRtVtI}78ax~0>Nl`T>!E)#AoiVyU?eDUP^NF>}Y)8d&gNiBBy>KiD0o`@X+
+zKN@h;xZ3NDl3s619>&;gX6pGB`uZ^*7F{f;GZYN!hRMn@1&xHm8XO%J4nbWvOz@*T
+z@kMnecO^Mh8sUTIEo&lI=TSuM#9t*0SwF(qy|hy<SET(2V?{sG1U0YSx^s70@S}ZC
+zDa0?sxMsh#XlAy=v#FcgezgCMW)ZWtM!8ku_JZIKbn6sM(vp`Wc2l<p($AA9cGT74
+j|L|<*AGFVpzXA*Z|5Kl~6^V5Y00000NkvXXu0mjflR<IX
+
+diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
+--- a/browser/themes/winstripe/jar.mn
++++ b/browser/themes/winstripe/jar.mn
+@@ -113,16 +113,17 @@ browser.jar:
+         skin/classic/browser/devtools/goto-mdn.png                  (devtools/goto-mdn.png)
+         skin/classic/browser/devtools/csshtmltree.css               (devtools/csshtmltree.css)
+         skin/classic/browser/devtools/gcli.css                      (devtools/gcli.css)
+         skin/classic/browser/devtools/orion.css                     (devtools/orion.css)
+         skin/classic/browser/devtools/toolbarbutton-close.png       (devtools/toolbarbutton-close.png)
+         skin/classic/browser/devtools/webconsole.css                  (devtools/webconsole.css)
+         skin/classic/browser/devtools/webconsole_networkpanel.css     (devtools/webconsole_networkpanel.css)
+         skin/classic/browser/devtools/webconsole.png                  (devtools/webconsole.png)
++        skin/classic/browser/devtools/breadcrumbs-scrollbutton.png                 (devtools/breadcrumbs-scrollbutton.png)
+         skin/classic/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
+         skin/classic/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
+         skin/classic/browser/devtools/breadcrumbs/ltr-end-selected.png             (devtools/breadcrumbs/ltr-end-selected.png)
+         skin/classic/browser/devtools/breadcrumbs/ltr-end.png                      (devtools/breadcrumbs/ltr-end.png)
+         skin/classic/browser/devtools/breadcrumbs/ltr-middle-pressed.png           (devtools/breadcrumbs/ltr-middle-pressed.png)
+         skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png  (devtools/breadcrumbs/ltr-middle-selected-pressed.png)
+         skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected.png          (devtools/breadcrumbs/ltr-middle-selected.png)
+         skin/classic/browser/devtools/breadcrumbs/ltr-middle.png                   (devtools/breadcrumbs/ltr-middle.png)
+@@ -144,16 +145,17 @@ browser.jar:
+         skin/classic/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
+         skin/classic/browser/devtools/splitview.css                 (devtools/splitview.css)
+         skin/classic/browser/devtools/styleeditor.css               (devtools/styleeditor.css)
+         skin/classic/browser/devtools/magnifying-glass.png          (devtools/magnifying-glass.png)
+         skin/classic/browser/devtools/itemToggle.png                (devtools/itemToggle.png)
+         skin/classic/browser/devtools/itemArrow-rtl.png             (devtools/itemArrow-rtl.png)
+         skin/classic/browser/devtools/itemArrow-ltr.png             (devtools/itemArrow-ltr.png)
+         skin/classic/browser/devtools/inspect-button.png            (devtools/inspect-button.png)
++        skin/classic/browser/devtools/treepanel-button.png          (devtools/treepanel-button.png)
+ #ifdef MOZ_SERVICES_SYNC
+         skin/classic/browser/sync-throbber.png
+         skin/classic/browser/sync-16.png
+         skin/classic/browser/sync-32.png
+         skin/classic/browser/sync-128.png
+         skin/classic/browser/sync-bg.png
+         skin/classic/browser/sync-desktopIcon.png
+         skin/classic/browser/sync-mobileIcon.png
+@@ -277,16 +279,17 @@ browser.jar:
+         skin/classic/aero/browser/devtools/goto-mdn.png              (devtools/goto-mdn.png)
+         skin/classic/aero/browser/devtools/csshtmltree.css           (devtools/csshtmltree.css)
+         skin/classic/aero/browser/devtools/gcli.css                  (devtools/gcli.css)
+         skin/classic/aero/browser/devtools/orion.css                 (devtools/orion.css)
+         skin/classic/aero/browser/devtools/toolbarbutton-close.png   (devtools/toolbarbutton-close.png)
+         skin/classic/aero/browser/devtools/webconsole.css                  (devtools/webconsole.css)
+         skin/classic/aero/browser/devtools/webconsole_networkpanel.css     (devtools/webconsole_networkpanel.css)
+         skin/classic/aero/browser/devtools/webconsole.png                  (devtools/webconsole.png)
++        skin/classic/aero/browser/devtools/breadcrumbs-scrollbutton.png                 (devtools/breadcrumbs-scrollbutton.png)
+         skin/classic/aero/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
+         skin/classic/aero/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
+         skin/classic/aero/browser/devtools/breadcrumbs/ltr-end-selected.png             (devtools/breadcrumbs/ltr-end-selected.png)
+         skin/classic/aero/browser/devtools/breadcrumbs/ltr-end.png                      (devtools/breadcrumbs/ltr-end.png)
+         skin/classic/aero/browser/devtools/breadcrumbs/ltr-middle-pressed.png           (devtools/breadcrumbs/ltr-middle-pressed.png)
+         skin/classic/aero/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png  (devtools/breadcrumbs/ltr-middle-selected-pressed.png)
+         skin/classic/aero/browser/devtools/breadcrumbs/ltr-middle-selected.png          (devtools/breadcrumbs/ltr-middle-selected.png)
+         skin/classic/aero/browser/devtools/breadcrumbs/ltr-middle.png                   (devtools/breadcrumbs/ltr-middle.png)
+@@ -308,16 +311,17 @@ browser.jar:
+         skin/classic/aero/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
+         skin/classic/aero/browser/devtools/splitview.css             (devtools/splitview.css)
+         skin/classic/aero/browser/devtools/styleeditor.css           (devtools/styleeditor.css)
+         skin/classic/aero/browser/devtools/magnifying-glass.png      (devtools/magnifying-glass.png)
+         skin/classic/aero/browser/devtools/itemToggle.png            (devtools/itemToggle.png)
+         skin/classic/aero/browser/devtools/itemArrow-rtl.png         (devtools/itemArrow-rtl.png)
+         skin/classic/aero/browser/devtools/itemArrow-ltr.png         (devtools/itemArrow-ltr.png)
+         skin/classic/aero/browser/devtools/inspect-button.png        (devtools/inspect-button.png)
++        skin/classic/aero/browser/devtools/treepanel-button.png      (devtools/treepanel-button.png)
+ #ifdef MOZ_SERVICES_SYNC
+         skin/classic/aero/browser/sync-throbber.png
+         skin/classic/aero/browser/sync-16.png
+         skin/classic/aero/browser/sync-32.png
+         skin/classic/aero/browser/sync-128.png
+         skin/classic/aero/browser/sync-bg.png
+         skin/classic/aero/browser/sync-desktopIcon.png
+         skin/classic/aero/browser/sync-mobileIcon.png
+diff --git a/toolkit/content/widgets/scrollbox.xml b/toolkit/content/widgets/scrollbox.xml
+--- a/toolkit/content/widgets/scrollbox.xml
++++ b/toolkit/content/widgets/scrollbox.xml
+@@ -515,26 +515,28 @@
+           if (event.detail == 1)
+             return;
+         }
+         else {    // horizontal scrollbox
+           if (event.detail == 0)
+             return;
+         }
+ 
++        this.removeAttribute("overflows");
+         this._scrollButtonUp.collapsed = true;
+         this._scrollButtonDown.collapsed = true;
+         try {
+           // See bug 341047 and comments in overflow handler as to why 
+           // try..catch is needed here
+           let childNodes = this._getScrollableElements();
+           if (childNodes && childNodes.length)
+             this.ensureElementIsVisible(childNodes[0], false);
+         }
+         catch(e) {
++          this.setAttribute("overflows", true);
+           this._scrollButtonUp.collapsed = false;
+           this._scrollButtonDown.collapsed = false;
+         }
+       ]]></handler>
+ 
+       <handler event="overflow" phase="capturing"><![CDATA[
+         // filter underflow events which were dispatched on nested scrollboxes
+         if (event.target != this)
+@@ -549,28 +551,30 @@
+           if (event.detail == 1)
+             return;
+         }
+         else {    // horizontal scrollbox
+           if (event.detail == 0)
+             return;
+         }
+ 
++        this.setAttribute("overflows", true);
+         this._scrollButtonUp.collapsed = false;
+         this._scrollButtonDown.collapsed = false;
+         try {
+           // See bug 341047, the overflow event is dispatched when the 
+           // scrollbox already is mostly destroyed. This causes some code in
+           // _updateScrollButtonsDisabledState() to throw an error. It also
+           // means that the scrollbarbuttons were uncollapsed when that should
+           // not be happening, because the whole overflow event should not be
+           // happening in that case.
+           this._updateScrollButtonsDisabledState();
+         } 
+         catch(e) {
++          this.removeAttribute("overflows");
+           this._scrollButtonUp.collapsed = true;
+           this._scrollButtonDown.collapsed = true;
+         }
+       ]]></handler>
+ 
+       <handler event="scroll" action="this._updateScrollButtonsDisabledState()"/>
+     </handlers>
+   </binding>
+@@ -650,17 +654,17 @@
+         stop: function arrowSmoothScroll_stop() {
+           window.mozCancelAnimationFrame(this.requestHandle);
+           this.requestHandle = 0;
+         },
+         sample: function arrowSmoothScroll_handleEvent(timeStamp) {
+           const scrollIndex = this.scrollbox._scrollIndex;
+           const timePassed = timeStamp - this.lastFrameTime;
+           this.lastFrameTime = timeStamp;
+-          
++
+           const scrollDelta = 0.5 * timePassed * scrollIndex;
+           this.scrollbox.scrollPosition += scrollDelta;
+ 
+           window.mozRequestAnimationFrame(this);
+         }
+       })]]></field>
+ 
+       <method name="_startScroll">

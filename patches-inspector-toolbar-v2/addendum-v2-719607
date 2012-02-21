@@ -1,0 +1,366 @@
+# vim: se ft=diff :
+# HG changeset patch
+# User Dave Camp <dcamp>
+# Date 2012-01-30 09:10
+Bug 719607 - "The HTML Tree Panel should NOT use the registerTools mechanism" []
+
+# HG changeset patch
+# Parent 4fb34fac1cb4c3ce711f8112b75e83ba63ce982e
+
+diff --git a/browser/devtools/highlighter/TreePanel.jsm b/browser/devtools/highlighter/TreePanel.jsm
+--- a/browser/devtools/highlighter/TreePanel.jsm
++++ b/browser/devtools/highlighter/TreePanel.jsm
+@@ -59,32 +59,28 @@ const INSPECTOR_URI = "chrome://browser/
+  */
+ function TreePanel(aContext, aIUI) {
+   this._init(aContext, aIUI);
+ };
+ 
+ TreePanel.prototype = {
+   showTextNodesWithWhitespace: false,
+   id: "treepanel", // DO NOT LOCALIZE
+-  openInDock: true,
++  _open: false,
+ 
+   /**
+    * The tree panel container element.
+    * @returns xul:panel|xul:vbox|null
+    *          xul:panel is returned when the tree panel is not docked, or
+    *          xul:vbox when when the tree panel is docked.
+    *          null is returned when no container is available.
+    */
+   get container()
+   {
+-    if (this.openInDock) {
+-      return this.document.getElementById("inspector-tree-box");
+-    }
+-
+-    return this.document.getElementById("inspector-tree-panel");
++    return this.document.getElementById("inspector-tree-box");
+   },
+ 
+   /**
+    * Main TreePanel boot-strapping method. Initialize the TreePanel with the
+    * originating context and the InspectorUI global.
+    * @param aContext nsIDOMWindow (xulwindow)
+    * @param aIUI global InspectorUI object
+    */
+@@ -98,21 +94,16 @@ TreePanel.prototype = {
+ 
+     domplateUtils.setDOM(this.window);
+ 
+     this.DOMHelpers = new DOMHelpers(this.window);
+ 
+     let isOpen = this.isOpen.bind(this);
+ 
+     this.editingEvents = {};
+-
+-    if (!this.openInDock) {
+-      this._boundClose = this.close.bind(this);
+-      this.container.addEventListener("popuphiding", this._boundClose, false);
+-    }
+   },
+ 
+   /**
+    * Initialization function for the TreePanel.
+    */
+   initializeIFrame: function TP_initializeIFrame()
+   {
+     if (!this.initializingTreePanel || this.treeLoaded) {
+@@ -135,83 +126,33 @@ TreePanel.prototype = {
+       this.select(this.IUI.selection, true);
+   },
+ 
+   /**
+    * Open the inspector's tree panel and initialize it.
+    */
+   open: function TP_open()
+   {
+-    if (this.initializingTreePanel && !this.treeLoaded) {
++    if (this._open) {
+       return;
+     }
+ 
++    this._open = true;
++
+     this.button.setAttribute("checked", true);
+     this.initializingTreePanel = true;
+-    if (!this.openInDock)
+-      this.container.hidden = false;
+ 
+     this.treeIFrame = this.document.getElementById("inspector-tree-iframe");
+     if (!this.treeIFrame) {
+       this.treeIFrame = this.document.createElement("iframe");
+       this.treeIFrame.setAttribute("id", "inspector-tree-iframe");
+       this.treeIFrame.flex = 1;
+       this.treeIFrame.setAttribute("type", "content");
+     }
+ 
+-    if (this.openInDock) { // Create vbox
+-      this.openDocked();
+-      return;
+-    }
+-
+-    let resizerBox = this.document.getElementById("tree-panel-resizer-box");
+-    this.treeIFrame = this.container.insertBefore(this.treeIFrame, resizerBox);
+-
+-    let boundLoadedInitializeTreePanel = function loadedInitializeTreePanel()
+-    {
+-      this.treeIFrame.removeEventListener("load",
+-        boundLoadedInitializeTreePanel, true);
+-      this.initializeIFrame();
+-    }.bind(this);
+-
+-    let boundTreePanelShown = function treePanelShown()
+-    {
+-      this.container.removeEventListener("popupshown",
+-        boundTreePanelShown, false);
+-
+-      this.treeIFrame.addEventListener("load",
+-        boundLoadedInitializeTreePanel, true);
+-
+-      let src = this.treeIFrame.getAttribute("src");
+-      if (src != INSPECTOR_URI) {
+-        this.treeIFrame.setAttribute("src", INSPECTOR_URI);
+-      } else {
+-        this.treeIFrame.contentWindow.location.reload();
+-      }
+-    }.bind(this);
+-
+-    this.container.addEventListener("popupshown", boundTreePanelShown, false);
+-
+-    const panelWidthRatio = 7 / 8;
+-    const panelHeightRatio = 1 / 5;
+-
+-    let width = parseInt(this.IUI.win.outerWidth * panelWidthRatio);
+-    let height = parseInt(this.IUI.win.outerHeight * panelHeightRatio);
+-    let y = Math.min(this.document.defaultView.screen.availHeight - height,
+-      this.IUI.win.innerHeight);
+-
+-    this.container.openPopup(this.browser, "overlap", 0, 0,
+-      false, false);
+-
+-    this.container.moveTo(80, y);
+-    this.container.sizeTo(width, height);
+-  },
+-
+-  openDocked: function TP_openDocked()
+-  {
+     let treeBox = null;
+     treeBox = this.document.createElement("vbox");
+     treeBox.id = "inspector-tree-box";
+     treeBox.state = "open";
+     try {
+       treeBox.height =
+         Services.prefs.getIntPref("devtools.inspector.htmlHeight");
+     } catch(e) {
+@@ -224,51 +165,57 @@ TreePanel.prototype = {
+     this.splitter.id = "inspector-tree-splitter";
+ 
+     let container = this.document.getElementById("appcontent");
+     container.appendChild(this.splitter);
+     container.appendChild(treeBox);
+ 
+     treeBox.appendChild(this.treeIFrame);
+ 
+-    let boundLoadedInitializeTreePanel = function loadedInitializeTreePanel()
++    this._boundLoadedInitializeTreePanel = function loadedInitializeTreePanel()
+     {
+       this.treeIFrame.removeEventListener("load",
+-        boundLoadedInitializeTreePanel, true);
++        this._boundLoadedInitializeTreePanel, true);
++      delete this._boundLoadedInitializeTreePanel;
+       this.initializeIFrame();
+     }.bind(this);
+ 
+     this.treeIFrame.addEventListener("load",
+-      boundLoadedInitializeTreePanel, true);
++      this._boundLoadedInitializeTreePanel, true);
+ 
+     let src = this.treeIFrame.getAttribute("src");
+     if (src != INSPECTOR_URI) {
+       this.treeIFrame.setAttribute("src", INSPECTOR_URI);
+     } else {
+       this.treeIFrame.contentWindow.location.reload();
+     }
+   },
+ 
+   /**
+    * Close the TreePanel.
+    */
+   close: function TP_close()
+   {
++    this._open = false;
++
++    // Stop caring about the tree iframe load if it's in progress.
++    if (this._boundLoadedInitializeTreePanel) {
++      this.treeIFrame.removeEventListener("load",
++        this._boundLoadedInitializeTreePanel, true);
++      delete this._boundLoadedInitializeTreePanel;
++    }
++
+     this.button.removeAttribute("checked");
+-    if (this.openInDock) {
+-      this.IUI.toolbar.removeAttribute("treepanel-open");
++    this.IUI.toolbar.removeAttribute("treepanel-open");
+ 
+-      let treeBox = this.container;
+-      Services.prefs.setIntPref("devtools.inspector.htmlHeight", treeBox.height);
+-      let treeBoxParent = treeBox.parentNode;
+-      treeBoxParent.removeChild(this.splitter);
+-      treeBoxParent.removeChild(treeBox);
+-    } else {
+-      this.container.hidePopup();
+-    }
++    let treeBox = this.container;
++    Services.prefs.setIntPref("devtools.inspector.htmlHeight", treeBox.height);
++    let treeBoxParent = treeBox.parentNode;
++    treeBoxParent.removeChild(this.splitter);
++    treeBoxParent.removeChild(treeBox);
+ 
+     if (this.treePanelDiv) {
+       this.treePanelDiv.ownerPanel = null;
+       let parent = this.treePanelDiv.parentNode;
+       parent.removeChild(this.treePanelDiv);
+       delete this.treePanelDiv;
+       delete this.treeBrowserDocument;
+     }
+@@ -277,20 +224,17 @@ TreePanel.prototype = {
+   },
+ 
+   /**
+    * Is the TreePanel open?
+    * @returns boolean
+    */
+   isOpen: function TP_isOpen()
+   {
+-    if (this.openInDock)
+-      return this.treeLoaded && this.container;
+-
+-    return this.treeLoaded && this.container.state == "open";
++    return this._open;
+   },
+ 
+   /**
+    * Toggle the TreePanel.
+    */
+   toggle: function TP_toggle()
+   {
+     this.isOpen() ? this.close() : this.open();
+@@ -697,21 +641,16 @@ TreePanel.prototype = {
+       parent.removeChild(this.treeIFrame);
+       delete this.treeIFrame;
+     }
+ 
+     if (this.ioBox) {
+       this.ioBox.destroy();
+       delete this.ioBox;
+     }
+-
+-    if (!this.openInDock) {
+-      this.container.removeEventListener("popuphiding", this._boundClose, false);
+-      delete this._boundClose;
+-    }
+   }
+ };
+ 
+ 
+ /**
+  * DOMHelpers
+  * Makes DOM traversal easier. Goes through iframes.
+  *
+diff --git a/browser/devtools/highlighter/test/browser_inspector_editor.js b/browser/devtools/highlighter/test/browser_inspector_editor.js
+--- a/browser/devtools/highlighter/test/browser_inspector_editor.js
++++ b/browser/devtools/highlighter/test/browser_inspector_editor.js
+@@ -29,17 +29,17 @@ function setupEditorTests()
+   Services.obs.addObserver(setupHTMLPanel, InspectorUI.INSPECTOR_NOTIFICATIONS.OPENED, false);
+   InspectorUI.toggleInspectorUI();
+ }
+ 
+ function setupHTMLPanel()
+ {
+   Services.obs.removeObserver(setupHTMLPanel, InspectorUI.INSPECTOR_NOTIFICATIONS.OPENED);
+   Services.obs.addObserver(runEditorTests, InspectorUI.INSPECTOR_NOTIFICATIONS.TREEPANELREADY, false);
+-  InspectorUI.toolShow(InspectorUI.treePanel.registrationObject);
++  InspectorUI.toggleHTMLPanel();
+ }
+ 
+ function runEditorTests()
+ {
+   Services.obs.removeObserver(runEditorTests, InspectorUI.INSPECTOR_NOTIFICATIONS.TREEPANELREADY);
+   InspectorUI.stopInspecting();
+   InspectorUI.inspectNode(doc.body, true);
+ 
+diff --git a/browser/devtools/highlighter/test/browser_inspector_ruleviewstore.js b/browser/devtools/highlighter/test/browser_inspector_ruleviewstore.js
+--- a/browser/devtools/highlighter/test/browser_inspector_ruleviewstore.js
++++ b/browser/devtools/highlighter/test/browser_inspector_ruleviewstore.js
+@@ -123,18 +123,18 @@ function inspectorFocusTab1()
+ }
+ 
+ function ruleViewOpened2()
+ {
+   let prop = InspectorUI.ruleView._elementStyle.rules[0].textProps[0];
+   is(prop.name, "background-color", "First prop is the background color prop.");
+   ok(!prop.enabled, "First prop should be disabled.");
+ 
++  InspectorUI.closeInspectorUI();
+   gBrowser.removeCurrentTab();
+-  InspectorUI.closeInspectorUI();
+   finish();
+ }
+ 
+ function test()
+ {
+   waitForExplicitFinish();
+ 
+   tab1 = gBrowser.addTab();
+diff --git a/browser/devtools/highlighter/test/browser_inspector_tab_switch.js b/browser/devtools/highlighter/test/browser_inspector_tab_switch.js
+--- a/browser/devtools/highlighter/test/browser_inspector_tab_switch.js
++++ b/browser/devtools/highlighter/test/browser_inspector_tab_switch.js
+@@ -131,17 +131,17 @@ function inspectorFocusTab1()
+   ok(InspectorUI.inspecting, "Inspector is highlighting");
+   ok(!InspectorUI.treePanel.isOpen(), "Inspector Tree Panel is not open");
+   is(InspectorUI.store.length, 2, "Inspector.store.length = 2");
+   is(InspectorUI.selection, div, "selection matches the div element");
+ 
+   Services.obs.addObserver(inspectorOpenTreePanelTab1,
+     InspectorUI.INSPECTOR_NOTIFICATIONS.TREEPANELREADY, false);
+ 
+-  InspectorUI.treePanel.open();
++  InspectorUI.toggleHTMLPanel();
+ }
+ 
+ function inspectorOpenTreePanelTab1()
+ {
+   Services.obs.removeObserver(inspectorOpenTreePanelTab1,
+     InspectorUI.INSPECTOR_NOTIFICATIONS.TREEPANELREADY);
+ 
+   ok(InspectorUI.inspecting, "Inspector is highlighting");
+diff --git a/browser/devtools/highlighter/test/head.js b/browser/devtools/highlighter/test/head.js
+--- a/browser/devtools/highlighter/test/head.js
++++ b/browser/devtools/highlighter/test/head.js
+@@ -36,16 +36,24 @@
+  *
+  * ***** END LICENSE BLOCK ***** */
+ 
+ const Cu = Components.utils;
+ let tempScope = {};
+ Cu.import("resource:///modules/devtools/LayoutHelpers.jsm", tempScope);
+ let LayoutHelpers = tempScope.LayoutHelpers;
+ 
++// Clear preferences that may be set during the course of tests.
++function clearUserPrefs()
++{
++  Services.prefs.clearUserPref("devtools.inspector.htmlPanelOpen");
++}
++
++registerCleanupFunction(clearUserPrefs);
++
+ function isHighlighting()
+ {
+   let veil = InspectorUI.highlighter.veilTransparentBox;
+   return !(veil.style.visibility == "hidden");
+ }
+ 
+ function getHighlitNode()
+ {

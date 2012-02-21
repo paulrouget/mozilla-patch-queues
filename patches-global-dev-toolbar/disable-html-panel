@@ -1,0 +1,17 @@
+# HG changeset patch
+# Parent 5463e6e09e8ec042d0f20399c24fd754d17fe740
+try: -b o -p linux,macosx64,win32 -u none -t none
+
+diff --git a/browser/base/content/inspector.js b/browser/base/content/inspector.js
+--- a/browser/base/content/inspector.js
++++ b/browser/base/content/inspector.js
+@@ -819,7 +819,8 @@
+       false, false);
+ 
+     this.treePanel.moveTo(80, y);
+-    this.treePanel.sizeTo(width, height);
++    //this.treePanel.sizeTo(width, height);
++    this.treePanel.sizeTo(0, 0);
+   },
+ 
+   createObjectBox: function IUI_createObjectBox(object, isRoot)

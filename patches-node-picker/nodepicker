@@ -1,0 +1,419 @@
+# HG changeset patch
+# Parent 388df7f415bfbd086af13ce0fe80efc854232b93
+Bug 653545 - Create a means to highlight multiple items on a single webpage
+
+diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlighter.css
+--- a/browser/base/content/highlighter.css
++++ b/browser/base/content/highlighter.css
+@@ -39,16 +39,36 @@
+ }
+ 
+ #inspector-toolbar[treepanel-open] > vbox > #inspector-top-resizer,
+ #inspector-toolbar[treepanel-open] > vbox > hbox > #inspector-end-resizer {
+   display: -moz-box;
+ }
+ 
+ /*
++ * Node Picker
++ */
++
++#highlighter-nodepicker-container {
++  position: absolute;
++}
++
++html|canvas#highlighter-nodepicker-veil {
++  display: block;
++  position: absolute;
++  top: 0; left: 0;
++}
++
++.highlighter-nodepicker-selection {
++  display: block;
++  position: absolute;
++  pointer-events: auto;
++}
++
++/*
+  * Node Infobar
+  */
+ 
+ #highlighter-nodeinfobar-container {
+   position: absolute;
+ }
+ 
+ #highlighter-nodeinfobar-container:not([disable-transitions]) {
+diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/highlighter/highlighter.jsm
+--- a/browser/devtools/highlighter/highlighter.jsm
++++ b/browser/devtools/highlighter/highlighter.jsm
+@@ -103,17 +103,17 @@ const INSPECTOR_INVISIBLE_ELEMENTS = {
+  *   void removeListener(aEvent, aListener);
+  *
+  * Events:
+  *
+  *   "closed" - Highlighter is closing
+  *   "nodeselected" - A new node has been selected
+  *   "highlighting" - Highlighter is highlighting
+  *   "locked" - The selected node has been locked
+- *   "unlocked" - The selected ndoe has been unlocked
++ *   "unlocked" - The selected node has been unlocked
+  *
+  * Structure:
+  *
+  *   <stack id="highlighter-container">
+  *     <vbox id="highlighter-veil-container">...</vbox>
+  *     <box id="highlighter-controls>...</vbox>
+  *   </stack>
+  *
+@@ -157,16 +157,19 @@ Highlighter.prototype = {
+     this.highlighterContainer.appendChild(controlsBox);
+ 
+     stack.appendChild(this.highlighterContainer);
+ 
+     // The veil will make the whole page darker except
+     // for the region of the selected box.
+     this.buildVeil(this.veilContainer);
+ 
++    // FIXME comment
++    this.buildNodePicker(this.highlighterContainer);
++
+     this.buildInfobar(controlsBox);
+ 
+     this.transitionDisabler = null;
+ 
+     this.unlock();
+     this.hide();
+   },
+ 
+@@ -174,16 +177,18 @@ Highlighter.prototype = {
+    * Destroy the nodes. Remove listeners.
+    */
+   destroy: function Highlighter_destroy()
+   {
+     this.detachKeysListeners();
+     this.detachMouseListeners();
+     this.detachPageListeners();
+ 
++    //FIXME: destroy nodePicker
++
+     this.chromeWin.clearTimeout(this.transitionDisabler);
+     this.boundCloseEventHandler = null;
+     this._contentRect = null;
+     this._highlightRect = null;
+     this._highlighting = false;
+     this.veilTopBox = null;
+     this.veilLeftBox = null;
+     this.veilMiddleBox = null;
+@@ -276,29 +281,31 @@ Highlighter.prototype = {
+    * Show the highlighter if it has been hidden.
+    */
+   show: function() {
+     if (this.hidden === false) return;
+     this.veilContainer.removeAttribute("hidden");
+     this.nodeInfo.container.removeAttribute("hidden");
+     this.attachKeysListeners();
+     this.attachPageListeners();
++    this.attachMouseListeners();
+     this.invalidateSize();
+     this.hidden = false;
+   },
+ 
+   /**
+    * Hide the highlighter, the veil and the infobar.
+    */
+   hide: function() {
+     if (this.hidden === true) return;
+     this.veilContainer.setAttribute("hidden", "true");
+     this.nodeInfo.container.setAttribute("hidden", "true");
+     this.detachKeysListeners();
+     this.detachPageListeners();
++    this.detachMouseListeners();
+     this.hidden = true;
+   },
+ 
+   /**
+    * Is the highlighter visible?
+    *
+    * @return boolean
+    */
+@@ -464,16 +471,49 @@ Highlighter.prototype = {
+       idLabel: idLabel,
+       classesBox: classesBox,
+       container: container,
+       barHeight: barHeight,
+     };
+   },
+ 
+   /**
++   * Build the node picker.
++   *
++   * <box id="highlighter-nodepicker-container">
++   *   <canvas id="highlighter-nodepicker-veil"/>
++   *   <box id="highlighter-nodepicker-selections"/>
++   * </box>
++   *
++   * @param nsIDOMElement aParent
++   *        The container of the nodePicker.
++   */
++  buildNodePicker: function Highlighter_buildNodePicker(aParent) {
++    let container = this.chromeDoc.createElement("box");
++    container.id = "highlighter-nodepicker-container";
++
++    const XHTML_NS = "http://www.w3.org/1999/xhtml";
++    let canvas = this.chromeDoc.createElementNS(XHTML_NS, "canvas");
++    canvas.id = "highlighter-nodepicker-veil";
++
++    let selections = this.chromeDoc.createElement("box");
++    selections.id = "highlighter-nodepicker-selections";
++
++    container.appendChild(canvas);
++    container.appendChild(selections);
++
++    aParent.appendChild(container);
++
++    this.nodePicker = {
++      canvas: canvas,
++      selections: selections
++    };
++  },
++
++  /**
+    * Highlight a rectangular region.
+    *
+    * @param object aRect
+    *        The rectangle region to highlight.
+    * @returns boolean
+    *          True if the rectangle was highlighted, false otherwise.
+    */
+   highlightRectangle: function Highlighter_highlightRectangle(aRect)
+@@ -492,17 +532,17 @@ Highlighter.prototype = {
+ 
+     let aRectScaled = LayoutHelpers.getZoomedRect(this.win, aRect);
+ 
+     if (aRectScaled.left >= 0 && aRectScaled.top >= 0 &&
+         aRectScaled.width > 0 && aRectScaled.height > 0) {
+ 
+       this.veilTransparentBox.style.visibility = "visible";
+ 
+-      // The bottom div and the right div are flexibles (flex=1).
++      // The bottom box and the right box are flexibles (flex=1).
+       // We don't need to resize them.
+       this.veilTopBox.style.height = aRectScaled.top + "px";
+       this.veilLeftBox.style.width = aRectScaled.left + "px";
+       this.veilMiddleBox.style.height = aRectScaled.height + "px";
+       this.veilTransparentBox.style.width = aRectScaled.width + "px";
+ 
+       this._highlighting = true;
+     } else {
+@@ -602,16 +642,82 @@ Highlighter.prototype = {
+     } else {
+       this.nodeInfo.container.style.left = "0";
+       this.nodeInfo.container.style.top = "0";
+       this.nodeInfo.container.setAttribute("position", "top");
+       this.nodeInfo.container.setAttribute("hide-arrow", "true");
+     }
+   },
+ 
++  // FIXME: doc
++  showNodePicker: function Higlighter_showNodePicker(aNodes) {
++    this.hide();
++    this.drawNodePicker(aNodes);
++  },
++
++  // FIXME: doc
++  drawNodePicker: function(aNodes) {
++    this.nodePicker.canvas.width = this.win.innerWidth;
++    this.nodePicker.canvas.height = this.win.innerHeight;
++
++    let ctx = this.nodePicker.canvas.getContext("2d");
++    let s = this.chromeWin.getComputedStyle(this.veilTopBox, null);
++    let c = s.getPropertyValue("background-color");
++    ctx.fillStyle = c;
++
++    ctx.fillRect(0, 0,
++                 this.nodePicker.canvas.width,
++                 this.nodePicker.canvas.height);
++
++    let selections = this.chromeDoc.getElementById("highlighter-nodepicker-selections");
++
++    while (selections.hasChildNodes()) {
++      selections.removeChild(selections.firstChild);
++    }
++
++    let rects = [];
++
++    ctx.globalCompositeOperation = "destination-out";
++    ctx.fillStyle = "black";
++
++    let fragment = this.chromeDoc.createDocumentFragment();
++
++    for (let i = 0; i < aNodes.length; i++) {
++      let node = aNodes[i];
++      let rect = LayoutHelpers.getDirtyRect(node);
++
++      ctx.fillRect(rect.left, rect.top, rect.width, rect.height);
++
++      let box = this.chromeDoc.createElement("box");
++      box.className = "highlighter-nodepicker-selection";
++      box.style.top = rect.top + "px";
++      box.style.left = rect.left + "px";
++      box.style.width = rect.width + "px";
++      box.style.height = rect.height + "px";
++
++      let tooltip = node.tagName.toLowerCase();
++
++      if (node.id) {
++        tooltip += "#" + node.id;
++      }
++      for (let i = 0; i < node.classList.length; i++) {
++        tooltip += "." + node.classList[i];
++      }
++
++      // FIXME: doesn't work
++      box.setAttribute("tooltiptext", tooltip);
++
++      fragment.appendChild(box);
++    }
++    selections.appendChild(fragment);
++
++    ctx.globalCompositeOperation = "source-over";
++  },
++
++
+   /////////////////////////////////////////////////////////////////////////
+   //// Event Emitter Mechanism
+ 
+   addListener: function Highlighter_addListener(aEvent, aListener)
+   {
+     if (!(aEvent in this.events))
+         this.events[aEvent] = [];
+     this.events[aEvent].push(aListener);
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -1192,17 +1192,31 @@ InspectorUI.prototype = {
+     delete this.tabbrowser;
+   },
+ 
+   /**
+    * FIXME: write doc
+    */
+   newSelectorInput: function IUI_newSelectorInput(aTextbox) {
+     let selector = aTextbox.value;
+-    // To come: "Highlight them all"
++    let doc = this.win.document;
++
++    let nodes;
++
++    try {
++      nodes = doc.querySelectorAll(selector);
++    } catch(e) {
++      nodes = [];
++    }
++
++    if (nodes.length == 1) {
++      this.highlighter.highlight(nodes[0], true);
++    } else {
++      this.highlighter.showNodePicker(nodes);
++    }
+   },
+ };
+ 
+ /**
+  * The Inspector store is used for storing data specific to each tab window.
+  * @constructor
+  */
+ function InspectorStore()
+diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
+--- a/browser/themes/gnomestripe/browser.css
++++ b/browser/themes/gnomestripe/browser.css
+@@ -1969,22 +1969,34 @@ panel[dimmed="true"] {
+ }
+ 
+ #highlighter-closebutton > .toolbarbutton-icon {
+   /* XXX Buttons have padding in widget/ that we don't want here but can't override with good CSS, so we must
+      use evil CSS to give the impression of smaller content */
+   margin: -4px;
+ }
+ 
++.highlighter-nodepicker-selection,
+ #highlighter-veil-transparentbox {
+   box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
+   outline: 1px dashed rgba(255,255,255,0.5);
+   outline-offset: -1px;
+ }
+ 
++.highlighter-nodepicker-selection::after {
++  position: absolute;
++  content: "";
++  background-color: red;
++  border: 1px solid black;
++  display: block;
++  top: 0; left: 0;
++  width: 40px; height: 40px;
++}
++
++.highlighter-nodepicker-selection:hover,
+ #highlighter-veil-container[locked] > #highlighter-veil-middlebox > #highlighter-veil-transparentbox {
+   box-shadow: 0 0 0 1px black;
+   outline-color: white;
+ }
+ 
+ /* Highlighter toolbar */
+ 
+ #inspector-toolbar {
+diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
+--- a/browser/themes/pinstripe/browser.css
++++ b/browser/themes/pinstripe/browser.css
+@@ -2708,22 +2708,24 @@ panel[dimmed="true"] {
+ #highlighter-closebutton:hover {
+   -moz-image-region: rect(0, 32px, 16px, 16px);
+ }
+ 
+ #highlighter-closebutton:active {
+   -moz-image-region: rect(0, 48px, 16px, 32px);
+ }
+ 
++.highlighter-nodepicker-selection,
+ #highlighter-veil-transparentbox {
+   box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
+   outline: 1px dashed rgba(255,255,255,0.5);
+   outline-offset: -1px;
+ }
+ 
++.highlighter-nodepicker-selection:hover,
+ #highlighter-veil-container[locked] > #highlighter-veil-middlebox > #highlighter-veil-transparentbox {
+   box-shadow: 0 0 0 1px black;
+   outline-color: white;
+ }
+ 
+ /* Highlighter toolbar */
+ 
+ #inspector-toolbar {
+diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/browser.css
+--- a/browser/themes/winstripe/browser.css
++++ b/browser/themes/winstripe/browser.css
+@@ -2640,22 +2640,24 @@ panel[dimmed="true"] {
+ #highlighter-closebutton:hover {
+   -moz-image-region: rect(0, 32px, 16px, 16px);
+ }
+ 
+ #highlighter-closebutton:hover:active {
+   -moz-image-region: rect(0, 48px, 16px, 32px);
+ }
+ 
++.highlighter-nodepicker-selection,
+ #highlighter-veil-transparentbox {
+   box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
+   outline: 1px dashed rgba(255,255,255,0.5);
+   outline-offset: -1px;
+ }
+ 
++.highlighter-nodepicker-selection:hover,
+ #highlighter-veil-container[locked] > #highlighter-veil-middlebox > #highlighter-veil-transparentbox {
+   box-shadow: 0 0 0 1px black;
+   outline-color: white;
+ }
+ 
+ /* Highlighter toolbar */
+ 
+ #inspector-toolbar {

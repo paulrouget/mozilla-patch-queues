@@ -1,0 +1,702 @@
+# HG changeset patch
+# Parent 306f45f24383b538723b8f063604fbcb1577650c
+Bug 724509 - Add an Option menu in the Inspector Toolbar
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -1025,16 +1025,18 @@ pref("services.sync.prefs.sync.xpinstall
+ 
+ // Disable the error console
+ pref("devtools.errorconsole.enabled", false);
+ 
+ // Enable the Inspector
+ pref("devtools.inspector.enabled", true);
+ pref("devtools.inspector.htmlHeight", 112);
+ pref("devtools.inspector.htmlPanelOpen", false);
++pref("devtools.inspector.highlighterShowVeil", true);
++pref("devtools.inspector.highlighterShowInfobar", true);
+ 
+ // Enable the style inspector
+ pref("devtools.styleinspector.enabled", true);
+ 
+ // Enable the Tilt inspector
+ pref("devtools.tilt.enabled", true);
+ pref("devtools.tilt.intro_transition", true);
+ pref("devtools.tilt.outro_transition", true);
+diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browser-sets.inc
+--- a/browser/base/content/browser-sets.inc
++++ b/browser/base/content/browser-sets.inc
+@@ -153,16 +153,19 @@
+              oncommand="InspectorUI.toggleSidebar();"/>
+     <command id="Inspector:Tilt"
+              oncommand="Tilt.initialize();"/>
+     <command id="Inspector:HTMLPanel"
+              oncommand="InspectorUI.toggleHTMLPanel();"/>
+     <command id="Inspector:CopyInner" oncommand="InspectorUI.copyInnerHTML();"/>
+     <command id="Inspector:CopyOuter" oncommand="InspectorUI.copyOuterHTML();"/>
+     <command id="Inspector:DeleteNode" oncommand="InspectorUI.deleteNode();"/>
++    <command id="Inspector:ToggleVeil" oncommand="InspectorUI.toggleVeil();"/>
++    <command id="Inspector:ToggleInfobar"
++             oncommand="InspectorUI.toggleInfobar();"/>
+   </commandset>
+ 
+   <broadcasterset id="mainBroadcasterSet">
+     <broadcaster id="viewBookmarksSidebar" autoCheck="false" label="&bookmarksButton.label;"
+                  type="checkbox" group="sidebar" sidebarurl="chrome://browser/content/bookmarks/bookmarksPanel.xul"
+                  oncommand="toggleSidebar('viewBookmarksSidebar');"/>
+ 
+     <!-- for both places and non-places, the sidebar lives at
+diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul
++++ b/browser/base/content/browser.xul
+@@ -1005,19 +1005,36 @@
+ 
+   <vbox id="browser-bottombox" layer="true">
+     <toolbar id="inspector-toolbar"
+              class="devtools-toolbar"
+              nowindowdrag="true"
+              hidden="true">
+ #ifdef XP_MACOSX
+       <toolbarbutton id="highlighter-closebutton"
+-                      oncommand="InspectorUI.closeInspectorUI(false);"
+-                      tooltiptext="&inspectCloseButton.tooltiptext;"/>
++                     oncommand="InspectorUI.closeInspectorUI(false);"
++                     tooltiptext="&inspectCloseButton.tooltiptext;"/>
+ #endif
++      <toolbarbutton id="inspector-menu-toolbarbutton"
++                     type="menu"
++                     tooltiptext="&inspectMenuButton.tooltiptext;">
++        <menupopup id="inspector-menu-popup"
++                   position="before_start">
++          <menuitem id="inspectorToggleVeil"
++                    type="checkbox"
++                    label="&inspectorToggleVeil.label;"
++                    accesskey="&inspectorToggleVeil.accesskey;"
++                    command="Inspector:ToggleVeil"/>
++          <menuitem id="inspectorToggleInfobar"
++                    type="checkbox"
++                    label="&inspectorToggleInfobar.label;"
++                    accesskey="&inspectorToggleInfobar.accesskey;"
++                    command="Inspector:ToggleInfobar"/>
++        </menupopup>
++      </toolbarbutton>
+       <toolbarbutton id="inspector-inspect-toolbutton"
+                      class="devtools-toolbarbutton"
+                      accesskey="&inspectButton.accesskey;"
+                      tooltiptext="&inspectButton.tooltiptext;"
+                      command="Inspector:Inspect"/>
+       <toolbarbutton id="inspector-treepanel-toolbutton"
+                      class="devtools-toolbarbutton"
+                      accesskey="&htmlPanel.accesskey;"
+diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlighter.css
+--- a/browser/base/content/highlighter.css
++++ b/browser/base/content/highlighter.css
+@@ -7,16 +7,20 @@
+   top: 0;
+   left: 0;
+ }
+ 
+ #highlighter-veil-container {
+   overflow: hidden;
+ }
+ 
++#highlighter-veil-container:not([dim]) .highlighter-veil {
++  background-color: transparent;
++}
++
+ #highlighter-veil-container:not([disable-transitions]) > .highlighter-veil,
+ #highlighter-veil-container:not([disable-transitions]) > #highlighter-veil-middlebox,
+ #highlighter-veil-container:not([disable-transitions]) > #highlighter-veil-middlebox > .highlighter-veil,
+ #highlighter-veil-container:not([disable-transitions]) > #highlighter-veil-middlebox > #highlighter-veil-transparentbox {
+   -moz-transition-property: width, height;
+   -moz-transition-duration: 0.1s;
+   -moz-transition-timing-function: linear;
+ }
+diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/highlighter/highlighter.jsm
+--- a/browser/devtools/highlighter/highlighter.jsm
++++ b/browser/devtools/highlighter/highlighter.jsm
+@@ -91,17 +91,23 @@ const INSPECTOR_INVISIBLE_ELEMENTS = {
+  *   boolean isHidden();
+  *
+  *   // Redraw the highlighter if the visible portion of the node has changed.
+  *   void invalidateSize(aScroll);
+  *
+  *   // Is a node highlightable.
+  *   boolean isNodeHighlightable(aNode);
+  *
+- *   // Add/Remove lsiteners
++ *   // Show/hide the veil and the infobar
++ *   void showInfobar();
++ *   void hideInfobar();
++ *   void showVeil();
++ *   void hideVeil();
++ *
++ *   // Add/Remove listeners
+  *   // @param aEvent - event name
+  *   // @param aListener - function callback
+  *   void addListener(aEvent, aListener);
+  *   void removeListener(aEvent, aListener);
+  *
+  * Events:
+  *
+  *   "closed" - Highlighter is closing
+@@ -156,16 +162,17 @@ Highlighter.prototype = {
+     this.highlighterContainer.appendChild(this.veilContainer);
+     this.highlighterContainer.appendChild(controlsBox);
+ 
+     stack.appendChild(this.highlighterContainer);
+ 
+     // The veil will make the whole page darker except
+     // for the region of the selected box.
+     this.buildVeil(this.veilContainer);
++    this.showVeil();
+ 
+     this.buildInfobar(controlsBox);
+ 
+     this.transitionDisabler = null;
+ 
+     this.computeZoomFactor();
+     this.unlock();
+     this.hide();
+@@ -343,33 +350,62 @@ Highlighter.prototype = {
+   isNodeHighlightable: function Highlighter_isNodeHighlightable(aNode)
+   {
+     if (aNode.nodeType != aNode.ELEMENT_NODE) {
+       return false;
+     }
+     let nodeName = aNode.nodeName.toLowerCase();
+     return !INSPECTOR_INVISIBLE_ELEMENTS[nodeName];
+   },
++
++  /**
++   * Hide the veil
++   */
++   hideVeil: function Highlighter_hideVeil() {
++     this.veilContainer.removeAttribute("dim");
++   },
++
++  /**
++   * Show the veil
++   */
++   showVeil: function Highlighter_showVeil() {
++     this.veilContainer.setAttribute("dim", true);
++   },
++
++   /**
++    * Hide the infobar
++    */
++    hideInfobar: function Highlighter_hideInfobar() {
++      this.nodeInfo.container.setAttribute("hidden", true);
++    },
++
++   /**
++    * Show the infobar
++    */
++    showInfobar: function Highlighter_showInfobar() {
++      this.nodeInfo.container.removeAttribute("hidden");
++      this.moveInfobar();
++    },
++
+   /**
+    * Build the veil:
+    *
+    * <vbox id="highlighter-veil-container">
+    *   <box id="highlighter-veil-topbox" class="highlighter-veil"/>
+    *   <hbox id="highlighter-veil-middlebox">
+    *     <box id="highlighter-veil-leftbox" class="highlighter-veil"/>
+    *     <box id="highlighter-veil-transparentbox"/>
+    *     <box id="highlighter-veil-rightbox" class="highlighter-veil"/>
+    *   </hbox>
+    *   <box id="highlighter-veil-bottombox" class="highlighter-veil"/>
+    * </vbox>
+    *
+    * @param nsIDOMElement aParent
+    *        The container of the veil boxes.
+    */
+-
+   buildVeil: function Highlighter_buildVeil(aParent)
+   {
+     // We will need to resize these boxes to surround a node.
+     // See highlightRectangle().
+ 
+     this.veilTopBox = this.chromeDoc.createElement("box");
+     this.veilTopBox.id = "highlighter-veil-topbox";
+     this.veilTopBox.className = "highlighter-veil";
+@@ -463,16 +499,22 @@ Highlighter.prototype = {
+       this.locked ? this.unlock() : this.lock();
+     }).bind(this);
+ 
+     let nodemenu = this.chromeDoc.createElement("toolbarbutton");
+     nodemenu.setAttribute("type", "menu");
+     nodemenu.id = "highlighter-nodeinfobar-menu";
+     nodemenu.className = "highlighter-nodeinfobar-button"
+ 
++    let menu = this.chromeDoc.getElementById("inspector-node-popup");
++    menu = menu.cloneNode(true);
++    menu.id = "highlighter-node-menu";
++
++    nodemenu.appendChild(menu);
++
+     // <hbox id="highlighter-nodeinfobar-text"/>
+     let texthbox = this.chromeDoc.createElement("hbox");
+     texthbox.id = "highlighter-nodeinfobar-text";
+ 
+     texthbox.appendChild(tagNameLabel);
+     texthbox.appendChild(idLabel);
+     texthbox.appendChild(classesBox);
+ 
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -190,17 +190,17 @@ InspectorUI.prototype = {
+     } else {
+       this.startInspecting();
+     }
+   },
+ 
+   /**
+    * Toggle the TreePanel.
+    */
+-  toggleHTMLPanel: function TP_toggle()
++  toggleHTMLPanel: function IUI_toggleHTMLPanel()
+   {
+     if (this.treePanel.isOpen()) {
+       this.treePanel.close();
+       Services.prefs.setBoolPref("devtools.inspector.htmlPanelOpen", false);
+       this.store.setValue(this.winID, "htmlPanelOpen", false);
+     } else {
+       this.treePanel.open();
+       Services.prefs.setBoolPref("devtools.inspector.htmlPanelOpen", true);
+@@ -214,16 +214,54 @@ InspectorUI.prototype = {
+    * @returns boolean
+    */
+   get isInspectorOpen()
+   {
+     return this.toolbar && !this.toolbar.hidden && this.highlighter;
+   },
+ 
+   /**
++   * Toggle highlighter veil.
++   */
++  toggleVeil: function IUI_toggleVeil()
++  {
++    let visible = this.store.getValue(this.winID, "highlighterShowVeil");
++    if (visible) {
++      this.highlighter.hideVeil();
++      this.store.setValue(this.winID, "highlighterShowVeil", false);
++      Services.prefs.setBoolPref("devtools.inspector.highlighterShowVeil",
++                                  false);
++    } else {
++      this.highlighter.showVeil();
++      this.store.setValue(this.winID, "highlighterShowVeil", true);
++      Services.prefs.setBoolPref("devtools.inspector.highlighterShowVeil",
++                                  true);
++    }
++  },
++
++  /**
++   * Toggle highlighter infobar.
++   */
++  toggleInfobar: function IUI_toggleInfobar()
++  {
++    let visible = this.store.getValue(this.winID, "highlighterShowInfobar");
++    if (visible) {
++      this.highlighter.hideInfobar();
++      this.store.setValue(this.winID, "highlighterShowInfobar", false);
++      Services.prefs.setBoolPref("devtools.inspector.highlighterShowInfobar",
++                                  false);
++    } else {
++      this.highlighter.showInfobar();
++      this.store.setValue(this.winID, "highlighterShowInfobar", true);
++      Services.prefs.setBoolPref("devtools.inspector.highlighterShowInfobar",
++                                  true);
++    }
++  },
++
++  /**
+    * Return the default selection element for the inspected document.
+    */
+   get defaultSelection()
+   {
+     let doc = this.win.document;
+     return doc.documentElement ? doc.documentElement.lastElementChild : null;
+   },
+ 
+@@ -360,16 +398,22 @@ InspectorUI.prototype = {
+       this.store.addStore(this.winID);
+       this.store.setValue(this.winID, "selectedNode", null);
+       this.store.setValue(this.winID, "inspecting", true);
+       this.store.setValue(this.winID, "isDirty", this.isDirty);
+ 
+       this.store.setValue(this.winID, "htmlPanelOpen",
+         Services.prefs.getBoolPref("devtools.inspector.htmlPanelOpen"));
+ 
++      this.store.setValue(this.winID, "highlighterShowVeil",
++        Services.prefs.getBoolPref("devtools.inspector.highlighterShowVeil"));
++
++      this.store.setValue(this.winID, "highlighterShowInfobar",
++        Services.prefs.getBoolPref("devtools.inspector.highlighterShowInfobar"));
++
+       this.win.addEventListener("pagehide", this, true);
+     }
+   },
+ 
+   /**
+    * Browse nodes according to the breadcrumbs layout, only for some specific
+    * elements of the UI.
+    */
+@@ -605,16 +649,33 @@ InspectorUI.prototype = {
+     this.win.focus();
+     Services.obs.notifyObservers({wrappedJSObject: this},
+                                  INSPECTOR_NOTIFICATIONS.OPENED, null);
+ 
+     if (this.store.getValue(this.winID, "htmlPanelOpen")) {
+       this.treePanel.open();
+     }
+ 
++    let menu = this.chromeDoc.getElementById("inspectorToggleVeil");
++    if (this.store.getValue(this.winID, "highlighterShowVeil")) {
++      menu.setAttribute("checked", true);
++    } else {
++      menu.removeAttribute("checked");
++      this.highlighter.hideVeil();
++    }
++
++    menu = this.chromeDoc.getElementById("inspectorToggleInfobar");
++    if (this.store.getValue(this.winID, "highlighterShowInfobar")) {
++      menu.setAttribute("checked", true);
++      this.highlighter.showInfobar();
++    } else {
++      menu.removeAttribute("checked");
++      this.highlighter.hideInfobar();
++    }
++
+     this.highlighter.highlight();
+   },
+ 
+   /**
+    * Main callback handler for events.
+    *
+    * @param event
+    *        The event to be handled.
+diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/en-US/chrome/browser/browser.dtd
+--- a/browser/locales/en-US/chrome/browser/browser.dtd
++++ b/browser/locales/en-US/chrome/browser/browser.dtd
+@@ -225,16 +225,25 @@ can reach it easily. -->
+ <!ENTITY inspectorHTMLCopyOuter.label       "Copy Outer HTML">
+ <!ENTITY inspectorHTMLCopyOuter.accesskey   "O">
+ <!ENTITY inspectorHTMLCopyOuter.commandkey  "">
+ 
+ <!ENTITY inspectorHTMLDelete.label          "Delete Node">
+ <!ENTITY inspectorHTMLDelete.accesskey      "D">
+ <!ENTITY inspectorHTMLDelete.commandkey     "">
+ 
++<!-- LOCALIZATION NOTE: The menu in the Inspector toolbar -->
++<!ENTITY inspectMenuButton.tooltiptext      "Inspector Options">
++
++<!-- LOCALIZATION NOTE: These are for the menu in the Inspector Toolbar -->
++<!ENTITY inspectorToggleVeil.label          "Dim the page">
++<!ENTITY inspectorToggleVeil.accesskey      "D">
++<!ENTITY inspectorToggleInfobar.label       "Show the node details">
++<!ENTITY inspectorToggleInfobar.accesskey   "S">
++
+ <!-- LOCALIZATION NOTE (inspect3DViewButton.label): This button shows an
+   -  alternate view for the Inspector, creating a 3D visualization of the
+   -  webpage. -->
+ <!ENTITY inspect3DViewButton.label     "3D View">
+ <!ENTITY inspect3DViewButton.accesskey "W">
+ 
+ <!ENTITY inspectStyleButton.label     "Style">
+ <!ENTITY inspectStyleButton.accesskey "S">
+diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
+--- a/browser/themes/gnomestripe/browser.css
++++ b/browser/themes/gnomestripe/browser.css
+@@ -1987,16 +1987,32 @@ panel[dimmed="true"] {
+   list-style-image: url("chrome://browser/skin/devtools/inspect-button.png");
+   -moz-image-region: rect(0px 16px 16px 0px);
+ }
+ 
+ #inspector-inspect-toolbutton[checked] {
+   -moz-image-region: rect(0px 32px 16px 16px);
+ }
+ 
++#inspector-menu-toolbarbutton {
++  -moz-appearance: none;
++  -moz-margin-end: 6px;
++  list-style-image: url("chrome://browser/skin/devtools/inspector-menu-icon.png");
++  -moz-image-region: rect(0px 16px 16px 0px);
++  border: none;
++}
++
++#inspector-menu-toolbarbutton[open] {
++  -moz-image-region: rect(0px 32px 16px 16px);
++}
++
++#inspector-menu-toolbarbutton > .toolbarbutton-menu-dropmarker {
++  display: none;
++}
++
+ #inspector-toolbar {
+   border-top: 1px solid hsla(210, 8%, 5%, .65);
+ }
+ 
+ #devtools-side-splitter {
+   -moz-appearance: none;
+   border: 0;
+   -moz-border-start: 1px solid #242b33;
+diff --git a/browser/themes/gnomestripe/devtools/inspector-menu-icon.png b/browser/themes/gnomestripe/devtools/inspector-menu-icon.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..9fd78175dfd5449b43034602ed854907ea82d885
+GIT binary patch
+literal 1441
+zc$@*D1z!4zP)<h;3K|Lk000e1NJLTq001BW000mO1^@s6cL04^000GONkl<Zc-noH
+zc~Db#5XbX=FXZ3|2*e{0KoL~H3KUe(V!f^Bc!Cwt78Pj)1R)g|!c{@afN}~F0fkl@
+z6f0o8kI|ymp<um5FkA*u4h_hd9`m}J@@6O<{Npq4xBK0FyZg)Um&egFmJEdg_<#vu
+z1keBh^a0~RjT)N6Q8L5f0z!Zf5P$-B=tFII{O|_!<}F({Re9#zH~Z4EH-kM25CzNR
+z%THEZkj-7X_9L))A83G{pzN`qbLFps8RxZMaSA&1Ik_zYm#TqP;5$5C**ghiKGc9P
+zGH(CIj_y9i!)K~ouonXhZrrKOKwnyRK>*l>BQ-$DDtRvDUE60}{+sc-{AU{{ugwvf
+zm^}NU_8$7&D>czn;w{1O1}K~yivuPGVw>fU8d?svcWZK9_4XGc?cII3P3o>p=_Hr+
+z5Mv4m26HHOazKxYy>7sbx#aFxG0^M$vzD26<qsXM=d_Gd)qAZd>E?WB(s1ynpxFla
+zUW->drDo=D5?fDMl%AuAS9fVLfP=$HNXdvb96f$6JU2|A^O*zY;>)a*Z|py=dKYYX
+zw9DDGyz8h_<pASQ@n0N)X=ShS^c0;AE|vW|EKc;=>Keg`N|Zl^cJ}mTHLG7|b@cRM
+z@l@pI-QQEL->ywzZPXfDJF+@^`m;`ypN)WAGo0GByt}}yLc@4ez3q2Cqhah$z11<{
+z_$&2<<DG4+?E*2LRd3(8RcaX5)7>TTa~N{Cu<f7w?^=KEYIOn>*$*TmTLZ)5KwF3S
+z1?-Mv{TNeS^WfW{2)Q2@8}L75V3AqpXH}wpVyo<C#{c*);sd`OAuD9_5pjA=0qe&Y
+z>+d^SrFoC{P+#U4akwH053qul`Kn&N#_dnI`Rl!Su$R&zi5P+PlJnPY#i3T;q(*Hk
+z<k$iNGIfa_`E=Vj%J1MJ%aV4jWoZW^DQ;~eKFJ=mwW}Ed>lu>5=0?;kj;RMAb_wKI
+zl3Bid+yO3Zr5IQPFPB4+nA^1v<zRb(#zSB|`^KF*od!*!wi2fYXgE|f6?RHQg`f5q
+zTiEh$Oi?Q%DO9}#p9AHa#zk-~IihMtZCp`{mI^JKfzyLV@C+F3jZ0orbN>lW9|`P*
+z8xR#DlZS%lg6s;9-VHY)8a0f$aIIRtB_L!WXa;!CZHk)%CLdEZnHRiZOb@?cMk`c|
+zm7*b)Q`9R(tQ5~v#()nsGr<1ni#p4q<`tZ5m2L;jGxLjgLQ&a+XR2^0paTwC%-y<2
+zI&jVU>zmsnpqagerDcJ52yuGJp~ni-yyuK4`>95hThAcUBMppQabqKbYxL>JdG=nM
+z|D2H?ep*UJT`<B1jBFg-JT`3E>Bl#f`bWr<WKbvsfkI&jYllT8Mwm$Kc5K-h`h|m=
+z*C&uGBFkm^f`EK?Uewtb;=OMbf8Q@v!i+}@BFcKKgSA1cp#2W`@a311g~27W$@&BX
+zJcL|e6d(a?MdNIJAJjJmLBU-^x&KrZ1P%H?%tSy6m|-p)QW_4TF_|)N4Dr|~r2`9>
+z@zU<~^V07#Ljj+L_~$MlGrg^d(;^9RTxdev*K&1#r|=R2&^S?OWc(&57<jVsVi4Fn
+zfWWKOHD9A|dr$;kOGAtW2>Vye=EI@VH&4AS=cd*&B<W5AOt_kOC#@#QciYit_FZ)_
+zSsN>4^Z)lPfR_s=PV<-<la%hiV5K)Zt^FF`?VA%*v$okgdrpTK!ARc%Xn@BHE_LU`
+zUOUd+Qx>F~)^n2$EjuIU#9cql5Bb3jV@CWKK{0x8YwZ9_fDZ@(8*BtH$C!~Cz^Pzc
+vP2hf8!*eW|JeLPg0h#F|!A4MHCujKww^Ko-W{nMk00000NkvXXu0mjfmjtI_
+
+diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
+--- a/browser/themes/gnomestripe/jar.mn
++++ b/browser/themes/gnomestripe/jar.mn
+@@ -122,16 +122,17 @@ browser.jar:
+   skin/classic/browser/devtools/styleeditor.css       (devtools/styleeditor.css)
+   skin/classic/browser/devtools/magnifying-glass.png  (devtools/magnifying-glass.png)
+   skin/classic/browser/devtools/itemToggle.png        (devtools/itemToggle.png)
+   skin/classic/browser/devtools/itemArrow-rtl.png     (devtools/itemArrow-rtl.png)
+   skin/classic/browser/devtools/itemArrow-ltr.png     (devtools/itemArrow-ltr.png)
+   skin/classic/browser/devtools/inspect-button.png    (devtools/inspect-button.png)
+   skin/classic/browser/devtools/treepanel-button.png  (devtools/treepanel-button.png)
+   skin/classic/browser/devtools/dropmarker.png        (devtools/dropmarker.png)
++  skin/classic/browser/devtools/inspector-menu-icon.png   (devtools/inspector-menu-icon.png)
+ #ifdef MOZ_SERVICES_SYNC
+   skin/classic/browser/sync-16-throbber.png
+   skin/classic/browser/sync-16.png
+   skin/classic/browser/sync-24-throbber.png
+   skin/classic/browser/sync-32.png
+   skin/classic/browser/sync-bg.png
+   skin/classic/browser/sync-128.png
+   skin/classic/browser/sync-desktopIcon.png
+diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
+--- a/browser/themes/pinstripe/browser.css
++++ b/browser/themes/pinstripe/browser.css
+@@ -2722,16 +2722,32 @@ panel[dimmed="true"] {
+   list-style-image: url("chrome://browser/skin/devtools/inspect-button.png");
+   -moz-image-region: rect(0px 16px 16px 0px);
+ }
+ 
+ #inspector-inspect-toolbutton[checked] {
+   -moz-image-region: rect(0px 32px 16px 16px);
+ }
+ 
++#inspector-menu-toolbarbutton {
++  -moz-appearance: none;
++  -moz-margin-end: 6px;
++  list-style-image: url("chrome://browser/skin/devtools/inspector-menu-icon.png");
++  -moz-image-region: rect(0px 16px 16px 0px);
++  border: none;
++}
++
++#inspector-menu-toolbarbutton[open] {
++  -moz-image-region: rect(0px 32px 16px 16px);
++}
++
++#inspector-menu-toolbarbutton > .toolbarbutton-menu-dropmarker {
++  display: none;
++}
++
+ #inspector-toolbar {
+   border-top: 1px solid hsla(210, 8%, 5%, .65);
+   padding-top: 4px;
+   padding-bottom: 4px;
+ }
+ 
+ #inspector-toolbar:-moz-locale-dir(ltr) {
+   padding-left: 2px;
+diff --git a/browser/themes/pinstripe/devtools/inspector-menu-icon.png b/browser/themes/pinstripe/devtools/inspector-menu-icon.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..9fd78175dfd5449b43034602ed854907ea82d885
+GIT binary patch
+literal 1441
+zc$@*D1z!4zP)<h;3K|Lk000e1NJLTq001BW000mO1^@s6cL04^000GONkl<Zc-noH
+zc~Db#5XbX=FXZ3|2*e{0KoL~H3KUe(V!f^Bc!Cwt78Pj)1R)g|!c{@afN}~F0fkl@
+z6f0o8kI|ymp<um5FkA*u4h_hd9`m}J@@6O<{Npq4xBK0FyZg)Um&egFmJEdg_<#vu
+z1keBh^a0~RjT)N6Q8L5f0z!Zf5P$-B=tFII{O|_!<}F({Re9#zH~Z4EH-kM25CzNR
+z%THEZkj-7X_9L))A83G{pzN`qbLFps8RxZMaSA&1Ik_zYm#TqP;5$5C**ghiKGc9P
+zGH(CIj_y9i!)K~ouonXhZrrKOKwnyRK>*l>BQ-$DDtRvDUE60}{+sc-{AU{{ugwvf
+zm^}NU_8$7&D>czn;w{1O1}K~yivuPGVw>fU8d?svcWZK9_4XGc?cII3P3o>p=_Hr+
+z5Mv4m26HHOazKxYy>7sbx#aFxG0^M$vzD26<qsXM=d_Gd)qAZd>E?WB(s1ynpxFla
+zUW->drDo=D5?fDMl%AuAS9fVLfP=$HNXdvb96f$6JU2|A^O*zY;>)a*Z|py=dKYYX
+zw9DDGyz8h_<pASQ@n0N)X=ShS^c0;AE|vW|EKc;=>Keg`N|Zl^cJ}mTHLG7|b@cRM
+z@l@pI-QQEL->ywzZPXfDJF+@^`m;`ypN)WAGo0GByt}}yLc@4ez3q2Cqhah$z11<{
+z_$&2<<DG4+?E*2LRd3(8RcaX5)7>TTa~N{Cu<f7w?^=KEYIOn>*$*TmTLZ)5KwF3S
+z1?-Mv{TNeS^WfW{2)Q2@8}L75V3AqpXH}wpVyo<C#{c*);sd`OAuD9_5pjA=0qe&Y
+z>+d^SrFoC{P+#U4akwH053qul`Kn&N#_dnI`Rl!Su$R&zi5P+PlJnPY#i3T;q(*Hk
+z<k$iNGIfa_`E=Vj%J1MJ%aV4jWoZW^DQ;~eKFJ=mwW}Ed>lu>5=0?;kj;RMAb_wKI
+zl3Bid+yO3Zr5IQPFPB4+nA^1v<zRb(#zSB|`^KF*od!*!wi2fYXgE|f6?RHQg`f5q
+zTiEh$Oi?Q%DO9}#p9AHa#zk-~IihMtZCp`{mI^JKfzyLV@C+F3jZ0orbN>lW9|`P*
+z8xR#DlZS%lg6s;9-VHY)8a0f$aIIRtB_L!WXa;!CZHk)%CLdEZnHRiZOb@?cMk`c|
+zm7*b)Q`9R(tQ5~v#()nsGr<1ni#p4q<`tZ5m2L;jGxLjgLQ&a+XR2^0paTwC%-y<2
+zI&jVU>zmsnpqagerDcJ52yuGJp~ni-yyuK4`>95hThAcUBMppQabqKbYxL>JdG=nM
+z|D2H?ep*UJT`<B1jBFg-JT`3E>Bl#f`bWr<WKbvsfkI&jYllT8Mwm$Kc5K-h`h|m=
+z*C&uGBFkm^f`EK?Uewtb;=OMbf8Q@v!i+}@BFcKKgSA1cp#2W`@a311g~27W$@&BX
+zJcL|e6d(a?MdNIJAJjJmLBU-^x&KrZ1P%H?%tSy6m|-p)QW_4TF_|)N4Dr|~r2`9>
+z@zU<~^V07#Ljj+L_~$MlGrg^d(;^9RTxdev*K&1#r|=R2&^S?OWc(&57<jVsVi4Fn
+zfWWKOHD9A|dr$;kOGAtW2>Vye=EI@VH&4AS=cd*&B<W5AOt_kOC#@#QciYit_FZ)_
+zSsN>4^Z)lPfR_s=PV<-<la%hiV5K)Zt^FF`?VA%*v$okgdrpTK!ARc%Xn@BHE_LU`
+zUOUd+Qx>F~)^n2$EjuIU#9cql5Bb3jV@CWKK{0x8YwZ9_fDZ@(8*BtH$C!~Cz^Pzc
+vP2hf8!*eW|JeLPg0h#F|!A4MHCujKww^Ko-W{nMk00000NkvXXu0mjfmjtI_
+
+diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
+--- a/browser/themes/pinstripe/jar.mn
++++ b/browser/themes/pinstripe/jar.mn
+@@ -163,16 +163,17 @@ browser.jar:
+   skin/classic/browser/devtools/magnifying-glass.png	    (devtools/magnifying-glass.png)
+   skin/classic/browser/devtools/itemToggle.png		    (devtools/itemToggle.png)
+   skin/classic/browser/devtools/itemArrow-rtl.png	    (devtools/itemArrow-rtl.png)
+   skin/classic/browser/devtools/itemArrow-ltr.png	    (devtools/itemArrow-ltr.png)
+   skin/classic/browser/devtools/background-noise-toolbar.png (devtools/background-noise-toolbar.png)
+   skin/classic/browser/devtools/inspect-button.png    (devtools/inspect-button.png)
+   skin/classic/browser/devtools/treepanel-button.png  (devtools/treepanel-button.png)
+   skin/classic/browser/devtools/dropmarker.png        (devtools/dropmarker.png)
++  skin/classic/browser/devtools/inspector-menu-icon.png   (devtools/inspector-menu-icon.png)
+ #ifdef MOZ_SERVICES_SYNC
+   skin/classic/browser/sync-throbber.png
+   skin/classic/browser/sync-16.png
+   skin/classic/browser/sync-32.png
+   skin/classic/browser/sync-bg.png
+   skin/classic/browser/sync-128.png
+   skin/classic/browser/sync-desktopIcon.png
+   skin/classic/browser/sync-mobileIcon.png
+diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/browser.css
+--- a/browser/themes/winstripe/browser.css
++++ b/browser/themes/winstripe/browser.css
+@@ -2668,16 +2668,32 @@ panel[dimmed="true"] {
+   list-style-image: url("chrome://browser/skin/devtools/inspect-button.png");
+   -moz-image-region: rect(0px 16px 16px 0px);
+ }
+ 
+ #inspector-inspect-toolbutton[checked] {
+   -moz-image-region: rect(0px 32px 16px 16px);
+ }
+ 
++#inspector-menu-toolbarbutton {
++  -moz-appearance: none;
++  -moz-margin-end: 6px;
++  list-style-image: url("chrome://browser/skin/devtools/inspector-menu-icon.png");
++  -moz-image-region: rect(0px 16px 16px 0px);
++  border: none;
++}
++
++#inspector-menu-toolbarbutton[open] {
++  -moz-image-region: rect(0px 32px 16px 16px);
++}
++
++#inspector-menu-toolbarbutton > .toolbarbutton-menu-dropmarker {
++  display: none;
++}
++
+ #inspector-toolbar {
+   border-top: 1px solid hsla(211,68%,6%,.65) !important;
+ }
+ 
+ #devtools-side-splitter {
+   border: 0;
+   -moz-border-start: 1px solid #242b33;
+   min-width: 0;
+diff --git a/browser/themes/winstripe/devtools/inspector-menu-icon.png b/browser/themes/winstripe/devtools/inspector-menu-icon.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..9fd78175dfd5449b43034602ed854907ea82d885
+GIT binary patch
+literal 1441
+zc$@*D1z!4zP)<h;3K|Lk000e1NJLTq001BW000mO1^@s6cL04^000GONkl<Zc-noH
+zc~Db#5XbX=FXZ3|2*e{0KoL~H3KUe(V!f^Bc!Cwt78Pj)1R)g|!c{@afN}~F0fkl@
+z6f0o8kI|ymp<um5FkA*u4h_hd9`m}J@@6O<{Npq4xBK0FyZg)Um&egFmJEdg_<#vu
+z1keBh^a0~RjT)N6Q8L5f0z!Zf5P$-B=tFII{O|_!<}F({Re9#zH~Z4EH-kM25CzNR
+z%THEZkj-7X_9L))A83G{pzN`qbLFps8RxZMaSA&1Ik_zYm#TqP;5$5C**ghiKGc9P
+zGH(CIj_y9i!)K~ouonXhZrrKOKwnyRK>*l>BQ-$DDtRvDUE60}{+sc-{AU{{ugwvf
+zm^}NU_8$7&D>czn;w{1O1}K~yivuPGVw>fU8d?svcWZK9_4XGc?cII3P3o>p=_Hr+
+z5Mv4m26HHOazKxYy>7sbx#aFxG0^M$vzD26<qsXM=d_Gd)qAZd>E?WB(s1ynpxFla
+zUW->drDo=D5?fDMl%AuAS9fVLfP=$HNXdvb96f$6JU2|A^O*zY;>)a*Z|py=dKYYX
+zw9DDGyz8h_<pASQ@n0N)X=ShS^c0;AE|vW|EKc;=>Keg`N|Zl^cJ}mTHLG7|b@cRM
+z@l@pI-QQEL->ywzZPXfDJF+@^`m;`ypN)WAGo0GByt}}yLc@4ez3q2Cqhah$z11<{
+z_$&2<<DG4+?E*2LRd3(8RcaX5)7>TTa~N{Cu<f7w?^=KEYIOn>*$*TmTLZ)5KwF3S
+z1?-Mv{TNeS^WfW{2)Q2@8}L75V3AqpXH}wpVyo<C#{c*);sd`OAuD9_5pjA=0qe&Y
+z>+d^SrFoC{P+#U4akwH053qul`Kn&N#_dnI`Rl!Su$R&zi5P+PlJnPY#i3T;q(*Hk
+z<k$iNGIfa_`E=Vj%J1MJ%aV4jWoZW^DQ;~eKFJ=mwW}Ed>lu>5=0?;kj;RMAb_wKI
+zl3Bid+yO3Zr5IQPFPB4+nA^1v<zRb(#zSB|`^KF*od!*!wi2fYXgE|f6?RHQg`f5q
+zTiEh$Oi?Q%DO9}#p9AHa#zk-~IihMtZCp`{mI^JKfzyLV@C+F3jZ0orbN>lW9|`P*
+z8xR#DlZS%lg6s;9-VHY)8a0f$aIIRtB_L!WXa;!CZHk)%CLdEZnHRiZOb@?cMk`c|
+zm7*b)Q`9R(tQ5~v#()nsGr<1ni#p4q<`tZ5m2L;jGxLjgLQ&a+XR2^0paTwC%-y<2
+zI&jVU>zmsnpqagerDcJ52yuGJp~ni-yyuK4`>95hThAcUBMppQabqKbYxL>JdG=nM
+z|D2H?ep*UJT`<B1jBFg-JT`3E>Bl#f`bWr<WKbvsfkI&jYllT8Mwm$Kc5K-h`h|m=
+z*C&uGBFkm^f`EK?Uewtb;=OMbf8Q@v!i+}@BFcKKgSA1cp#2W`@a311g~27W$@&BX
+zJcL|e6d(a?MdNIJAJjJmLBU-^x&KrZ1P%H?%tSy6m|-p)QW_4TF_|)N4Dr|~r2`9>
+z@zU<~^V07#Ljj+L_~$MlGrg^d(;^9RTxdev*K&1#r|=R2&^S?OWc(&57<jVsVi4Fn
+zfWWKOHD9A|dr$;kOGAtW2>Vye=EI@VH&4AS=cd*&B<W5AOt_kOC#@#QciYit_FZ)_
+zSsN>4^Z)lPfR_s=PV<-<la%hiV5K)Zt^FF`?VA%*v$okgdrpTK!ARc%Xn@BHE_LU`
+zUOUd+Qx>F~)^n2$EjuIU#9cql5Bb3jV@CWKK{0x8YwZ9_fDZ@(8*BtH$C!~Cz^Pzc
+vP2hf8!*eW|JeLPg0h#F|!A4MHCujKww^Ko-W{nMk00000NkvXXu0mjfmjtI_
+
+diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
+--- a/browser/themes/winstripe/jar.mn
++++ b/browser/themes/winstripe/jar.mn
+@@ -146,16 +146,17 @@ browser.jar:
+         skin/classic/browser/devtools/styleeditor.css               (devtools/styleeditor.css)
+         skin/classic/browser/devtools/magnifying-glass.png          (devtools/magnifying-glass.png)
+         skin/classic/browser/devtools/itemToggle.png                (devtools/itemToggle.png)
+         skin/classic/browser/devtools/itemArrow-rtl.png             (devtools/itemArrow-rtl.png)
+         skin/classic/browser/devtools/itemArrow-ltr.png             (devtools/itemArrow-ltr.png)
+         skin/classic/browser/devtools/inspect-button.png            (devtools/inspect-button.png)
+         skin/classic/browser/devtools/treepanel-button.png          (devtools/treepanel-button.png)
+         skin/classic/browser/devtools/dropmarker.png                (devtools/dropmarker.png)
++        skin/classic/browser/devtools/inspector-menu-icon.png       (devtools/inspector-menu-icon.png)
+ #ifdef MOZ_SERVICES_SYNC
+         skin/classic/browser/sync-throbber.png
+         skin/classic/browser/sync-16.png
+         skin/classic/browser/sync-32.png
+         skin/classic/browser/sync-128.png
+         skin/classic/browser/sync-bg.png
+         skin/classic/browser/sync-desktopIcon.png
+         skin/classic/browser/sync-mobileIcon.png
+@@ -312,16 +313,17 @@ browser.jar:
+         skin/classic/aero/browser/devtools/styleeditor.css           (devtools/styleeditor.css)
+         skin/classic/aero/browser/devtools/magnifying-glass.png      (devtools/magnifying-glass.png)
+         skin/classic/aero/browser/devtools/itemToggle.png            (devtools/itemToggle.png)
+         skin/classic/aero/browser/devtools/itemArrow-rtl.png         (devtools/itemArrow-rtl.png)
+         skin/classic/aero/browser/devtools/itemArrow-ltr.png         (devtools/itemArrow-ltr.png)
+         skin/classic/aero/browser/devtools/inspect-button.png        (devtools/inspect-button.png)
+         skin/classic/aero/browser/devtools/treepanel-button.png      (devtools/treepanel-button.png)
+         skin/classic/aero/browser/devtools/dropmarker.png            (devtools/dropmarker.png)
++        skin/classic/aera/browser/devtools/inspector-menu-icon.png   (devtools/inspector-menu-icon.png)
+ #ifdef MOZ_SERVICES_SYNC
+         skin/classic/aero/browser/sync-throbber.png
+         skin/classic/aero/browser/sync-16.png
+         skin/classic/aero/browser/sync-32.png
+         skin/classic/aero/browser/sync-128.png
+         skin/classic/aero/browser/sync-bg.png
+         skin/classic/aero/browser/sync-desktopIcon.png
+         skin/classic/aero/browser/sync-mobileIcon.png

@@ -1,0 +1,33 @@
+# vim: se ft=diff :
+# HG changeset patch
+# User Spyros Livathinos <livathinos.spyros>
+# Date 2012-02-02 06:45
+Bug 703346 - "Scroll to offscreen element when you click the infobar" [f=livathinos.spyros]
+
+diff -r e33539a90ae2 browser/devtools/highlighter/highlighter.jsm
+--- a/browser/devtools/highlighter/highlighter.jsm	Sun Jan 29 20:42:00 2012 -0800
++++ b/browser/devtools/highlighter/highlighter.jsm	Thu Feb 02 16:29:56 2012 +0200
+@@ -462,16 +462,22 @@ Highlighter.prototype = {
+ 
+     this.nodeInfo = {
+       tagNameLabel: tagNameLabel,
+       idLabel: idLabel,
+       classesBox: classesBox,
+       container: container,
+       barHeight: barHeight,
+     };
++
++    // When the user clicks on the infobar of an "out-of-view" node,
++    // make sure to scroll the view so that the node is visible.
++    this.nodeInfo.container.addEventListener("click", (function() { 
++      this.node.scrollIntoView(); 
++    }).bind(this));
+   },
+ 
+   /**
+    * Highlight a rectangular region.
+    *
+    * @param object aRect
+    *        The rectangle region to highlight.
+    * @returns boolean
+

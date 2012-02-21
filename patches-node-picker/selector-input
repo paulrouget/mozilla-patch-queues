@@ -1,0 +1,53 @@
+# HG changeset patch
+# Parent 513ac2155d420de9c874576b19ce3e011e61fc43
+Bug 653545 - Create a means to highlight multiple items on a single webpage
+
+diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul
++++ b/browser/base/content/browser.xul
+@@ -993,16 +993,17 @@
+                  dir="top" disabled="true"
+                  element="inspector-tree-box"/>
+         <hbox>
+ #ifdef XP_MACOSX
+           <toolbarbutton id="highlighter-closebutton"
+                          oncommand="InspectorUI.closeInspectorUI(false);"
+                          tooltiptext="&inspectCloseButton.tooltiptext;"/>
+ #endif
++          <textbox id="inspector-selector-input" oninput="InspectorUI.newSelectorInput(this)"/>
+           <toolbarbutton id="inspector-inspect-toolbutton"
+                          label="&inspectButton.label;"
+                          accesskey="&inspectButton.accesskey;"
+                          command="Inspector:Inspect"/>
+           <arrowscrollbox id="inspector-breadcrumbs"
+                           flex="1" orient="horizontal"
+                           clicktoscroll="true"/>
+           <hbox id="inspector-tools">
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -1186,16 +1186,24 @@ InspectorUI.prototype = {
+       this.closeInspectorUI();
+     }
+ 
+     delete this.store;
+     delete this.chromeDoc;
+     delete this.chromeWin;
+     delete this.tabbrowser;
+   },
++
++  /**
++   * FIXME: write doc
++   */
++  newSelectorInput: function IUI_newSelectorInput(aTextbox) {
++    let selector = aTextbox.value;
++    // To come: "Highlight them all"
++  },
+ };
+ 
+ /**
+  * The Inspector store is used for storing data specific to each tab window.
+  * @constructor
+  */
+ function InspectorStore()
+ {

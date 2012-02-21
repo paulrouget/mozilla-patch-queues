@@ -1,0 +1,359 @@
+# vim: se ft=diff :
+# HG changeset patch
+# User Rob Campbell <rcampbell@mozilla.com>
+# Date 2012-01-31 12:44
+more cleanup
+* * *
+docommand ftw
+
+# HG changeset patch
+# Parent b35e18d159fe099a56327953e6cd14632ffcc931
+# User Rob Campbell <rcampbell@mozilla.com>
+more cleanup
+* * *
+docommand ftw
+
+diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browser-sets.inc
+--- a/browser/base/content/browser-sets.inc
++++ b/browser/base/content/browser-sets.inc
+@@ -150,16 +150,19 @@
+     <command id="Inspector:Inspect"
+              oncommand="InspectorUI.toggleInspection();"/>
+     <command id="Inspector:Sidebar"
+              oncommand="InspectorUI.toggleSidebar();"/>
+     <command id="Inspector:Tilt"
+              oncommand="Tilt.initialize();"/>
+     <command id="Inspector:HTMLPanel"
+              oncommand="InspectorUI.toggleHTMLPanel();"/>
++    <command id="Inspector:CopyInner" oncommand="InspectorUI.copyInnerHTML();"/>
++    <command id="Inspector:CopyOuter" oncommand="InspectorUI.copyOuterHTML();"/>
++    <command id="Inspector:DeleteNode" oncommand="InspectorUI.deleteNode();"/>
+   </commandset>
+ 
+   <broadcasterset id="mainBroadcasterSet">
+     <broadcaster id="viewBookmarksSidebar" autoCheck="false" label="&bookmarksButton.label;"
+                  type="checkbox" group="sidebar" sidebarurl="chrome://browser/content/bookmarks/bookmarksPanel.xul"
+                  oncommand="toggleSidebar('viewBookmarksSidebar');"/>
+ 
+     <!-- for both places and non-places, the sidebar lives at
+diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul
++++ b/browser/base/content/browser.xul
+@@ -237,16 +237,32 @@
+            close="true"
+            label="&inspectPanelTitle.label;">
+       <hbox id="tree-panel-resizer-box" align="end">
+         <spacer flex="1" />
+         <resizer dir="bottomend" />
+       </hbox>
+     </panel>
+ 
++    <menupopup id="inspector-node-popup">
++      <menuitem id="inspectorHTMLCopyInner"
++                label="&inspectorHTMLCopyInner.label;"
++                accesskey="&inspectorHTMLCopyInner.accesskey;"
++                command="Inspector:CopyInner"/>
++      <menuitem id="inspectorHTMLCopyOuter"
++                label="&inspectorHTMLCopyOuter.label;"
++                accesskey="&inspectorHTMLCopyOuter.accesskey;"
++                command="Inspector:CopyOuter"/>
++      <menuseparator/>
++      <menuitem id="inspectorHTMLDelete"
++                label="&inspectorHTMLDelete.label;"
++                accesskey="&inspectorHTMLDelete.accesskey;"
++                command="Inspector:DeleteNode"/>
++    </menupopup>
++
+     <menupopup id="toolbar-context-menu"
+                onpopupshowing="onViewToolbarsPopupShowing(event);">
+       <menuseparator/>
+       <menuitem command="cmd_ToggleTabsOnTop"
+                 type="checkbox"
+                 label="&viewTabsOnTop.label;"
+                 accesskey="&viewTabsOnTop.accesskey;"/>
+       <menuseparator/>
+diff --git a/browser/devtools/highlighter/TreePanel.jsm b/browser/devtools/highlighter/TreePanel.jsm
+--- a/browser/devtools/highlighter/TreePanel.jsm
++++ b/browser/devtools/highlighter/TreePanel.jsm
+@@ -141,16 +141,17 @@ TreePanel.prototype = {
+     this.initializingTreePanel = true;
+ 
+     this.treeIFrame = this.document.getElementById("inspector-tree-iframe");
+     if (!this.treeIFrame) {
+       this.treeIFrame = this.document.createElement("iframe");
+       this.treeIFrame.setAttribute("id", "inspector-tree-iframe");
+       this.treeIFrame.flex = 1;
+       this.treeIFrame.setAttribute("type", "content");
++      this.treeIFrame.setAttribute("context", "inspector-node-popup");
+     }
+ 
+     let treeBox = null;
+     treeBox = this.document.createElement("vbox");
+     treeBox.id = "inspector-tree-box";
+     treeBox.state = "open";
+     try {
+       treeBox.height =
+@@ -606,16 +607,30 @@ TreePanel.prototype = {
+         else
+           return child.repObject;
+       }
+     }
+     return null;
+   },
+ 
+   /**
++   * Remove a node box from the tree view.
++   * @param aElement
++   *        The DOM node to remove from the HTML IOBox.
++   */
++  deleteChildBox: function TP_deleteChildBox(aElement)
++  {
++    let childBox = this.ioBox.findObjectBox(aElement);
++    if (!childBox) {
++      return;
++    }
++    childBox.parentNode.removeChild(childBox);
++  },
++
++  /**
+    * Destructor function. Cleanup.
+    */
+   destroy: function TP_destroy()
+   {
+     if (this.isOpen()) {
+       this.close();
+     }
+ 
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -37,16 +37,17 @@
+  * use your version of this file under the terms of the MPL, indicate your
+  * decision by deleting the provisions above and replace them with the notice
+  * and other provisions required by the GPL or the LGPL. If you do not delete
+  * the provisions above, a recipient may use your version of this file under
+  * the terms of any one of the MPL, the GPL or the LGPL.
+  *
+  * ***** END LICENSE BLOCK ***** */
+ 
++const Cc = Components.classes;
+ const Cu = Components.utils;
+ const Ci = Components.interfaces;
+ const Cr = Components.results;
+ 
+ var EXPORTED_SYMBOLS = ["InspectorUI"];
+ 
+ Cu.import("resource://gre/modules/Services.jsm");
+ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+@@ -731,16 +732,56 @@ InspectorUI.prototype = {
+           this.highlighter.highlight(node, true);
+         }
+         event.preventDefault();
+         event.stopPropagation();
+         break;
+     }
+   },
+ 
++  /**
++   * Copy the innerHTML of the selected Node to the clipboard. Called via the
++   * Inspector:CopyInner command.
++   */
++  copyInnerHTML: function IUI_copyInnerHTML()
++  {
++    let clipboard = Cc["@mozilla.org/widget/clipboardhelper;1"].
++                    getService(Ci.nsIClipboardHelper);
++    clipboard.copyString(this.selection.innerHTML);
++  },
++
++  /**
++   * Copy the outerHTML of the selected Node to the clipboard. Called via the
++   * Inspector:CopyOuter command.
++   */
++  copyOuterHTML: function IUI_copyOuterHTML()
++  {
++    let clipboard = Cc["@mozilla.org/widget/clipboardhelper;1"].
++                    getService(Ci.nsIClipboardHelper);
++    clipboard.copyString(this.selection.outerHTML);
++  },
++
++  /**
++   * Delete the selected node. Called via the Inspector:DeleteNode command.
++   */
++  deleteNode: function IUI_deleteNode()
++  {
++    let selection = this.selection;
++    let parent = this.selection.parentNode;
++
++    // remove the node from the treepanel
++    this.treePanel.deleteChildBox(selection);
++
++    // remove the node from content
++    parent.removeChild(selection);
++    this.breadcrumbs.invalidateHierarchy();
++
++    // select the parent node in the highlighter, treepanel, breadcrumbs
++    this.inspectNode(parent);
++  },
+ 
+   /////////////////////////////////////////////////////////////////////////
+   //// CssRuleView methods
+ 
+   /**
+    * Is the cssRuleView open?
+    */
+   isRuleViewOpen: function IUI_isRuleViewOpen()
+diff --git a/browser/devtools/highlighter/test/Makefile.in b/browser/devtools/highlighter/test/Makefile.in
+--- a/browser/devtools/highlighter/test/Makefile.in
++++ b/browser/devtools/highlighter/test/Makefile.in
+@@ -65,16 +65,17 @@ include $(topsrcdir)/config/rules.mk
+ 		browser_inspector_keybindings.js \
+ 		browser_inspector_breadcrumbs.html \
+ 		browser_inspector_breadcrumbs.js \
+ 		browser_inspector_bug_699308_iframe_navigation.js \
+ 		browser_inspector_changes.js \
+ 		browser_inspector_ruleviewstore.js \
+ 		browser_inspector_duplicate_ruleview.js \
+ 		browser_inspector_invalidate.js \
++		browser_inspector_treePanel_menu.js \
+ 		head.js \
+ 		$(NULL)
+ 
+ # Disabled due to constant failures
+ # 		browser_inspector_treePanel_click.js \
+ 
+ libs::	$(_BROWSER_FILES)
+ 	$(INSTALL) $(foreach f,$^,"$f") $(DEPTH)/_tests/testing/mochitest/browser/$(relativesrcdir)
+diff --git a/browser/devtools/highlighter/test/browser_inspector_treePanel_menu.js b/browser/devtools/highlighter/test/browser_inspector_treePanel_menu.js
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/highlighter/test/browser_inspector_treePanel_menu.js
+@@ -0,0 +1,97 @@
++/* Any copyright is dedicated to the Public Domain.
++http://creativecommons.org/publicdomain/zero/1.0/ */
++
++
++function test() {
++
++  waitForExplicitFinish();
++
++  let doc;
++  let node1;
++  let div;
++
++  function createDocument() {
++    div = doc.createElement("div");
++    let h1 = doc.createElement("h1");
++    let p1 = doc.createElement("p");
++    let p2 = doc.createElement("p");
++    doc.title = "Inspector Tree Menu Test";
++    h1.textContent = "Inspector Tree Menu Test";
++    p1.textContent = "This is some example text";
++    div.appendChild(h1);
++    div.appendChild(p1);
++    doc.body.appendChild(div);
++    node1 = p1;
++    setupTest();
++  }
++
++  gBrowser.selectedTab = gBrowser.addTab();
++  gBrowser.selectedBrowser.addEventListener("load", function onload() {
++    gBrowser.selectedBrowser.removeEventListener("load", onload, true);
++    doc = content.document;
++    waitForFocus(createDocument, content);
++  }, true);
++
++  content.location = content.location = "data:text/html,basic tests for inspector";;
++
++  function setupTest() {
++    Services.obs.addObserver(runTests, InspectorUI.INSPECTOR_NOTIFICATIONS.OPENED, false);
++    InspectorUI.toggleInspectorUI();
++  }
++
++  function runTests() {
++    Services.obs.removeObserver(runTests, InspectorUI.INSPECTOR_NOTIFICATIONS.OPENED);
++    Services.obs.addObserver(testCopyInnerMenu, InspectorUI.INSPECTOR_NOTIFICATIONS.TREEPANELREADY, false);
++    InspectorUI.stopInspecting();
++    InspectorUI.inspectNode(node1, true);
++    InspectorUI.treePanel.open();
++  }
++
++  function testCopyInnerMenu() {
++    let copyInner = document.getElementById("inspectorHTMLCopyInner");
++    ok(copyInner, "the popup menu has a copy inner html menu item");
++
++    waitForClipboard("This is some example text",
++                     function() { copyInner.doCommand(); },
++                     testCopyOuterMenu, testCopyOuterMenu);
++  }
++
++  function testCopyOuterMenu() {
++    let copyOuter = document.getElementById("inspectorHTMLCopyOuter");
++    ok(copyOuter, "the popup menu has a copy outer html menu item");
++
++    waitForClipboard("<p>This is some example text</p>",
++                     function() { copyOuter.doCommand(); },
++                     testDeleteNode, testDeleteNode);
++  }
++
++  function testDeleteNode() {
++    let deleteNode = document.getElementById("inspectorHTMLDelete");
++    ok(deleteNode, "the popup menu has a delete menu item");
++
++    InspectorUI.highlighter.addListener("nodeselected", deleteTest);
++
++    let commandEvent = document.createEvent("XULCommandEvent");
++    commandEvent.initCommandEvent("command", true, true, window, 0, false, false,
++                                  false, false, null);
++    deleteNode.dispatchEvent(commandEvent);
++  }
++
++  function deleteTest() {
++    InspectorUI.highlighter.removeListener("nodeSelected", deleteTest);
++    Services.obs.addObserver(finishUp, InspectorUI.INSPECTOR_NOTIFICATIONS.CLOSED, false);
++    is(InspectorUI.selection, div, "parent node selected");
++    let p = doc.querySelector("P");
++    is(p, null, "node deleted");
++    executeSoon(function() {
++      InspectorUI.closeInspectorUI();
++    });
++  }
++
++  function finishUp() {
++    Services.obs.removeObserver(finishUp, InspectorUI.INSPECTOR_NOTIFICATIONS.CLOSED);
++    doc = node1 = div = null;
++    gBrowser.removeCurrentTab();
++    finish();
++  }
++}
+diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/en-US/chrome/browser/browser.dtd
+--- a/browser/locales/en-US/chrome/browser/browser.dtd
++++ b/browser/locales/en-US/chrome/browser/browser.dtd
+@@ -213,16 +213,28 @@ can reach it easily. -->
+ <!ENTITY scratchpad.keycode           "VK_F4">
+ <!ENTITY scratchpad.keytext           "F4">
+ 
+ <!ENTITY inspectPanelTitle.label        "HTML">
+ <!ENTITY inspectButton.accesskey        "I">
+ <!ENTITY inspectButton.tooltiptext      "Inspect  (&inspectButton.accesskey;)">
+ <!ENTITY inspectCloseButton.tooltiptext "Close Inspector">
+ 
++<!ENTITY inspectorHTMLCopyInner.label       "Copy Inner HTML">
++<!ENTITY inspectorHTMLCopyInner.accesskey   "I">
++<!ENTITY inspectorHTMLCopyInner.commandkey  "">
++
++<!ENTITY inspectorHTMLCopyOuter.label       "Copy Outer HTML">
++<!ENTITY inspectorHTMLCopyOuter.accesskey   "O">
++<!ENTITY inspectorHTMLCopyOuter.commandkey  "">
++
++<!ENTITY inspectorHTMLDelete.label          "Delete Node">
++<!ENTITY inspectorHTMLDelete.accesskey      "D">
++<!ENTITY inspectorHTMLDelete.commandkey     "">
++
+ <!-- LOCALIZATION NOTE (inspect3DViewButton.label): This button shows an
+   -  alternate view for the Inspector, creating a 3D visualization of the
+   -  webpage. -->
+ <!ENTITY inspect3DViewButton.label     "3D View">
+ <!ENTITY inspect3DViewButton.accesskey "W">
+ 
+ <!ENTITY inspectStyleButton.label     "Style">
+ <!ENTITY inspectStyleButton.accesskey "S">

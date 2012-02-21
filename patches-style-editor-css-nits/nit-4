@@ -1,0 +1,28 @@
+# HG changeset patch
+# Parent 74c8323159f741b4659edf667bc1fd76e4354db1
+Bug 712930 - Improve the look of the Style Editor -  Item 4
+
+diff --git a/browser/devtools/sourceeditor/orion/mozilla.css b/browser/devtools/sourceeditor/orion/mozilla.css
+--- a/browser/devtools/sourceeditor/orion/mozilla.css
++++ b/browser/devtools/sourceeditor/orion/mozilla.css
+@@ -28,18 +28,18 @@
+ }
+ 
+ /* Styles for the line number ruler */
+ .rulerLines {
+   border-right: 1px solid #b4c4d3;
+   background: #cddae5;
+   color: #7a8a99;
+   min-width: 1.4em;
+-  padding-left: 4px;
+-  padding-right: 4px;
++  padding-left: 5px;
++  padding-right: 5px;
+   text-align: end;
+ }
+ 
+ .token_singleline_comment {
+   color: #45a946; /* green */
+ }
+ 
+ .token_multiline_comment {

@@ -1,0 +1,680 @@
+# HG changeset patch
+# Parent 9b908c80bb20332f298631ba0fc4251649522004
+Inspector Expose Mode - try: -b do -p linux,macosx64,win32 -u mochitests -t none
+
+diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browser-sets.inc
+--- a/browser/base/content/browser-sets.inc
++++ b/browser/base/content/browser-sets.inc
+@@ -156,16 +156,18 @@
+     <command id="Inspector:HTMLPanel"
+              oncommand="InspectorUI.toggleHTMLPanel();"/>
+     <command id="Inspector:CopyInner" oncommand="InspectorUI.copyInnerHTML();"/>
+     <command id="Inspector:CopyOuter" oncommand="InspectorUI.copyOuterHTML();"/>
+     <command id="Inspector:DeleteNode" oncommand="InspectorUI.deleteNode();"/>
+     <command id="Inspector:ToggleVeil" oncommand="InspectorUI.toggleVeil();"/>
+     <command id="Inspector:ToggleInfobar"
+              oncommand="InspectorUI.toggleInfobar();"/>
++    <command id="Inspector:LayoutView"
++             oncommand="InspectorUI.toggleLayoutView();"/>
+   </commandset>
+ 
+   <broadcasterset id="mainBroadcasterSet">
+     <broadcaster id="viewBookmarksSidebar" autoCheck="false" label="&bookmarksButton.label;"
+                  type="checkbox" group="sidebar" sidebarurl="chrome://browser/content/bookmarks/bookmarksPanel.xul"
+                  oncommand="toggleSidebar('viewBookmarksSidebar');"/>
+ 
+     <!-- for both places and non-places, the sidebar lives at
+diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul
++++ b/browser/base/content/browser.xul
+@@ -1050,16 +1050,21 @@
+                         label="&inspect3DViewButton.label;"
+                         accesskey="&inspect3DViewButton.accesskey;"
+                         command="Inspector:Tilt"/>
+         <toolbarbutton id="inspector-style-button"
+                         class="devtools-toolbarbutton"
+                         label="&inspectStyleButton.label;"
+                         accesskey="&inspectStyleButton.accesskey;"
+                         command="Inspector:Sidebar"/>
++        <toolbarbutton id="inspector-layout-button"
++                        class="devtools-toolbarbutton"
++                        label="1280x245"
++                        XXXaccesskey="FIXME"
++                        command="Inspector:LayoutView"/>
+         <!-- registered tools go here -->
+       </hbox>
+ #ifndef XP_MACOSX
+       <toolbarbutton id="highlighter-closebutton"
+                       oncommand="InspectorUI.closeInspectorUI(false);"
+                       tooltiptext="&inspectCloseButton.tooltiptext;"/>
+ #endif
+     </toolbar>
+diff --git a/browser/devtools/Makefile.in b/browser/devtools/Makefile.in
+--- a/browser/devtools/Makefile.in
++++ b/browser/devtools/Makefile.in
+@@ -49,12 +49,13 @@ include $(topsrcdir)/config/config.mk
+ DIRS = \
+   highlighter \
+   webconsole \
+   sourceeditor \
+   styleeditor \
+   styleinspector \
+   tilt \
+   scratchpad \
++  layoutview \
+   shared \
+   $(NULL)
+ 
+ include $(topsrcdir)/config/rules.mk
+diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/highlighter/highlighter.jsm
+--- a/browser/devtools/highlighter/highlighter.jsm
++++ b/browser/devtools/highlighter/highlighter.jsm
+@@ -236,17 +236,17 @@ Highlighter.prototype = {
+ 
+     if (oldNode !== this.node) {
+       this.updateInfobar();
+     }
+ 
+     this.invalidateSize(!!aScroll);
+ 
+     if (oldNode !== this.node) {
+-      this.emitEvent("nodeselected");
++      this.emitEvent("nodeselected", [this.node]);
+     }
+   },
+ 
+   /**
+    * Update the highlighter size and position.
+    */
+   invalidateSize: function Highlighter_invalidateSize(aScroll)
+   {
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -49,16 +49,17 @@ const Cr = Components.results;
+ 
+ var EXPORTED_SYMBOLS = ["InspectorUI"];
+ 
+ Cu.import("resource://gre/modules/Services.jsm");
+ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+ Cu.import("resource:///modules/TreePanel.jsm");
+ Cu.import("resource:///modules/devtools/CssRuleView.jsm");
+ Cu.import("resource:///modules/highlighter.jsm");
++Cu.import("resource:///modules/LayoutView.jsm");
+ Cu.import("resource:///modules/devtools/LayoutHelpers.jsm");
+ 
+ // Inspector notifications dispatched through the nsIObserverService.
+ const INSPECTOR_NOTIFICATIONS = {
+   // Fires once the Inspector completes the initialization and opens up on
+   // screen.
+   OPENED: "inspector-opened",
+ 
+@@ -204,16 +205,32 @@ InspectorUI.prototype = {
+     } else {
+       this.treePanel.open();
+       Services.prefs.setBoolPref("devtools.inspector.htmlPanelOpen", true);
+       this.store.setValue(this.winID, "htmlPanelOpen", true);
+     }
+   },
+ 
+   /**
++   * Toggle the TreePanel.
++   */
++  toggleLayoutView: function IUI_toggleLayoutView()
++  {
++    if (this.layoutview.isOpen()) {
++      this.layoutview.close();
++      //Services.prefs.setBoolPref("devtools.inspector.htmlPanelOpen", false);
++      //this.store.setValue(this.winID, "htmlPanelOpen", false);
++    } else {
++      this.layoutview.open();
++      //Services.prefs.setBoolPref("devtools.inspector.htmlPanelOpen", true);
++      //this.store.setValue(this.winID, "htmlPanelOpen", true);
++    }
++  },
++
++  /**
+    * Is the inspector UI open? Simply check if the toolbar is visible or not.
+    *
+    * @returns boolean
+    */
+   get isInspectorOpen()
+   {
+     return this.toolbar && !this.toolbar.hidden && this.highlighter;
+   },
+@@ -336,16 +353,18 @@ InspectorUI.prototype = {
+ 
+     this.progressListener = new InspectorProgressListener(this);
+ 
+     this.chromeWin.addEventListener("keypress", this, false);
+ 
+     // initialize the highlighter
+     this.highlighter = new Highlighter(this.chromeWin);
+ 
++    this.layoutview = new LayoutView(this);
++
+     this.setupNavigationKeys();
+     this.highlighterReady();
+   },
+ 
+   /**
+    * Register the Rule View in the Sidebar.
+    */
+   registerRuleView: function IUI_registerRuleView()
+@@ -459,16 +478,19 @@ InspectorUI.prototype = {
+   {
+     // if currently editing an attribute value, closing the
+     // highlighter/HTML panel dismisses the editor
+     if (this.treePanel && this.treePanel.editingContext)
+       this.treePanel.closeEditor();
+ 
+     this.treePanel.destroy();
+ 
++    this.layoutview.destroy()
++    this.layoutview = null;
++
+     if (this.closing || !this.win || !this.browser) {
+       return;
+     }
+ 
+     let winId = new String(this.winID); // retain this to notify observers.
+ 
+     this.closing = true;
+     this.toolbar.hidden = true;
+diff --git a/browser/devtools/jar.mn b/browser/devtools/jar.mn
+--- a/browser/devtools/jar.mn
++++ b/browser/devtools/jar.mn
+@@ -7,9 +7,10 @@ browser.jar:
+ *   content/browser/styleeditor.xul               (styleeditor/styleeditor.xul)
+     content/browser/styleeditor.css               (styleeditor/styleeditor.css)
+     content/browser/devtools/csshtmltree.xul      (styleinspector/csshtmltree.xul)
+     content/browser/devtools/cssruleview.xul      (styleinspector/cssruleview.xul)
+     content/browser/devtools/styleinspector.css   (styleinspector/styleinspector.css)
+     content/browser/orion.js                      (sourceeditor/orion/orion.js)
+     content/browser/orion.css                     (sourceeditor/orion/orion.css)
+     content/browser/source-editor-overlay.xul     (sourceeditor/source-editor-overlay.xul)
++    content/browser/devtools/layoutview/view.html (layoutview/view.html)
+ 
+diff --git a/browser/devtools/layoutview/LayoutView.jsm b/browser/devtools/layoutview/LayoutView.jsm
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/layoutview/LayoutView.jsm
+@@ -0,0 +1,180 @@
++/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
++/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * The Original Code is the Mozilla Layout Module.
++ *
++ * The Initial Developer of the Original Code is
++ * The Mozilla Foundation.
++ * Portions created by the Initial Developer are Copyright (C) 2012
++ * the Initial Developer. All Rights Reserved.
++ *
++ * Contributor(s):
++ *   Paul Rouget <paul@mozilla.com> (original author)
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++
++ /* TODO:
++  tests
++  "usable" panel
++  preffed-off
++ */
++
++"use strict";
++
++var EXPORTED_SYMBOLS = ["LayoutView"];
++
++const Cu = Components.utils;
++Cu.import("resource:///modules/devtools/LayoutHelpers.jsm");
++
++function LayoutView(aIUI) {
++  this.chromeDoc = aIUI.chromeWin.document;
++  this.browser = aIUI.chromeWin.gBrowser;
++  this.highlighter = aIUI.highlighter;
++
++  this._init();
++}
++
++LayoutView.prototype = {
++  _init: function LV__init() {
++    this.button = this.chromeDoc.getElementById("inspector-layout-button");
++
++    this.update = this.update.bind(this);
++    this.onPopupShown = this.onPopupShown.bind(this);
++    this.onPopupHiding = this.onPopupHiding.bind(this);
++
++    this._isOpen = false;
++
++    this.highlighter.addListener("nodeselected", this.update);
++    this.browser.addEventListener("MozAfterPaint", this.update, true);
++
++    this.map = {
++      marginTop: [".margin.top > span", "margin-top"],
++      marginBottom: [".margin.bottom > span", "margin-bottom"],
++      marginLeft: [".margin.left > span", "margin-left"],
++      marginRight: [".margin.right > span", "margin-right"],
++      paddingTop: [".padding.top > span", "padding-top"],
++      paddingBottom: [".padding.bottom > span", "padding-bottom"],
++      paddingLeft: [".padding.left > span", "padding-left"],
++      paddingRight: [".padding.right > span", "padding-right"],
++      borderTop: [".border.top > span", "border-top-width"],
++      borderBottom: [".border.bottom > span", "border-bottom-width"],
++      borderLeft: [".border.left > span", "border-left-width"],
++      borderRight: [".border.right > span", "border-right-width"],
++    };
++
++    this.buildPanel();
++  },
++
++  destroy: function LV_destroy() {
++    this.close();
++
++    this.iframe = null;
++    this.button.setAttribute("label", "");
++    this.button = null;
++    this.highlighter.removeListener("nodeselected", this.update);
++    this.browser.removeEventListener("MozAfterPaint", this.update, true);
++    this.panel.removeEventListener("popupshown", this.onPopupShown, true);
++    this.panel.removeEventListener("popuphiding", this.onPopupHiding, true);
++    this.panel.parentNode.removeChild(this.panel);
++  },
++
++  buildPanel: function LV_buildPanel() {
++    let popupset = this.chromeDoc.getElementById("mainPopupSet");
++
++    this.iframe = this.chromeDoc.createElement("iframe");
++    this.iframe.setAttribute("src", "chrome://browser/content/devtools/layoutview/view.html");
++    this.iframe.setAttribute("style", "width: 240px; height: 155px");
++
++    this.panel = this.chromeDoc.createElement("panel");
++    this.panel.setAttribute("noautofocus", true);
++    this.panel.setAttribute("noautohide", true);
++    this.panel.setAttribute("type", "arrow");
++    this.panel.setAttribute("position", "before_end");
++    this.panel.appendChild(this.iframe);
++
++    this.panel.addEventListener("popupshown", this.onPopupShown, true);
++    this.panel.addEventListener("popuphiding", this.onPopupHiding, true);
++
++    popupset.appendChild(this.panel);
++  },
++
++  onPopupShown: function() {
++    this._isOpen = true;
++    this.update();
++    this.button.setAttribute("checked", true);
++  },
++
++  onPopupHiding: function() {
++    this._isOpen = false;
++    this.button.removeAttribute("checked");
++  },
++
++  isOpen: function LV_isOpen() {
++    return this._isOpen;
++  },
++
++  open: function LV_open() {
++    this.panel.openPopup(this.button);
++  },
++
++  close: function LV_close() {
++    this.panel.hidePopup();
++  },
++
++  update: function LV_update() {
++    let node = this.highlighter.node;
++    let clientRect = node.getBoundingClientRect();
++
++    let width = Math.round(clientRect.width);
++    let height = Math.round(clientRect.height);
++
++    this.button.setAttribute("label", width + "x" + height);
++
++    if (!this.isOpen() || !this.iframe.contentDocument) return;
++
++    let doc = this.iframe.contentDocument;
++    let win = this.iframe.contentWindow;
++
++    let style = win.getComputedStyle(node);
++
++    for (let i in this.map) {
++      let selector = this.map[i][0];
++      let property = this.map[i][1];
++      this.map[i][2] = parseInt(style.getPropertyValue(property));
++      let span = doc.querySelector(selector);
++      span.textContent = this.map[i][2];
++    }
++
++    width -= this.map.borderLeft[2] + this.map.borderRight[2] +
++             this.map.paddingLeft[2] + this.map.paddingRight[2];
++
++    height -= this.map.borderTop[2] + this.map.borderBottom[2] +
++              this.map.paddingTop[2] + this.map.paddingBottom[2];
++
++    doc.querySelector(".size > span").textContent = width + "x" + height;
++  },
++}
+diff --git a/browser/devtools/layoutview/Makefile.in b/browser/devtools/layoutview/Makefile.in
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/layoutview/Makefile.in
+@@ -0,0 +1,18 @@
++# FIXME license
++
++DEPTH		= ../../..
++topsrcdir	= @top_srcdir@
++srcdir		= @srcdir@
++VPATH		= @srcdir@
++
++include $(DEPTH)/config/autoconf.mk
++
++EXTRA_JS_MODULES = \
++	LayoutView.jsm \
++	$(NULL)
++
++#ifdef ENABLE_TESTS
++# 	DIRS += test
++#endif
++
++include $(topsrcdir)/config/rules.mk
+diff --git a/browser/devtools/layoutview/view.html b/browser/devtools/layoutview/view.html
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/layoutview/view.html
+@@ -0,0 +1,225 @@
++<!DOCTYPE html>
++
++<meta charset="utf8">
++
++<script type="application/javascript;version=1.8">
++  let elts;
++  let tooltip;
++
++  window.onload = function() {
++    elts = document.querySelectorAll("*[tooltip]");
++    tooltip = document.querySelector(".tooltip");
++    for (let i = 0; i < elts.length; i++) {
++      let elt = elts[i];
++      elt.addEventListener("mouseover", onmouseover, true);
++      elt.addEventListener("mouseout", onmouseout, true);
++    }
++  }
++
++  window.onunload = function() {
++    if (elts) {
++      for (let i = 0; i < elts.length; i++) {
++        let elt = elts[i];
++        elt.removeEventListener("mouseover", onmouseover, true);
++        elt.removeEventListener("mouseout", onmouseout, true);
++      }
++    }
++  }
++
++  function onmouseover(e) {
++    tooltip.textContent = e.target.getAttribute("tooltip");
++  }
++
++  function onmouseout(e) {
++    tooltip.textContent = "";
++  }
++</script>
++
++<style>
++  body, html {
++    height: 100%;
++    width: 100%;
++  }
++
++  body {
++    background: url(http://i.imgur.com/Lyp1h.png), -moz-radial-gradient(50% 70%, circle cover, hsl(210,53%,45%) 0%, hsl(210,54%,33%) 100%);
++    margin: 0;
++  }
++
++  #main {
++    margin: 10px;
++    -moz-box-sizing: border-box;
++    width: -moz-calc(100% - 2 * 10px);
++    border: 1px dotted hsla(210,100%,85%,0.7);
++    position: absolute;
++    font: 10px/12px monospace;
++    color: hsl(210,100%,85%);
++  }
++
++  #margins {
++    padding: 28px;
++  }
++
++  #content {
++    height: 20px;
++    border: 1px dotted hsla(210,100%,85%,0.7);
++  }
++
++  #padding {
++    border: 25px solid  hsla(210,100%,85%,0.2);
++  }
++
++  #borders {
++    border: 2px solid  hsl(210,100%,85%);
++    box-shadow: 0 0 16px black;
++  }
++
++  #main > p {
++    position: absolute;
++    pointer-events: none;
++  }
++
++  #main > p {
++    margin: 0;
++    text-align: center;
++  }
++
++  #main > p > span {
++    vertical-align: middle;
++    pointer-events: auto;
++    cursor: default;
++  }
++
++  #main > .border {
++    color: hsl(210,53%,45%);
++  }
++
++  .border > span {
++    background-color: hsl(210,100%,85%);
++    border-radius: 2px;
++    padding: 0 4px;
++  }
++
++  .border.top {
++    left: 0; top: 23px;
++    width: 98px;
++  }
++
++  .border.bottom {
++    right: 0; bottom: 22px;
++    width: 98px;
++    top: auto;
++  }
++
++  .border.left {
++    top: 42px; left: 0;
++    width: 56px;
++  }
++
++  .border.right{
++    bottom: 42px; right: 0;
++    width: 56px;
++    top: auto;
++  }
++
++  .top, .bottom {
++    width: -moz-calc(100% - 2px);
++    text-align: center;
++  }
++
++  .margin.top {
++    top: 8px;
++  }
++
++  .margin.bottom {
++    bottom: 6px;
++  }
++
++  .padding.top {
++    top: 35px;
++  }
++
++  .padding.bottom {
++    bottom: 35px;
++  }
++
++  .size,
++  .margin.left,
++  .margin.right,
++  .padding.left,
++  .padding.right {
++    top: 0;
++    line-height: 132px;
++  }
++
++  .size {
++    width: -moz-calc(100% - 2px);
++  }
++
++  .margin.right,
++  .margin.left {
++    width: 28px;
++  }
++
++  .padding.right,
++  .padding.left {
++    width: 25px;
++  }
++
++  .margin.right {
++    right: 0;
++  }
++
++  .margin.left {
++    left: 0;
++  }
++
++  .padding.left {
++    left: 30px;
++  }
++
++  .padding.right {
++    right: 30px;
++  }
++
++  .tooltip {
++    position: absolute;
++    bottom: 0;
++    right: 2px;
++    pointer-events: none;
++  }
++
++</style>
++
++
++<div id="main">
++
++  <div id="margins" tooltip="margins">
++    <div id="borders" tooltip="borders">
++      <div id="padding" tooltip="padding">
++        <div id="content" tooltip="content">
++        </div>
++      </div>
++    </div>
++  </div>
++
++  <p class="border top"><span tooltip="border-top"></span></p>
++  <p class="border right"><span tooltip="border-right"></span></p>
++  <p class="border bottom"><span tooltip="border-bottom"></span></p>
++  <p class="border left"><span tooltip="border-left"></span></p>
++
++  <p class="margin top"><span tooltip="margin-top"></span></p>
++  <p class="margin right"><span tooltip="margin-right"></span></p>
++  <p class="margin bottom"><span tooltip="margin-bottom"></span></p>
++  <p class="margin left"><span tooltip="margin-left"></span></p>
++
++  <p class="padding top"><span tooltip="padding-top"></span></p>
++  <p class="padding right"><span tooltip="padding-right"></span></p>
++  <p class="padding bottom"><span tooltip="padding-bottom"></span></p>
++  <p class="padding left"><span tooltip="padding-left"></span></p>
++
++  <p class="size"><span tooltip="content"></span></p>
++
++  <span class="tooltip"></span>
++
++</div>
+diff --git a/browser/devtools/shared/LayoutHelpers.jsm b/browser/devtools/shared/LayoutHelpers.jsm
+--- a/browser/devtools/shared/LayoutHelpers.jsm
++++ b/browser/devtools/shared/LayoutHelpers.jsm
+@@ -208,17 +208,16 @@ LayoutHelpers = {
+     let aRectScaled = {};
+     for (let prop in aRect) {
+       aRectScaled[prop] = aRect[prop] * zoom;
+     }
+ 
+     return aRectScaled;
+   },
+ 
+-
+   /**
+    * Find an element from the given coordinates. This method descends through
+    * frames to find the element the user clicked inside frames.
+    *
+    * @param DOMDocument aDocument the document to look into.
+    * @param integer aX
+    * @param integer aY
+    * @returns Node|null the element node found at the given coordinates.
+diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gnomestripe/devtools/common.css
+--- a/browser/themes/gnomestripe/devtools/common.css
++++ b/browser/themes/gnomestripe/devtools/common.css
+@@ -52,16 +52,20 @@
+   text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
+   border: 1px solid hsla(210,8%,5%,.45);
+   border-radius: 3px;
+   background: -moz-linear-gradient(hsla(212,7%,57%,.35), hsla(212,7%,57%,.1)) padding-box;
+   box-shadow: 0 1px 0 hsla(210,16%,76%,.15) inset, 0 0 0 1px hsla(210,16%,76%,.15) inset, 0 1px 0 hsla(210,16%,76%,.15);
+   margin: 0 3px;
+ }
+ 
++.devtools-toolbarbutton > .toolbarbutton-icon {
++  margin: 0;
++}
++
+ .devtools-toolbarbutton:not([label]) {
+   min-width: 32px;
+ }
+ 
+ .devtools-toolbarbutton:not([label]) > .toolbarbutton-text {
+   display: none;
+ }
+ 

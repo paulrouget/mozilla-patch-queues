@@ -1,0 +1,44 @@
+# vim: se ft=diff :
+# HG changeset patch
+# User Cedric Vivier <cedricv@neonux.com>
+# Date 2012-01-26 04:58
+Bug 719022 - - Digits-only file names get .css prefixed in front of postfixed [part 2/2]. r=paul
+---
+ browser/devtools/styleeditor/styleeditor.css |    5 +----
+ 1 files changed, 1 insertions(+), 4 deletions(-)
+
+---
+ browser/devtools/styleeditor/styleeditor.css |    5 +----
+ 1 files changed, 1 insertions(+), 4 deletions(-)
+
+diff --git a/browser/devtools/styleeditor/styleeditor.css b/browser/devtools/styleeditor/styleeditor.css
+index b255ba7..4361fd1 100644
+--- a/browser/devtools/styleeditor/styleeditor.css
++++ b/browser/devtools/styleeditor/styleeditor.css
+@@ -59,21 +59,18 @@ li.error > .stylesheet-info > .stylesheet-more  > .stylesheet-error-message {
+   -moz-box-orient: vertical;
+   -moz-box-flex: 1;
+ }
+ 
+ .stylesheet-info > h1 {
+   -moz-box-flex: 1;
+ }
+ 
+-.stylesheet-name {
+-  outline: none;
+-}
+-
+ .stylesheet-name > label {
++  display: inline;
+   cursor: pointer;
+ }
+ 
+ .splitview-nav > li > hgroup.stylesheet-info {
+   -moz-box-pack: center;
+ }
+ 
+ .stylesheet-enabled {
+-- 
+1.7.6.5
+
+
