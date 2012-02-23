@@ -1,11 +1,11 @@
 # HG changeset patch
-# Parent d42fcb70cb22bb2c43c18b3f687e36e89652b0e0
+# Parent 3d77924fb9701af70a6f84894b311532e52b6cd8
 Bug 704110 - The WebConsole should use the DevTools CSS theme (dark theme)
 
 diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
 --- a/browser/base/content/browser.xul
 +++ b/browser/base/content/browser.xul
-@@ -993,16 +993,17 @@
+@@ -996,16 +996,17 @@
               hidden="true">
        <vbox flex="1">
          <resizer id="inspector-top-resizer" flex="1" 
@@ -23,7 +23,7 @@ diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
                           label="&inspectButton.label;"
                           accesskey="&inspectButton.accesskey;"
                           command="Inspector:Inspect"/>
-@@ -1020,16 +1021,17 @@
+@@ -1023,16 +1024,17 @@
                             class="devtools-toolbarbutton"
                             label="&inspectStyleButton.label;"
                             accesskey="&inspectStyleButton.accesskey;"
@@ -340,7 +340,7 @@ diff --git a/browser/devtools/webconsole/HUDService.jsm b/browser/devtools/webco
      repeatNode.setAttribute("value", occurrences);
    },
  
-@@ -7045,28 +7037,25 @@ GcliTerm.prototype = {
+@@ -7051,28 +7043,25 @@ GcliTerm.prototype = {
      }
  
      // See https://github.com/mozilla/domtemplate/blob/master/README.md
@@ -867,8 +867,18 @@ diff --git a/browser/themes/gnomestripe/devtools/webconsole.css b/browser/themes
    font-family: monospace;
    font-size: 1em;
    background-color: #000;
-@@ -296,20 +318,16 @@
-   background: url("chrome://global/skin/icons/commandline.png") 4px 3px no-repeat;
+@@ -287,29 +309,25 @@
+ .jsterm-input-node,
+ .jsterm-complete-node {
+   border: none;
+   padding: 0 0 0 16px;
+   -moz-appearance: none;
+ }
+ 
+ .jsterm-input-node {
+-  width: 98%;
++  width: 98%; /* FIXME: what is that? */
+   background: url("chrome://browser/skin/devtools/commandline.png") 4px 3px no-repeat;
  }
  
  :-moz-any(.jsterm-input-node,
@@ -891,13 +901,13 @@ diff --git a/browser/themes/gnomestripe/devtools/webconsole.css b/browser/themes
 diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
 --- a/browser/themes/gnomestripe/jar.mn
 +++ b/browser/themes/gnomestripe/jar.mn
-@@ -84,17 +84,17 @@ browser.jar:
-   skin/classic/browser/tabview/search.png             (tabview/search.png)
+@@ -85,17 +85,17 @@ browser.jar:
    skin/classic/browser/tabview/stack-expander.png     (tabview/stack-expander.png)
    skin/classic/browser/tabview/tabview.png            (tabview/tabview.png)
    skin/classic/browser/tabview/tabview.css            (tabview/tabview.css)
    skin/classic/browser/devtools/common.css            (devtools/common.css)
    skin/classic/browser/devtools/arrows.png            (devtools/arrows.png)
+   skin/classic/browser/devtools/commandline.png       (devtools/commandline.png)
    skin/classic/browser/devtools/goto-mdn.png          (devtools/goto-mdn.png)
    skin/classic/browser/devtools/csshtmltree.css       (devtools/csshtmltree.css)
 -  skin/classic/browser/devtools/webconsole.css                  (devtools/webconsole.css)
@@ -905,16 +915,16 @@ diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.
    skin/classic/browser/devtools/webconsole_networkpanel.css     (devtools/webconsole_networkpanel.css)
    skin/classic/browser/devtools/webconsole.png                  (devtools/webconsole.png)
    skin/classic/browser/devtools/gcli.css              (devtools/gcli.css)
+   skin/classic/browser/devtools/orion.css             (devtools/orion.css)
    skin/classic/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
    skin/classic/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
    skin/classic/browser/devtools/breadcrumbs/ltr-end-selected.png             (devtools/breadcrumbs/ltr-end-selected.png)
    skin/classic/browser/devtools/breadcrumbs/ltr-end.png                      (devtools/breadcrumbs/ltr-end.png)
-   skin/classic/browser/devtools/breadcrumbs/ltr-middle-pressed.png           (devtools/breadcrumbs/ltr-middle-pressed.png)
-@@ -118,16 +118,17 @@ browser.jar:
-   skin/classic/browser/devtools/breadcrumbs/rtl-start.png                    (devtools/breadcrumbs/rtl-start.png)
+@@ -121,16 +121,17 @@ browser.jar:
    skin/classic/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
    skin/classic/browser/devtools/splitview.css         (devtools/splitview.css)
    skin/classic/browser/devtools/styleeditor.css       (devtools/styleeditor.css)
+   skin/classic/browser/devtools/debugger.css          (devtools/debugger.css)
    skin/classic/browser/devtools/magnifying-glass.png  (devtools/magnifying-glass.png)
    skin/classic/browser/devtools/itemToggle.png        (devtools/itemToggle.png)
    skin/classic/browser/devtools/itemArrow-rtl.png     (devtools/itemArrow-rtl.png)
@@ -924,6 +934,640 @@ diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.
    skin/classic/browser/sync-16-throbber.png
    skin/classic/browser/sync-16.png
    skin/classic/browser/sync-24-throbber.png
+   skin/classic/browser/sync-32.png
+   skin/classic/browser/sync-bg.png
+   skin/classic/browser/sync-128.png
+   skin/classic/browser/sync-desktopIcon.png
+diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
+--- a/browser/themes/pinstripe/browser.css
++++ b/browser/themes/pinstripe/browser.css
+@@ -2680,36 +2680,16 @@ panel[dimmed="true"] {
+ 
+ 
+ /* Highlighter */
+ 
+ .highlighter-veil {
+   background-color: rgba(25, 25, 25, 0.5);
+ }
+ 
+-#highlighter-closebutton {
+-  list-style-image: url("chrome://browser/skin/devtools/toolbarbutton-close.png");
+-  -moz-image-region: rect(0, 16px, 16px, 0);
+-  min-width: 16px;
+-  width: 16px;
+-  margin: 0 4px;
+-}
+-
+-#highlighter-closebutton > .toolbarbutton-text {
+-  display: none;
+-}
+-
+-#highlighter-closebutton:hover {
+-  -moz-image-region: rect(0, 32px, 16px, 16px);
+-}
+-
+-#highlighter-closebutton:active {
+-  -moz-image-region: rect(0, 48px, 16px, 32px);
+-}
+-
+ #highlighter-veil-transparentbox {
+   box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
+   outline: 1px dashed rgba(255,255,255,0.5);
+   outline-offset: -1px;
+ }
+ 
+ #highlighter-veil-container[locked] > #highlighter-veil-middlebox > #highlighter-veil-transparentbox {
+   box-shadow: 0 0 0 1px black;
+diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinstripe/devtools/common.css
+--- a/browser/themes/pinstripe/devtools/common.css
++++ b/browser/themes/pinstripe/devtools/common.css
+@@ -57,44 +57,59 @@
+   background: -moz-linear-gradient(hsla(212,7%,57%,.35), hsla(212,7%,57%,.1)) padding-box;
+   box-shadow: 0 1px 0 hsla(210,16%,76%,.15) inset, 0 0 0 1px hsla(210,16%,76%,.15) inset, 0 1px 0 hsla(210,16%,76%,.15);
+ }
+ 
+ .devtools-toolbarbutton > .toolbarbutton-text {
+   margin: 1px 6px;
+ }
+ 
+-.devtools-toolbarbutton:not([checked]):hover:active {
++.devtools-toolbarbutton:not([checked=true]):hover:active {
+   border-color: hsla(210,8%,5%,.6);
+   background: -moz-linear-gradient(hsla(220,6%,10%,.3), hsla(212,7%,57%,.15) 65%, hsla(212,7%,57%,.3));
+   box-shadow: 0 0 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
+ }
+ 
+-.devtools-toolbarbutton[checked] {
++.devtools-toolbarbutton[checked=true] {
+   color: hsl(208,100%,60%) !important;
+   border-color: hsla(210,8%,5%,.6);
+   background: -moz-linear-gradient(hsla(220,6%,10%,.6), hsla(210,11%,18%,.45) 75%, hsla(210,11%,30%,.4));
+   box-shadow: 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
+ }
+ 
+-.devtools-toolbarbutton[checked]:hover:active {
++.devtools-toolbarbutton[checked=true]:hover:active {
+   background-color: hsla(210,8%,5%,.2);
+ }
+ 
++.devtools-toolbarbutton[type=menu-button] > .toolbarbutton-menubutton-button {
++  -moz-appearance: none;
++  color: white;
++  border-width: 0 1px 0 0;
++  border-right: 1px solid hsla(210,8%,5%,.45);
++  box-shadow: -1px 0 0 hsla(210,16%,76%,.15) inset, 1px 0 0 hsla(210,16%,76%,.15);
++}
++
++.devtools-toolbarbutton[type=menu] > .toolbarbutton-menu-dropmarker,
++.devtools-toolbarbutton[type=menu-button] > .toolbarbutton-menubutton-dropmarker {
++  -moz-appearance: none!important;
++  list-style-image: url("chrome://browser/skin/devtools/dropmarker.png");
++  -moz-box-align: center;
++}
++
+ /* Search input */
+ 
+ .devtools-searchinput {
+   -moz-appearance: none;
+   margin: 0 3px;
+   background-color: transparent;
+   border: 1px solid hsla(210,8%,5%,.6);
+   border-radius: 20px;
+   background-image: url(magnifying-glass.png), -moz-linear-gradient(hsla(210,16%,76%,.15), hsla(210,16%,76%,.35));
+   background-repeat: no-repeat;
+-  background-position: 4px 3px, top left, top left;
++  background-position: 4px center, top left, top left;
+   padding-top: 0;
+   padding-bottom: 0;
+   -moz-padding-start: 18px;
+   -moz-padding-end: 12px;
+   box-shadow: 0 1px 1px hsla(210,8%,5%,.3) inset,
+               0 0 0 1px hsla(210,16%,76%,.1) inset,
+               0 1px 0 hsla(210,16%,76%,.15);
+   color: hsl(210,30%,85%);
+@@ -106,8 +121,30 @@
+ 
+ .devtools-searchinput > .textbox-input-box > .textbox-search-icons {
+   display: none;
+ }
+ 
+ .devtools-searchinput > .textbox-input-box > .textbox-input:-moz-placeholder {
+   color: hsl(208,10%,66%);
+ }
++
++/* Close button */
++
++.devtools-closebutton {
++  list-style-image: url("chrome://browser/skin/devtools/toolbarbutton-close.png");
++  -moz-image-region: rect(0, 16px, 16px, 0);
++  min-width: 16px;
++  width: 16px;
++  margin: 0 4px;
++}
++
++.devtools-closebutton > .toolbarbutton-text {
++  display: none;
++}
++
++.devtools-closebutton:hover {
++  -moz-image-region: rect(0, 32px, 16px, 16px);
++}
++
++.devtools-closebutton:active {
++  -moz-image-region: rect(0, 48px, 16px, 32px);
++}
+diff --git a/browser/themes/pinstripe/devtools/dropmarker.png b/browser/themes/pinstripe/devtools/dropmarker.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..4bca6dd1dab75701644d8f90368c4d6ccb1b9520
+GIT binary patch
+literal 205
+zc%17D@N?(olHy`uVBq!ia0vp^>_E)I!3HFqj;YoHDaPU;cPEB*=VV?2Ic!PZ?k)^q
+z@Y8vBJ&@uo@Q5sCVBi)8VMc~ob0k29lz95Ovfp9kXBFW5`A?k(C?uO15>euupPQSS
+zR|3}WT$GwvlA5AWo>`Ki;O^-gkfN6gvRuW}#W95Adh(C||NkHQf8(GN8wludDF_)f
+gEMW*`iexmBX9)GM)t?{Uw*+L6r>mdKI;Vst0CvtYJ^%m!
+
+diff --git a/browser/themes/pinstripe/devtools/webconsole.css b/browser/themes/pinstripe/devtools/webconsole.css
+--- a/browser/themes/pinstripe/devtools/webconsole.css
++++ b/browser/themes/pinstripe/devtools/webconsole.css
+@@ -17,16 +17,17 @@
+  *   Mozilla Corporation
+  * Portions created by the Initial Developer are Copyright (C) 2010
+  * the Initial Developer. All Rights Reserved.
+  *
+  * Contributor(s):
+  *   David Dahl <ddahl@mozilla.com>
+  *   Patrick Walton <pcwalton@mozilla.com>
+  *   Rob Campbell <rcampbell@mozilla.com>
++ *   Paul Rouget <paul@mozilla.com>
+  *
+  * Alternatively, the contents of this file may be used under the terms of
+  * either the GNU General Public License Version 2 or later (the "GPL"), or
+  * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+  * in which case the provisions of the GPL or the LGPL are applicable instead
+  * of those above. If you wish to allow use of your version of this file only
+  * under the terms of either the GPL or the LGPL, and not to allow others to
+  * use your version of this file under the terms of the MPL, indicate your
+@@ -35,281 +36,249 @@
+  * the provisions above, a recipient may use your version of this file under
+  * the terms of any one of the MPL, the GPL or the LGPL.
+  *
+  * ***** END LICENSE BLOCK ***** */
+ 
+ %include ../shared.inc
+ 
+ .hud-box {
+-  border-bottom: 1px solid #aaa;
++  border-bottom: 1px solid black;
+   text-shadow: none;
+ }
+ 
+ .hud-box.animated {
+   -moz-transition: height 100ms;
+ }
+ 
+ .hud-splitter {
+   border-bottom: solid #a5a5a5 1px;
+   background: url("chrome://global/skin/splitter/dimple.png") no-repeat center,
+-    -moz-linear-gradient(top, #fcfcfc, #dfdfdf);
++  -moz-linear-gradient(top, #fcfcfc, #dfdfdf);
+ }
+ 
+ .hud-outer-wrapper {
+   width: 100%;
+   height: 100%;
+ }
+ 
+ .hud-console-wrapper {
+   width: 100%;
+   overflow: auto;
+ }
+ 
+ /* General output styles */
+ 
+ .webconsole-timestamp {
+-  color: GrayText;
+-  margin-top: 0;
+-  margin-bottom: 0;
+-  font: 11px Menlo, Monaco, monospace;
++  color: #667380; /*FIXME:SHORLANDER COLOR*/
++  margin: 0;
++  background-color: rgba(255, 255, 255, 0.04);
++  padding: 2px 5px;
++  font: 12px monospace;
++  border-right: 1px solid #566370;
++}
++
++.webconsole-timestamp:before {
++  content: "[";
++}
++
++.webconsole-timestamp:after {
++  content: "]";
+ }
+ 
+ .hud-msg-node {
+   list-style-image: url(chrome://browser/skin/devtools/webconsole.png);
+   -moz-image-region: rect(0, 1px, 0, 0);
+ }
+ 
+-.webconsole-msg-icon {
+-  margin: 3px 4px;
+-  width: 8px;
+-  height: 8px;
+-}
+-
+-.hud-clickable {
++.hud-clickable:hover {
+   cursor: pointer;
+   text-decoration: underline;
+ }
+ 
+ .webconsole-msg-body {
+-  margin-top: 0;
+-  margin-bottom: 3px;
+-  -moz-margin-start: 3px;
+-  -moz-margin-end: 6px;
++  -moz-margin-end: 3px;
++  -moz-margin-start: 0;
++  padding-top: 2px;
+   white-space: pre-wrap;
+-  font: 11px Menlo, Monaco, monospace;
++  font: 12px monospace;
+ }
+ 
+ .webconsole-msg-body-piece {
+   margin: 0;
+ }
+ 
+ .webconsole-msg-url {
+-  margin: 0 6px;
++  margin: 0 3px;
+ }
+ 
+ /* Repeated messages */
+ .webconsole-msg-repeat {
+-  margin: 2px 0;
+-  padding-left: 4px;
+-  padding-right: 4px;
+-  color: white;
+-  background-color: red;
+-  border-radius: 40px;
++  margin-top: 0;
++  -moz-margin-end: 6px;
++  -moz-margin-start: 0;
++  padding: 0 4px;
++  color: #030e1a; /*FIXME:SHORLANDER COLOR*/
++  background-color: #6B8299; /*FIXME:SHORLANDER COLOR*/
++  border-radius: 1px;
+   font: message-box;
+   font-size: 10px;
+   font-weight: 600;
++  vertical-align: middle;
+ }
+ 
+ /* TODO move this and other functional rules to content - bug 635359 */
+ .webconsole-msg-repeat[value="1"] {
+   display: none;
+ }
+ 
+ .webconsole-location {
+   margin-top: 0;
+   margin-bottom: 0;
+   -moz-margin-start: 0;
+-  -moz-margin-end: 6px;
++  -moz-margin-end: 3px;
+   width: 10em;
+   text-align: end;
+ }
+ 
+-.hud-msg-node[selected="true"] > .webconsole-timestamp,
+-.hud-msg-node[selected="true"] > .webconsole-location {
++/* FIXME: doesn't work if node is filtered */
++.hud-msg-node:not([selected="true"]):nth-child(odd) {
++  background-color: #151F2A;
++}
++
++.hud-msg-node[selected="true"],
++.hud-output-node:focus > .hud-msg-node[selected="true"] {
++  background-color: inherit;
+   color: inherit;
+ }
+ 
++.jsterm-input-container {
++  background-color: #151F2A;
++}
++
++.jsterm-input-node {
++  color: white;
++}
++
++.jsterm-complete-node {
++  color: #667380;
++  background-color: transparent;
++}
++
+ .jsterm-input-node,
+ .jsterm-complete-node {
+-  font: 11px Menlo, Monaco, monospace;
++  font: 12px "DejaVu Sans Mono", monospace;
+ }
+ 
+ .hud-output-node {
+   -moz-appearance: none;
+-  border-bottom: 1px solid ThreeDShadow;
+-  border-top: 1px solid ThreeDShadow;
+   margin: 0;
++  background-color: #030e1a; /*FIXME:SHORLANDER COLOR*/
++  border-bottom: 1px solid #566370;
+ }
+ 
+ .hud-filtered-by-type,
+ .hud-filtered-by-string {
+   display: none;
+ }
+ 
+-.webconsole-filter-button,
+-.webconsole-clear-console-button {
+-  -moz-appearance: none;
+-  border: @roundButtonBorder@;
+-  background: @roundButtonBackground@;
+-  box-shadow: @roundButtonShadow@;
+-  color: buttontext;
+-  margin: 1px 0;
+-  padding: 0;
++.webconsole-clear-console-button > .toolbarbutton-icon {
++  display: none;
++}
++
++.webconsole-filter-button > .toolbarbutton-menubutton-button,
++.webconsole-filter-button:not([type="menu-button"]) {
++  -moz-box-orient: horizontal;
+ }
+ 
+ .webconsole-filter-button {
+-  border-radius: 10000px;
+-  -moz-margin-start: 6px;
+-  -moz-box-orient: horizontal;
++  min-width: 32px;
++  -moz-box-align: center;
+ }
+ 
+-.webconsole-clear-console-button {
+-  border-radius: 3px;
+-  -moz-margin-end: 6px;
+-  -moz-margin-start: 4px;
+-  padding: 1px 6px;
++.webconsole-filter-button > .toolbarbutton-icon {
++  display: none;
+ }
+ 
+-.webconsole-filter-button[checked="true"] {
+-  box-shadow: @roundButtonPressedShadow@;
+-  background: #d0d0d0;
++.webconsole-filter-button:before {
++  content: "";
++  display: inline-block;
++  box-shadow: 0 0 1px 1px solid black;
++  height: 8px;
++  width: 8px;
++  border-radius: 50%;
++  margin-left: 5px;
+ }
+ 
+-.webconsole-filter-button > .toolbarbutton-menubutton-button {
+-  -moz-appearance: none;
++.webconsole-msg-icon {
++  width: 26px;
+   margin: 0;
+-  padding: 1px 0;
+-  list-style-image: url(chrome://browser/skin/devtools/webconsole.png);
+-  -moz-box-orient: horizontal;
++  text-align: center;
++  padding-top: 3px;
+ }
+ 
+-.webconsole-filter-button:hover:active,
+-.webconsole-clear-console-button:hover:active {
+-  text-shadow: @loweredShadow@;
+-  box-shadow: @roundButtonPressedShadow@;
+-  background: @roundButtonPressedBackground@;
++.webconsole-msg-error > .webconsole-msg-icon:before {
++  content: "✕";
++  color: red;
+ }
+ 
+-.webconsole-clear-console-button > .toolbarbutton-text {
+-  margin: 0;
+-}
+-
+-.webconsole-filter-button > .toolbarbutton-menubutton-button > .toolbarbutton-text {
+-  margin: 0 3px;
+-}
+-
+-.webconsole-filter-button > .toolbarbutton-menubutton-button > .toolbarbutton-icon {
+-  -moz-margin-start: 3px;
+-}
+-
+-.webconsole-filter-button > .toolbarbutton-menubutton-dropmarker {
+-  padding: 6px 3px 2px;
+-  -moz-border-start: dotted #aaaaaa 1px;
+-}
+-
+-.webconsole-new-group {
+-  margin-top: 6px;
++.webconsole-msg-warn > .webconsole-msg-icon:before {
++  content: "⚠";
++  color: white;
+ }
+ 
+ /* Network styles */
+-.webconsole-filter-button[category="net"] {
+-  -moz-image-region: rect(0, 8px, 8px, 0);
++.webconsole-filter-button[category="net"]:before {
++  background-color: @NET_COLOR@;
+ }
+ 
+-.webconsole-msg-network > .webconsole-msg-icon-container {
+-  -moz-border-start: solid #000 6px;
+-}
+-
+-.webconsole-msg-network.webconsole-msg-error {
+-  -moz-image-region: rect(0, 16px, 8px, 8px);
++.webconsole-msg-network > .webconsole-msg-body {
++  color: @NET_COLOR@;
+ }
+ 
+ /* CSS styles */
+-.webconsole-filter-button[category="css"] {
+-  -moz-image-region: rect(8px, 8px, 16px, 0);
++.webconsole-filter-button[category="css"]:before {
++  background-color: @CSS_COLOR@;
+ }
+ 
+-.webconsole-msg-cssparser > .webconsole-msg-icon-container {
+-  -moz-border-start: solid #00b6f0 6px;
+-}
+-
+-.webconsole-msg-cssparser.webconsole-msg-error {
+-  -moz-image-region: rect(8px, 16px, 16px, 8px);
+-}
+-
+-.webconsole-msg-cssparser.webconsole-msg-warn {
+-  -moz-image-region: rect(8px, 24px, 16px, 16px);
++.webconsole-msg-cssparser {
++  color: @CSS_COLOR@;
+ }
+ 
+ /* JS styles */
+-.webconsole-filter-button[category="js"] {
+-  -moz-image-region: rect(16px, 8px, 24px, 0);
++.webconsole-filter-button[category="js"]:before {
++  background-color: @JS_COLOR@;
+ }
+ 
+-.webconsole-msg-exception > .webconsole-msg-icon-container {
+-  -moz-border-start: solid #fb9500 6px;
+-}
+-
+-.webconsole-msg-exception.webconsole-msg-error {
+-  -moz-image-region: rect(16px, 16px, 24px, 8px);
+-}
+-
+-.webconsole-msg-exception.webconsole-msg-warn {
+-  -moz-image-region: rect(16px, 24px, 24px, 16px);
++.webconsole-msg-exception {
++  color: @JS_COLOR@;
+ }
+ 
+ /* Web Developer styles */
+-.webconsole-filter-button[category="logging"] {
+-  -moz-image-region: rect(24px, 8px, 32px, 0);
++.webconsole-filter-button[category="logging"]:before {
++  background-color: @LOG_COLOR@;
+ }
+ 
+-.webconsole-msg-console > .webconsole-msg-icon-container {
+-  -moz-border-start: solid #cbcbcb 6px;
+-}
+-
+-.webconsole-msg-console.webconsole-msg-error,
+-.webconsole-msg-output.webconsole-msg-error {
+-  -moz-image-region: rect(24px, 16px, 32px, 8px);
+-}
+-
+-.webconsole-msg-console.webconsole-msg-warn {
+-  -moz-image-region: rect(24px, 24px, 32px, 16px);
+-}
+-
+-.webconsole-msg-console.webconsole-msg-info {
+-  -moz-image-region: rect(24px, 32px, 32px, 24px);
++.webconsole-msg-input,
++.webconsole-msg-log,
++.webconsole-msg-console {
++  color: @LOG_COLOR@;
+ }
+ 
+ /* Input and output styles */
+-.webconsole-msg-input > .webconsole-msg-icon-container,
+-.webconsole-msg-output > .webconsole-msg-icon-container {
+-  border-left: solid #808080 6px;
++.webconsole-msg-input > .webconsole-msg-icon:before {
++  content: ">";
+ }
+ 
+-.webconsole-msg-input {
+-  -moz-image-region: rect(24px, 40px, 32px, 32px);
+-}
+-
+-.webconsole-msg-output {
+-  -moz-image-region: rect(24px, 48px, 32px, 40px);
++.webconsole-msg-output > .webconsole-msg-icon:before {
++  content: "↳";
+ }
+ 
+ .webconsole-close-button {
+-  list-style-image: url("chrome://global/skin/icons/close.png");
++  list-style-image: url("chrome://global/skin/icons/close.png"); /* FIXME */
+   margin-top: 0;
+   margin-bottom: 0;
+   -moz-margin-start: 3px;
+   -moz-margin-end: -14px;
+   min-width: 0;
+   -moz-appearance: none;
+   -moz-image-region: rect(0, 16px, 16px, 0);
+ }
+@@ -356,46 +325,42 @@
+ .jsterm-input-node,
+ .jsterm-complete-node {
+   border: none;
+   padding: 0 0 0 16px;
+   -moz-appearance: none;
+ }
+ 
+ .jsterm-input-node {
+-  background: url("chrome://browser/skin/devtools/commandline.png") 4px 2px no-repeat;
++  background: url("chrome://browser/skin/devtools/commandline.png") 4px 3px no-repeat;
+ }
+ 
+ :-moz-any(.jsterm-input-node,
+           .jsterm-complete-node) > .textbox-input-box > .textbox-textarea {
+   overflow-x: hidden;
+ }
+ 
+-.jsterm-complete-node > .textbox-input-box > .textbox-textarea {
+-  color: GrayText;
+-}
+-
+ .jsterm-output-line {
+   font-size: 1em;
+ }
+ 
+-.hud-console-filter-toolbar {
++.web-console-panel {
++  -moz-appearance: none;
++  background-color: white;
++}
++
++.hud-console-filter-toolbar { /* FIXME: useful? */
+   background: @scopeBarBackground@;
+   border-bottom: @scopeBarSeparatorBorder@;
+   padding: 0px 1px;
+   -moz-appearance: none;
+   -moz-box-align: center;
+ }
+ 
+-.hud-console-filter-toolbar:-moz-lwtheme {
++.hud-console-filter-toolbar:-moz-lwtheme { /* FIXME: useful? */
+   border-top: @scopeBarSeparatorBorder@;
+ }
+ 
+-.web-console-panel {
+-  -moz-appearance: none;
+-  background-color: white;
+-}
+-
+ .web-console-panel > .hud-box {
+   height: 100%;
+   width: 100%;
+   background-color: white;
+ }
+diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
+--- a/browser/themes/pinstripe/jar.mn
++++ b/browser/themes/pinstripe/jar.mn
+@@ -161,16 +161,17 @@ browser.jar:
+   skin/classic/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
+   skin/classic/browser/devtools/splitview.css               (devtools/splitview.css)
+   skin/classic/browser/devtools/styleeditor.css             (devtools/styleeditor.css)
+   skin/classic/browser/devtools/debugger.css                (devtools/debugger.css)
+   skin/classic/browser/devtools/magnifying-glass.png	    (devtools/magnifying-glass.png)
+   skin/classic/browser/devtools/itemToggle.png		    (devtools/itemToggle.png)
+   skin/classic/browser/devtools/itemArrow-rtl.png	    (devtools/itemArrow-rtl.png)
+   skin/classic/browser/devtools/itemArrow-ltr.png	    (devtools/itemArrow-ltr.png)
++  skin/classic/browser/devtools/dropmarker.png        (devtools/dropmarker.png)
+   skin/classic/browser/devtools/background-noise-toolbar.png (devtools/background-noise-toolbar.png)
+ #ifdef MOZ_SERVICES_SYNC
+   skin/classic/browser/sync-throbber.png
+   skin/classic/browser/sync-16.png
    skin/classic/browser/sync-32.png
    skin/classic/browser/sync-bg.png
    skin/classic/browser/sync-128.png
