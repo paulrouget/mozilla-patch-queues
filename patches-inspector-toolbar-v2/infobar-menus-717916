@@ -1,5 +1,5 @@
 # HG changeset patch
-# Parent 2d419f036e81e96061cfe8949dbcbe6883972c54
+# Parent a0e8be430b3ee405329e1b2290a3dc7641f6e8a1
 Bug 717916 - Add an Inspect button to the infobar
 
 diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlighter.css
@@ -59,7 +59,45 @@ diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlig
 diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/highlighter/highlighter.jsm
 --- a/browser/devtools/highlighter/highlighter.jsm
 +++ b/browser/devtools/highlighter/highlighter.jsm
-@@ -405,19 +405,23 @@ Highlighter.prototype = {
+@@ -72,17 +72,17 @@ const PSEUDO_CLASSES = [":hover", ":acti
+  * The highlighter is built dynamically into the browser element.
+  * The caller is in charge of destroying the highlighter (ie, the highlighter
+  * won't be destroyed if a new tab is selected for example).
+  *
+  * API:
+  *
+  *   // Constructor and destructor.
+  *   // @param aWindow - browser.xul window.
+- *   Highlighter(aWindow); 
++ *   Highlighter(aWindow);
+  *   void destroy();
+  *
+  *   // Highlight a node.
+  *   // @param aNode - node to highlight
+  *   // @param aScroll - scroll to ensure the node is visible
+  *   void highlight(aNode, aScroll);
+  *
+  *   // Get the selected node.
+@@ -248,17 +248,17 @@ Highlighter.prototype = {
+   },
+ 
+   /**
+    * Notify that a pseudo-class lock was toggled on the highlighted element
+    *
+    * @param aPseudo - The pseudo-class to toggle, e.g. ":hover".
+    */
+   pseudoClassLockToggled: function Highlighter_pseudoClassLockToggled(aPseudo)
+-  {  
++  {
+     this.emitEvent("pseudoclasstoggled", [aPseudo]);
+     this.updateInfobar();
+   },
+ 
+   /**
+    * Update the highlighter size and position.
+    */
+   invalidateSize: function Highlighter_invalidateSize(aScroll)
+@@ -425,19 +425,24 @@ Highlighter.prototype = {
    },
  
    /**
@@ -76,6 +114,7 @@ diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/hig
 +   *       <xhtml:span id="highlighter-nodeinfobar-tagname"/>
 +   *       <xhtml:span id="highlighter-nodeinfobar-id"/>
 +   *       <xhtml:span id="highlighter-nodeinfobar-classes"/>
++   *       <xhtml:span id="highlighter-nodeinfobar-pseudo-classes"/>
 +   *     </hbox>
 +   *     <toolbarbutton class="highlighter-nodeinfobar-button" id="highlighter-nodeinfobar-menu"/>
     *   </hbox>
@@ -86,18 +125,28 @@ diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/hig
     *        The container of the infobar.
     */
    buildInfobar: function Highlighter_buildInfobar(aParent)
-@@ -444,19 +448,43 @@ Highlighter.prototype = {
+@@ -461,27 +466,57 @@ Highlighter.prototype = {
+     let tagNameLabel = this.chromeDoc.createElementNS("http://www.w3.org/1999/xhtml", "span");
+     tagNameLabel.id = "highlighter-nodeinfobar-tagname";
+ 
      let idLabel = this.chromeDoc.createElementNS("http://www.w3.org/1999/xhtml", "span");
      idLabel.id = "highlighter-nodeinfobar-id";
  
      let classesBox = this.chromeDoc.createElementNS("http://www.w3.org/1999/xhtml", "span");
      classesBox.id = "highlighter-nodeinfobar-classes";
+-    
++
+     let pseudoClassesBox = this.chromeDoc.createElementNS("http://www.w3.org/1999/xhtml", "span");
+     pseudoClassesBox.id = "highlighter-nodeinfobar-pseudo-classes";
+-    
++
      // Add some content to force a better boundingClientRect down below.
-     classesBox.textContent = "&nbsp;";
+     pseudoClassesBox.textContent = "&nbsp;";
  
 -    nodeInfobar.appendChild(tagNameLabel);
 -    nodeInfobar.appendChild(idLabel);
 -    nodeInfobar.appendChild(classesBox);
+-    nodeInfobar.appendChild(pseudoClassesBox);
 +    // Create buttons
 +
 +    let inspect = this.chromeDoc.createElement("toolbarbutton");
@@ -113,6 +162,12 @@ diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/hig
 +    nodemenu.id = "highlighter-nodeinfobar-menu";
 +    nodemenu.className = "highlighter-nodeinfobar-button"
 +
++    let menu = this.chromeDoc.getElementById("inspector-node-popup");
++    menu = menu.cloneNode(true);
++    menu.id = "highlighter-node-menu";
++
++    nodemenu.appendChild(menu);
++
 +    // <hbox id="highlighter-nodeinfobar-text"/>
 +    let texthbox = this.chromeDoc.createElement("hbox");
 +    texthbox.id = "highlighter-nodeinfobar-text";
@@ -120,6 +175,7 @@ diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/hig
 +    texthbox.appendChild(tagNameLabel);
 +    texthbox.appendChild(idLabel);
 +    texthbox.appendChild(classesBox);
++    texthbox.appendChild(pseudoClassesBox);
 +
 +    nodeInfobar.appendChild(inspect);
 +    nodeInfobar.appendChild(texthbox);
@@ -131,12 +187,39 @@ diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/hig
  
      aParent.appendChild(container);
  
-     let barHeight = container.getBoundingClientRect().height;
+     nodeInfobar.onclick = (function _onInfobarRightClick(aEvent) {
+       if (aEvent.button == 2) {
+@@ -506,23 +541,23 @@ Highlighter.prototype = {
+    */
+   openPseudoClassMenu: function Highlighter_openPseudoClassMenu()
+   {
+     let menu = this.chromeDoc.createElement("menupopup");
+     menu.id = "infobar-context-menu";
  
+     let popupSet = this.chromeDoc.getElementById("mainPopupSet");
+     popupSet.appendChild(menu);
+-    
++
+     let fragment = this.buildPseudoClassMenu();
+     menu.appendChild(fragment);
+ 
+     menu.openPopup(this.nodeInfo.pseudoClassesBox, "end_before", 0, 0, true, false);
+-  },  
+-  
++  },
++
+   /**
+    * Create the menuitems for toggling the selection's pseudo-class state
+    *
+    * @returns DocumentFragment. The menuitems for toggling pseudo-classes.
+    */
+   buildPseudoClassMenu: function IUI_buildPseudoClassesMenu()
+   {
+     let fragment = this.chromeDoc.createDocumentFragment();
 diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
 --- a/browser/themes/gnomestripe/browser.css
 +++ b/browser/themes/gnomestripe/browser.css
-@@ -2008,36 +2008,78 @@ panel[dimmed="true"] {
+@@ -2013,40 +2013,82 @@ panel[dimmed="true"] {
  }
  
  #devtools-sidebar-box {
@@ -153,6 +236,10 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
 -
 -html|*#highlighter-nodeinfobar-id {
 -  color: hsl(90, 79%, 52%);
+-}
+-
+-html|*#highlighter-nodeinfobar-pseudo-classes {
+-  color: hsl(20, 100%, 70%);
 -}
 -
 -/* Highlighter - Node Infobar - box & arrow */
@@ -179,6 +266,10 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
 +
 +html|*#highlighter-nodeinfobar-id {
 +  color: hsl(90, 79%, 52%);
++}
++
++html|*#highlighter-nodeinfobar-pseudo-classes {
++  color: hsl(20, 100%, 70%);
 +}
 +
 +/* Highlighter - Node Infobar - buttons */
@@ -241,9 +332,9 @@ uV<TgClk2*5>pu1v$W4N<B%V2l9$;kPuNGKg&%W<B$W%{PKbLh*2~7Y420teN
 diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
 --- a/browser/themes/gnomestripe/jar.mn
 +++ b/browser/themes/gnomestripe/jar.mn
-@@ -121,16 +121,17 @@ browser.jar:
-   skin/classic/browser/devtools/splitview.css         (devtools/splitview.css)
+@@ -128,16 +128,17 @@ browser.jar:
    skin/classic/browser/devtools/styleeditor.css       (devtools/styleeditor.css)
+   skin/classic/browser/devtools/debugger.css          (devtools/debugger.css)
    skin/classic/browser/devtools/magnifying-glass.png  (devtools/magnifying-glass.png)
    skin/classic/browser/devtools/itemToggle.png        (devtools/itemToggle.png)
    skin/classic/browser/devtools/itemArrow-rtl.png     (devtools/itemArrow-rtl.png)
@@ -262,7 +353,7 @@ diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.
 diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
 --- a/browser/themes/pinstripe/browser.css
 +++ b/browser/themes/pinstripe/browser.css
-@@ -2755,36 +2755,78 @@ panel[dimmed="true"] {
+@@ -2760,40 +2760,82 @@ panel[dimmed="true"] {
  }
  
  #devtools-sidebar-box {
@@ -279,6 +370,10 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
 -
 -html|*#highlighter-nodeinfobar-id {
 -  color: hsl(90, 79%, 52%);
+-}
+-
+-html|*#highlighter-nodeinfobar-pseudo-classes {
+-  color: hsl(20, 100%, 70%);
 -}
 -
 -/* Highlighter - Node Infobar - box & arrow */
@@ -305,6 +400,10 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
 +
 +html|*#highlighter-nodeinfobar-id {
 +  color: hsl(90, 79%, 52%);
++}
++
++html|*#highlighter-nodeinfobar-pseudo-classes {
++  color: hsl(20, 100%, 70%);
 +}
 +
 +/* Highlighter - Node Infobar - buttons */
@@ -367,16 +466,16 @@ uV<TgClk2*5>pu1v$W4N<B%V2l9$;kPuNGKg&%W<B$W%{PKbLh*2~7Y420teN
 diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
 --- a/browser/themes/pinstripe/jar.mn
 +++ b/browser/themes/pinstripe/jar.mn
-@@ -162,16 +162,17 @@ browser.jar:
-   skin/classic/browser/devtools/styleeditor.css             (devtools/styleeditor.css)
-   skin/classic/browser/devtools/magnifying-glass.png	    (devtools/magnifying-glass.png)
-   skin/classic/browser/devtools/itemToggle.png		    (devtools/itemToggle.png)
-   skin/classic/browser/devtools/itemArrow-rtl.png	    (devtools/itemArrow-rtl.png)
-   skin/classic/browser/devtools/itemArrow-ltr.png	    (devtools/itemArrow-ltr.png)
+@@ -169,16 +169,17 @@ browser.jar:
+   skin/classic/browser/devtools/debugger.css                (devtools/debugger.css)
+   skin/classic/browser/devtools/magnifying-glass.png        (devtools/magnifying-glass.png)
+   skin/classic/browser/devtools/itemToggle.png              (devtools/itemToggle.png)
+   skin/classic/browser/devtools/itemArrow-rtl.png           (devtools/itemArrow-rtl.png)
+   skin/classic/browser/devtools/itemArrow-ltr.png           (devtools/itemArrow-ltr.png)
    skin/classic/browser/devtools/background-noise-toolbar.png (devtools/background-noise-toolbar.png)
-   skin/classic/browser/devtools/inspect-button.png    (devtools/inspect-button.png)
-   skin/classic/browser/devtools/treepanel-button.png  (devtools/treepanel-button.png)
-+  skin/classic/browser/devtools/dropmarker.png        (devtools/dropmarker.png)
+   skin/classic/browser/devtools/inspect-button.png          (devtools/inspect-button.png)
+   skin/classic/browser/devtools/treepanel-button.png        (devtools/treepanel-button.png)
++  skin/classic/browser/devtools/dropmarker.png              (devtools/dropmarker.png)
  #ifdef MOZ_SERVICES_SYNC
    skin/classic/browser/sync-throbber.png
    skin/classic/browser/sync-16.png
@@ -388,7 +487,7 @@ diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
 diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/browser.css
 --- a/browser/themes/winstripe/browser.css
 +++ b/browser/themes/winstripe/browser.css
-@@ -2688,36 +2688,78 @@ panel[dimmed="true"] {
+@@ -2707,40 +2707,82 @@ panel[dimmed="true"] {
  }
  
  #devtools-sidebar-box {
@@ -405,6 +504,10 @@ diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/bro
 -
 -html|*#highlighter-nodeinfobar-id {
 -  color: hsl(90, 79%, 52%);
+-}
+-
+-html|*#highlighter-nodeinfobar-pseudo-classes {
+-  color: hsl(20, 100%, 70%);
 -}
 -
 -/* Highlighter - Node Infobar - box & arrow */
@@ -431,6 +534,10 @@ diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/bro
 +
 +html|*#highlighter-nodeinfobar-id {
 +  color: hsl(90, 79%, 52%);
++}
++
++html|*#highlighter-nodeinfobar-pseudo-classes {
++  color: hsl(20, 100%, 70%);
 +}
 +
 +/* Highlighter - Node Infobar - buttons */
@@ -493,9 +600,9 @@ uV<TgClk2*5>pu1v$W4N<B%V2l9$;kPuNGKg&%W<B$W%{PKbLh*2~7Y420teN
 diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
 --- a/browser/themes/winstripe/jar.mn
 +++ b/browser/themes/winstripe/jar.mn
-@@ -145,16 +145,17 @@ browser.jar:
-         skin/classic/browser/devtools/splitview.css                 (devtools/splitview.css)
+@@ -153,16 +153,17 @@ browser.jar:
          skin/classic/browser/devtools/styleeditor.css               (devtools/styleeditor.css)
+         skin/classic/browser/devtools/debugger.css                  (devtools/debugger.css)
          skin/classic/browser/devtools/magnifying-glass.png          (devtools/magnifying-glass.png)
          skin/classic/browser/devtools/itemToggle.png                (devtools/itemToggle.png)
          skin/classic/browser/devtools/itemArrow-rtl.png             (devtools/itemArrow-rtl.png)
@@ -511,9 +618,9 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/browser/sync-bg.png
          skin/classic/browser/sync-desktopIcon.png
          skin/classic/browser/sync-mobileIcon.png
-@@ -310,16 +311,17 @@ browser.jar:
-         skin/classic/aero/browser/devtools/splitview.css             (devtools/splitview.css)
+@@ -326,16 +327,17 @@ browser.jar:
          skin/classic/aero/browser/devtools/styleeditor.css           (devtools/styleeditor.css)
+         skin/classic/aero/browser/devtools/debugger.css              (devtools/debugger.css)
          skin/classic/aero/browser/devtools/magnifying-glass.png      (devtools/magnifying-glass.png)
          skin/classic/aero/browser/devtools/itemToggle.png            (devtools/itemToggle.png)
          skin/classic/aero/browser/devtools/itemArrow-rtl.png         (devtools/itemArrow-rtl.png)

@@ -1,42 +1,43 @@
 # HG changeset patch
-# Parent 306f45f24383b538723b8f063604fbcb1577650c
+# Parent 7a5edeb1419074158a8eb25ad7a4a7bf774f4957
 Bug 724509 - Add an Option menu in the Inspector Toolbar
 
 diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
 --- a/browser/app/profile/firefox.js
 +++ b/browser/app/profile/firefox.js
-@@ -1025,16 +1025,18 @@ pref("services.sync.prefs.sync.xpinstall
- 
- // Disable the error console
+@@ -1026,16 +1026,18 @@ pref("services.sync.prefs.sync.xpinstall
  pref("devtools.errorconsole.enabled", false);
  
  // Enable the Inspector
  pref("devtools.inspector.enabled", true);
  pref("devtools.inspector.htmlHeight", 112);
  pref("devtools.inspector.htmlPanelOpen", false);
+ pref("devtools.inspector.sidebarOpen", false);
+ pref("devtools.inspector.activeSidebar", "ruleview");
 +pref("devtools.inspector.highlighterShowVeil", true);
 +pref("devtools.inspector.highlighterShowInfobar", true);
  
- // Enable the style inspector
- pref("devtools.styleinspector.enabled", true);
+ // Enable the Debugger
+ pref("devtools.debugger.enabled", false);
  
- // Enable the Tilt inspector
- pref("devtools.tilt.enabled", true);
- pref("devtools.tilt.intro_transition", true);
- pref("devtools.tilt.outro_transition", true);
+ // The default Debugger UI height
+ pref("devtools.debugger.ui.height", 250);
+ 
+ // Enable the style inspector
 diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browser-sets.inc
 --- a/browser/base/content/browser-sets.inc
 +++ b/browser/base/content/browser-sets.inc
-@@ -153,16 +153,19 @@
-              oncommand="InspectorUI.toggleSidebar();"/>
-     <command id="Inspector:Tilt"
-              oncommand="Tilt.initialize();"/>
+@@ -157,16 +157,20 @@
      <command id="Inspector:HTMLPanel"
               oncommand="InspectorUI.toggleHTMLPanel();"/>
-     <command id="Inspector:CopyInner" oncommand="InspectorUI.copyInnerHTML();"/>
-     <command id="Inspector:CopyOuter" oncommand="InspectorUI.copyOuterHTML();"/>
-     <command id="Inspector:DeleteNode" oncommand="InspectorUI.deleteNode();"/>
-+    <command id="Inspector:ToggleVeil" oncommand="InspectorUI.toggleVeil();"/>
+     <command id="Inspector:CopyInner"
+              oncommand="InspectorUI.copyInnerHTML();"/>
+     <command id="Inspector:CopyOuter"
+              oncommand="InspectorUI.copyOuterHTML();"/>
+     <command id="Inspector:DeleteNode"
+              oncommand="InspectorUI.deleteNode();"/>
++    <command id="Inspector:ToggleVeil"
++             oncommand="InspectorUI.toggleVeil();"/>
 +    <command id="Inspector:ToggleInfobar"
 +             oncommand="InspectorUI.toggleInfobar();"/>
    </commandset>
@@ -50,19 +51,14 @@ diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browse
 diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
 --- a/browser/base/content/browser.xul
 +++ b/browser/base/content/browser.xul
-@@ -1005,19 +1005,36 @@
- 
-   <vbox id="browser-bottombox" layer="true">
-     <toolbar id="inspector-toolbar"
+@@ -996,16 +996,33 @@
               class="devtools-toolbar"
               nowindowdrag="true"
               hidden="true">
  #ifdef XP_MACOSX
        <toolbarbutton id="highlighter-closebutton"
--                      oncommand="InspectorUI.closeInspectorUI(false);"
--                      tooltiptext="&inspectCloseButton.tooltiptext;"/>
-+                     oncommand="InspectorUI.closeInspectorUI(false);"
-+                     tooltiptext="&inspectCloseButton.tooltiptext;"/>
+                      oncommand="InspectorUI.closeInspectorUI(false);"
+                      tooltiptext="&inspectCloseButton.tooltiptext;"/>
  #endif
 +      <toolbarbutton id="inspector-menu-toolbarbutton"
 +                     type="menu"
@@ -223,33 +219,10 @@ diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/hig
      this.veilTopBox = this.chromeDoc.createElement("box");
      this.veilTopBox.id = "highlighter-veil-topbox";
      this.veilTopBox.className = "highlighter-veil";
-@@ -463,16 +499,22 @@ Highlighter.prototype = {
-       this.locked ? this.unlock() : this.lock();
-     }).bind(this);
- 
-     let nodemenu = this.chromeDoc.createElement("toolbarbutton");
-     nodemenu.setAttribute("type", "menu");
-     nodemenu.id = "highlighter-nodeinfobar-menu";
-     nodemenu.className = "highlighter-nodeinfobar-button"
- 
-+    let menu = this.chromeDoc.getElementById("inspector-node-popup");
-+    menu = menu.cloneNode(true);
-+    menu.id = "highlighter-node-menu";
-+
-+    nodemenu.appendChild(menu);
-+
-     // <hbox id="highlighter-nodeinfobar-text"/>
-     let texthbox = this.chromeDoc.createElement("hbox");
-     texthbox.id = "highlighter-nodeinfobar-text";
- 
-     texthbox.appendChild(tagNameLabel);
-     texthbox.appendChild(idLabel);
-     texthbox.appendChild(classesBox);
- 
 diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
 --- a/browser/devtools/highlighter/inspector.jsm
 +++ b/browser/devtools/highlighter/inspector.jsm
-@@ -190,17 +190,17 @@ InspectorUI.prototype = {
+@@ -231,17 +231,17 @@ InspectorUI.prototype = {
      } else {
        this.startInspecting();
      }
@@ -268,7 +241,7 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
      } else {
        this.treePanel.open();
        Services.prefs.setBoolPref("devtools.inspector.htmlPanelOpen", true);
-@@ -214,16 +214,54 @@ InspectorUI.prototype = {
+@@ -255,16 +255,54 @@ InspectorUI.prototype = {
     * @returns boolean
     */
    get isInspectorOpen()
@@ -323,14 +296,14 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
      return doc.documentElement ? doc.documentElement.lastElementChild : null;
    },
  
-@@ -360,16 +398,22 @@ InspectorUI.prototype = {
-       this.store.addStore(this.winID);
-       this.store.setValue(this.winID, "selectedNode", null);
-       this.store.setValue(this.winID, "inspecting", true);
-       this.store.setValue(this.winID, "isDirty", this.isDirty);
- 
-       this.store.setValue(this.winID, "htmlPanelOpen",
+@@ -409,16 +447,22 @@ InspectorUI.prototype = {
          Services.prefs.getBoolPref("devtools.inspector.htmlPanelOpen"));
+ 
+       this.store.setValue(this.winID, "sidebarOpen",
+         Services.prefs.getBoolPref("devtools.inspector.sidebarOpen"));
+ 
+       this.store.setValue(this.winID, "activeSidebar",
+         Services.prefs.getCharPref("devtools.inspector.activeSidebar"));
  
 +      this.store.setValue(this.winID, "highlighterShowVeil",
 +        Services.prefs.getBoolPref("devtools.inspector.highlighterShowVeil"));
@@ -346,13 +319,13 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
     * Browse nodes according to the breadcrumbs layout, only for some specific
     * elements of the UI.
     */
-@@ -605,16 +649,33 @@ InspectorUI.prototype = {
-     this.win.focus();
-     Services.obs.notifyObservers({wrappedJSObject: this},
-                                  INSPECTOR_NOTIFICATIONS.OPENED, null);
- 
+@@ -659,16 +703,33 @@ InspectorUI.prototype = {
      if (this.store.getValue(this.winID, "htmlPanelOpen")) {
        this.treePanel.open();
+     }
+ 
+     if (this.store.getValue(this.winID, "sidebarOpen")) {
+       this.showSidebar();
      }
  
 +    let menu = this.chromeDoc.getElementById("inspectorToggleVeil");
@@ -372,25 +345,25 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
 +      this.highlighter.hideInfobar();
 +    }
 +
-     this.highlighter.highlight();
+     Services.obs.notifyObservers({wrappedJSObject: this},
+                                  INSPECTOR_NOTIFICATIONS.OPENED, null);
    },
  
    /**
     * Main callback handler for events.
     *
     * @param event
-    *        The event to be handled.
 diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/en-US/chrome/browser/browser.dtd
 --- a/browser/locales/en-US/chrome/browser/browser.dtd
 +++ b/browser/locales/en-US/chrome/browser/browser.dtd
-@@ -225,16 +225,25 @@ can reach it easily. -->
+@@ -221,16 +221,25 @@ can reach it easily. -->
+ <!ENTITY inspectorHTMLCopyInner.accesskey   "I">
+ 
  <!ENTITY inspectorHTMLCopyOuter.label       "Copy Outer HTML">
  <!ENTITY inspectorHTMLCopyOuter.accesskey   "O">
- <!ENTITY inspectorHTMLCopyOuter.commandkey  "">
  
  <!ENTITY inspectorHTMLDelete.label          "Delete Node">
  <!ENTITY inspectorHTMLDelete.accesskey      "D">
- <!ENTITY inspectorHTMLDelete.commandkey     "">
  
 +<!-- LOCALIZATION NOTE: The menu in the Inspector toolbar -->
 +<!ENTITY inspectMenuButton.tooltiptext      "Inspector Options">
@@ -482,8 +455,8 @@ vP2hf8!*eW|JeLPg0h#F|!A4MHCujKww^Ko-W{nMk00000NkvXXu0mjfmjtI_
 diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
 --- a/browser/themes/gnomestripe/jar.mn
 +++ b/browser/themes/gnomestripe/jar.mn
-@@ -122,16 +122,17 @@ browser.jar:
-   skin/classic/browser/devtools/styleeditor.css       (devtools/styleeditor.css)
+@@ -128,16 +128,17 @@ browser.jar:
+   skin/classic/browser/devtools/debugger.css          (devtools/debugger.css)
    skin/classic/browser/devtools/magnifying-glass.png  (devtools/magnifying-glass.png)
    skin/classic/browser/devtools/itemToggle.png        (devtools/itemToggle.png)
    skin/classic/browser/devtools/itemArrow-rtl.png     (devtools/itemArrow-rtl.png)
@@ -573,7 +546,7 @@ vP2hf8!*eW|JeLPg0h#F|!A4MHCujKww^Ko-W{nMk00000NkvXXu0mjfmjtI_
 diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
 --- a/browser/themes/pinstripe/jar.mn
 +++ b/browser/themes/pinstripe/jar.mn
-@@ -163,16 +163,17 @@ browser.jar:
+@@ -169,16 +169,17 @@ browser.jar:
    skin/classic/browser/devtools/magnifying-glass.png	    (devtools/magnifying-glass.png)
    skin/classic/browser/devtools/itemToggle.png		    (devtools/itemToggle.png)
    skin/classic/browser/devtools/itemArrow-rtl.png	    (devtools/itemArrow-rtl.png)
@@ -594,7 +567,7 @@ diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
 diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/browser.css
 --- a/browser/themes/winstripe/browser.css
 +++ b/browser/themes/winstripe/browser.css
-@@ -2668,16 +2668,32 @@ panel[dimmed="true"] {
+@@ -2683,16 +2683,32 @@ panel[dimmed="true"] {
    list-style-image: url("chrome://browser/skin/devtools/inspect-button.png");
    -moz-image-region: rect(0px 16px 16px 0px);
  }
@@ -664,8 +637,8 @@ vP2hf8!*eW|JeLPg0h#F|!A4MHCujKww^Ko-W{nMk00000NkvXXu0mjfmjtI_
 diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
 --- a/browser/themes/winstripe/jar.mn
 +++ b/browser/themes/winstripe/jar.mn
-@@ -146,16 +146,17 @@ browser.jar:
-         skin/classic/browser/devtools/styleeditor.css               (devtools/styleeditor.css)
+@@ -153,16 +153,17 @@ browser.jar:
+         skin/classic/browser/devtools/debugger.css                  (devtools/debugger.css)
          skin/classic/browser/devtools/magnifying-glass.png          (devtools/magnifying-glass.png)
          skin/classic/browser/devtools/itemToggle.png                (devtools/itemToggle.png)
          skin/classic/browser/devtools/itemArrow-rtl.png             (devtools/itemArrow-rtl.png)
@@ -682,8 +655,8 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/browser/sync-bg.png
          skin/classic/browser/sync-desktopIcon.png
          skin/classic/browser/sync-mobileIcon.png
-@@ -312,16 +313,17 @@ browser.jar:
-         skin/classic/aero/browser/devtools/styleeditor.css           (devtools/styleeditor.css)
+@@ -326,16 +327,17 @@ browser.jar:
+         skin/classic/aero/browser/devtools/debugger.css              (devtools/debugger.css)
          skin/classic/aero/browser/devtools/magnifying-glass.png      (devtools/magnifying-glass.png)
          skin/classic/aero/browser/devtools/itemToggle.png            (devtools/itemToggle.png)
          skin/classic/aero/browser/devtools/itemArrow-rtl.png         (devtools/itemArrow-rtl.png)

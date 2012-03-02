@@ -1,6 +1,6 @@
 # HG changeset patch
-# Parent 9ad5dd5c1dd14e5fe76170db1a53220b57cb025c
-Bug 704110 - The WebConsole should use the DevTools CSS theme (dark theme)
+# Parent bb35c037f19a7a384d0c638aee3fffd568a17ce6
+Bug 704110 - The WebConsole should use the DevTools CSS theme (dark theme) / webconsole.css
 
 diff --git a/browser/devtools/webconsole/HUDService.jsm b/browser/devtools/webconsole/HUDService.jsm
 --- a/browser/devtools/webconsole/HUDService.jsm
@@ -740,10 +740,10 @@ diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.
    skin/classic/browser/devtools/webconsole.png                  (devtools/webconsole.png)
    skin/classic/browser/devtools/gcli.css              (devtools/gcli.css)
    skin/classic/browser/devtools/orion.css             (devtools/orion.css)
-   skin/classic/browser/devtools/orion-container.css   (devtools/orion-container.css)
-   skin/classic/browser/devtools/orion-task.png        (devtools/orion-task.png)
-   skin/classic/browser/devtools/orion-breakpoint.png  (devtools/orion-breakpoint.png)
    skin/classic/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end-selected.png             (devtools/breadcrumbs/ltr-end-selected.png)
+   skin/classic/browser/devtools/breadcrumbs/ltr-end.png                      (devtools/breadcrumbs/ltr-end.png)
 diff --git a/browser/themes/pinstripe/devtools/webconsole.css b/browser/themes/pinstripe/devtools/webconsole.css
 --- a/browser/themes/pinstripe/devtools/webconsole.css
 +++ b/browser/themes/pinstripe/devtools/webconsole.css

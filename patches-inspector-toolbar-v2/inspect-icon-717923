@@ -1,21 +1,21 @@
 # HG changeset patch
-# Parent 7ca76fd89968b7fa06bd2b95eb53a4b5a7d7cef0
+# Parent 5724c5ba0f84ef3e2928717e7900c9e11e3d1c13
 Bug 717923 - Use an icon for the inspect button
 
 diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
 --- a/browser/base/content/browser.xul
 +++ b/browser/base/content/browser.xul
-@@ -994,18 +994,18 @@
+@@ -998,18 +998,17 @@
               hidden="true">
  #ifdef XP_MACOSX
        <toolbarbutton id="highlighter-closebutton"
-                       oncommand="InspectorUI.closeInspectorUI(false);"
-                       tooltiptext="&inspectCloseButton.tooltiptext;"/>
+                      oncommand="InspectorUI.closeInspectorUI(false);"
+                      tooltiptext="&inspectCloseButton.tooltiptext;"/>
  #endif
        <toolbarbutton id="inspector-inspect-toolbutton"
                       class="devtools-toolbarbutton"
 -                     label="&inspectButton.label;"
-                      accesskey="&inspectButton.accesskey;"
+-                     accesskey="&inspectButton.accesskey;"
 +                     tooltiptext="&inspectButton.tooltiptext;"
                       command="Inspector:Inspect"/>
        <toolbarbutton id="inspector-treepanel-toolbutton"
@@ -25,10 +25,27 @@ diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
                       tooltiptext="&htmlPanel.tooltiptext;"
                       command="Inspector:HTMLPanel"/>
        <arrowscrollbox id="inspector-breadcrumbs"
+diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlighter.css
+--- a/browser/base/content/highlighter.css
++++ b/browser/base/content/highlighter.css
+@@ -82,8 +82,12 @@ html|*#highlighter-nodeinfobar-tagname {
+ 
+ #highlighter-nodeinfobar-container[disabled] {
+   visibility: hidden;
+ }
+ 
+ html|*#highlighter-nodeinfobar-tagname {
+   text-transform: lowercase;
+ }
++
++.devtools-toolbarbutton:not([label]) > .toolbarbutton-text {
++  display: none;
++}
 diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/en-US/chrome/browser/browser.dtd
 --- a/browser/locales/en-US/chrome/browser/browser.dtd
 +++ b/browser/locales/en-US/chrome/browser/browser.dtd
-@@ -209,18 +209,18 @@ can reach it easily. -->
+@@ -208,18 +208,17 @@ can reach it easily. -->
+   -  "Scratchpad" in your locale. You should feel free to find a close
    -  approximation to it or choose a word (or words) that means
    -  "simple discardable text editor". -->
  <!ENTITY scratchpad.label             "Scratchpad">
@@ -36,22 +53,21 @@ diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/
  <!ENTITY scratchpad.keycode           "VK_F4">
  <!ENTITY scratchpad.keytext           "F4">
  
- <!ENTITY inspectPanelTitle.label        "HTML">
 -<!ENTITY inspectButton.label            "Inspect">
- <!ENTITY inspectButton.accesskey        "I">
-+<!ENTITY inspectButton.tooltiptext      "Inspect  (&inspectButton.accesskey;)">
+-<!ENTITY inspectButton.accesskey        "I">
++<!ENTITY inspectButton.tooltiptext      "Inspect">
  <!ENTITY inspectCloseButton.tooltiptext "Close Inspector">
  
- <!-- LOCALIZATION NOTE (inspect3DViewButton.label): This button shows an
-   -  alternate view for the Inspector, creating a 3D visualization of the
-   -  webpage. -->
- <!ENTITY inspect3DViewButton.label     "3D View">
- <!ENTITY inspect3DViewButton.accesskey "W">
+ <!ENTITY inspectorHTMLCopyInner.label       "Copy Inner HTML">
+ <!ENTITY inspectorHTMLCopyInner.accesskey   "I">
+ 
+ <!ENTITY inspectorHTMLCopyOuter.label       "Copy Outer HTML">
+ <!ENTITY inspectorHTMLCopyOuter.accesskey   "O">
  
 diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
 --- a/browser/themes/gnomestripe/browser.css
 +++ b/browser/themes/gnomestripe/browser.css
-@@ -1978,16 +1978,25 @@ panel[dimmed="true"] {
+@@ -1983,16 +1983,25 @@ panel[dimmed="true"] {
  
  #highlighter-veil-container[locked] > #highlighter-veil-middlebox > #highlighter-veil-transparentbox {
    box-shadow: 0 0 0 1px black;
@@ -80,7 +96,7 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
 diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gnomestripe/devtools/common.css
 --- a/browser/themes/gnomestripe/devtools/common.css
 +++ b/browser/themes/gnomestripe/devtools/common.css
-@@ -52,16 +52,24 @@
+@@ -52,16 +52,20 @@
    text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
    border: 1px solid hsla(210,8%,5%,.45);
    border-radius: 3px;
@@ -91,10 +107,6 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
  
 +.devtools-toolbarbutton:not([label]) {
 +  min-width: 32px;
-+}
-+
-+.devtools-toolbarbutton:not([label]) > .toolbarbutton-text {
-+  display: none;
 +}
 +
  .devtools-toolbarbutton:not([checked]):hover:active {
@@ -140,11 +152,11 @@ fEPTn?{Dtuko9Z^s$RVN?00000NkvXXu0mjf0U~aI
 diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
 --- a/browser/themes/gnomestripe/jar.mn
 +++ b/browser/themes/gnomestripe/jar.mn
-@@ -118,16 +118,17 @@ browser.jar:
-   skin/classic/browser/devtools/breadcrumbs/rtl-start.png                    (devtools/breadcrumbs/rtl-start.png)
+@@ -125,16 +125,17 @@ browser.jar:
    skin/classic/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
    skin/classic/browser/devtools/splitview.css         (devtools/splitview.css)
    skin/classic/browser/devtools/styleeditor.css       (devtools/styleeditor.css)
+   skin/classic/browser/devtools/debugger.css          (devtools/debugger.css)
    skin/classic/browser/devtools/magnifying-glass.png  (devtools/magnifying-glass.png)
    skin/classic/browser/devtools/itemToggle.png        (devtools/itemToggle.png)
    skin/classic/browser/devtools/itemArrow-rtl.png     (devtools/itemArrow-rtl.png)
@@ -161,7 +173,7 @@ diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.
 diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
 --- a/browser/themes/pinstripe/browser.css
 +++ b/browser/themes/pinstripe/browser.css
-@@ -2713,16 +2713,25 @@ panel[dimmed="true"] {
+@@ -2718,16 +2718,25 @@ panel[dimmed="true"] {
  
  #highlighter-veil-container[locked] > #highlighter-veil-middlebox > #highlighter-veil-transparentbox {
    box-shadow: 0 0 0 1px black;
@@ -250,16 +262,16 @@ fEPTn?{Dtuko9Z^s$RVN?00000NkvXXu0mjf0U~aI
 diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
 --- a/browser/themes/pinstripe/jar.mn
 +++ b/browser/themes/pinstripe/jar.mn
-@@ -159,16 +159,17 @@ browser.jar:
-   skin/classic/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
+@@ -166,16 +166,17 @@ browser.jar:
    skin/classic/browser/devtools/splitview.css               (devtools/splitview.css)
    skin/classic/browser/devtools/styleeditor.css             (devtools/styleeditor.css)
-   skin/classic/browser/devtools/magnifying-glass.png	    (devtools/magnifying-glass.png)
-   skin/classic/browser/devtools/itemToggle.png		    (devtools/itemToggle.png)
-   skin/classic/browser/devtools/itemArrow-rtl.png	    (devtools/itemArrow-rtl.png)
-   skin/classic/browser/devtools/itemArrow-ltr.png	    (devtools/itemArrow-ltr.png)
+   skin/classic/browser/devtools/debugger.css                (devtools/debugger.css)
+   skin/classic/browser/devtools/magnifying-glass.png        (devtools/magnifying-glass.png)
+   skin/classic/browser/devtools/itemToggle.png              (devtools/itemToggle.png)
+   skin/classic/browser/devtools/itemArrow-rtl.png           (devtools/itemArrow-rtl.png)
+   skin/classic/browser/devtools/itemArrow-ltr.png           (devtools/itemArrow-ltr.png)
    skin/classic/browser/devtools/background-noise-toolbar.png (devtools/background-noise-toolbar.png)
-+  skin/classic/browser/devtools/inspect-button.png    (devtools/inspect-button.png)
++  skin/classic/browser/devtools/inspect-button.png          (devtools/inspect-button.png)
  #ifdef MOZ_SERVICES_SYNC
    skin/classic/browser/sync-throbber.png
    skin/classic/browser/sync-16.png
@@ -271,7 +283,7 @@ diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
 diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/browser.css
 --- a/browser/themes/winstripe/browser.css
 +++ b/browser/themes/winstripe/browser.css
-@@ -2659,16 +2659,25 @@ panel[dimmed="true"] {
+@@ -2678,16 +2678,25 @@ panel[dimmed="true"] {
  
  #highlighter-veil-container[locked] > #highlighter-veil-middlebox > #highlighter-veil-transparentbox {
    box-shadow: 0 0 0 1px black;
@@ -360,11 +372,11 @@ fEPTn?{Dtuko9Z^s$RVN?00000NkvXXu0mjf0U~aI
 diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
 --- a/browser/themes/winstripe/jar.mn
 +++ b/browser/themes/winstripe/jar.mn
-@@ -142,16 +142,17 @@ browser.jar:
-         skin/classic/browser/devtools/breadcrumbs/rtl-start.png                    (devtools/breadcrumbs/rtl-start.png)
+@@ -150,16 +150,17 @@ browser.jar:
          skin/classic/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
          skin/classic/browser/devtools/splitview.css                 (devtools/splitview.css)
          skin/classic/browser/devtools/styleeditor.css               (devtools/styleeditor.css)
+         skin/classic/browser/devtools/debugger.css                  (devtools/debugger.css)
          skin/classic/browser/devtools/magnifying-glass.png          (devtools/magnifying-glass.png)
          skin/classic/browser/devtools/itemToggle.png                (devtools/itemToggle.png)
          skin/classic/browser/devtools/itemArrow-rtl.png             (devtools/itemArrow-rtl.png)
@@ -378,11 +390,11 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/browser/sync-bg.png
          skin/classic/browser/sync-desktopIcon.png
          skin/classic/browser/sync-mobileIcon.png
-@@ -304,16 +305,17 @@ browser.jar:
-         skin/classic/aero/browser/devtools/breadcrumbs/rtl-start.png                    (devtools/breadcrumbs/rtl-start.png)
+@@ -320,16 +321,17 @@ browser.jar:
          skin/classic/aero/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
          skin/classic/aero/browser/devtools/splitview.css             (devtools/splitview.css)
          skin/classic/aero/browser/devtools/styleeditor.css           (devtools/styleeditor.css)
+         skin/classic/aero/browser/devtools/debugger.css              (devtools/debugger.css)
          skin/classic/aero/browser/devtools/magnifying-glass.png      (devtools/magnifying-glass.png)
          skin/classic/aero/browser/devtools/itemToggle.png            (devtools/itemToggle.png)
          skin/classic/aero/browser/devtools/itemArrow-rtl.png         (devtools/itemArrow-rtl.png)

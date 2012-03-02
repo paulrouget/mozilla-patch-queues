@@ -1,0 +1,295 @@
+# HG changeset patch
+# Parent d320ba88cd68cede545bc3438fbca51886b5aeaa
+
+diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul
++++ b/browser/base/content/browser.xul
+@@ -993,17 +993,17 @@
+ 
+   <vbox id="browser-bottombox" layer="true">
+     <toolbar id="inspector-toolbar"
+              class="devtools-toolbar"
+              nowindowdrag="true"
+              hidden="true">
+ #ifdef XP_MACOSX
+       <toolbarbutton id="highlighter-closebutton"
+-					 class="devtools-closebutton"
++                     class="devtools-closebutton"
+                      oncommand="InspectorUI.closeInspectorUI(false);"
+                      tooltiptext="&inspectCloseButton.tooltiptext;"/>
+ #endif
+       <toolbarbutton id="inspector-inspect-toolbutton"
+                      class="devtools-toolbarbutton"
+                      label="&inspectButton.label;"
+                      accesskey="&inspectButton.accesskey;"
+                      command="Inspector:Inspect"/>
+@@ -1027,17 +1027,17 @@
+                        class="devtools-toolbarbutton"
+                        label="&inspectStyleButton.label;"
+                        accesskey="&inspectStyleButton.accesskey;"
+                        command="Inspector:Sidebar"/>
+         <!-- registered tools go here -->
+       </hbox>
+ #ifndef XP_MACOSX
+       <toolbarbutton id="highlighter-closebutton"
+-					 class="devtools-closebutton"
++                     class="devtools-closebutton"
+                      oncommand="InspectorUI.closeInspectorUI(false);"
+                      tooltiptext="&inspectCloseButton.tooltiptext;"/>
+ #endif
+     </toolbar>
+     <toolbar id="addon-bar"
+              toolbarname="&addonBarCmd.label;" accesskey="&addonBarCmd.accesskey;"
+              collapsed="true"
+              class="toolbar-primary chromeclass-toolbar"
+diff --git a/browser/devtools/debugger/debugger.xul b/browser/devtools/debugger/debugger.xul
+--- a/browser/devtools/debugger/debugger.xul
++++ b/browser/devtools/debugger/debugger.xul
+@@ -44,34 +44,37 @@
+ <?xml-stylesheet href="chrome://browser/skin/devtools/common.css" type="text/css"?>
+ <?xml-stylesheet href="chrome://browser/skin/devtools/debugger.css" type="text/css"?>
+ <!DOCTYPE window [
+ <!ENTITY % debuggerDTD SYSTEM "chrome://browser/locale/devtools/debugger.dtd" >
+  %debuggerDTD;
+ ]>
+ <xul:window xmlns="http://www.w3.org/1999/xhtml"
+             xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+-    <xul:script type="text/javascript" src="debugger.js"/>
+-    <xul:script type="text/javascript" src="debugger-view.js"/>
++  <xul:script type="text/javascript" src="debugger.js"/>
++  <xul:script type="text/javascript" src="debugger-view.js"/>
+ 
+-    <div id="body" class="vbox flex">
++  <div id="body" class="vbox flex">
+     <xul:toolbar id="dbg-toolbar" class="devtools-toolbar">
+-            <xul:toolbarbutton id="close" class="devtools-closebutton"/>
+-            <xul:toolbarbutton id="resume" class="devtools-toolbarbutton"/>
+-            <xul:menulist id="scripts"
+-                          class="devtools-toolbarbutton"/>
+-      <xul:hbox flex="1"/>
++#ifdef XP_MACOSX
++      <xul:toolbarbutton id="close" class="devtools-closebutton"/>
++#endif
++      <xul:toolbarbutton id="resume" class="devtools-toolbarbutton"/>
++      <xul:menulist id="scripts" class="devtools-menulist"/>
++      <xul:spacer flex="1"/>
+       <xul:label id="status" class="devtools-toolbarlabel" align="end"/>
+-        </xul:toolbar>
+-        <div id="dbg-content" class="hbox flex">
+-            <div id="stack" class="vbox">
+-                <div id="stackframes" class="vbox flex"></div>
+-            </div>
+-            <div id="script" class="vbox flex">
+-                <div id="editor" class="vbox flex"></div>
+-            </div>
+-            <div id="properties" class="vbox">
+-                <div id="variables" class="vbox flex"></div>
+-            </div>
+-        </div>
++#ifndef XP_MACOSX
++      <xul:toolbarbutton id="close" class="devtools-closebutton"/>
++#endif
++    </xul:toolbar>
++    <div id="dbg-content" class="hbox flex">
++      <div id="stack" class="vbox">
++        <div id="stackframes" class="vbox flex"></div>
++      </div>
++      <div id="script" class="vbox flex">
++        <div id="editor" class="vbox flex"></div>
++      </div>
++      <div id="properties" class="vbox">
++        <div id="variables" class="vbox flex"></div>
++      </div>
+     </div>
+-
++  </div>
+ </xul:window>
+diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gnomestripe/devtools/common.css
+--- a/browser/themes/gnomestripe/devtools/common.css
++++ b/browser/themes/gnomestripe/devtools/common.css
+@@ -48,27 +48,25 @@
+   margin-bottom: -3px;
+   position: relative;
+ }
+ 
+ /* Toolbar and Toolbar items */
+ 
+ .devtools-toolbar {
+   -moz-appearance: none;
++  -moz-box-align: center;
+   padding: 4px 3px;
+   box-shadow: 0 1px 0 0 hsla(210, 16%, 76%, .2) inset;
+   background: -moz-linear-gradient(top, hsl(210,11%,36%), hsl(210,11%,18%));
+-}
+-
+-.devtools-toolbarlabel {
+-  margin: 7px 6px;
+   color: hsl(210,30%,85%);
+   text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
+ }
+ 
++.devtools-menulist,
+ .devtools-toolbarbutton {
+   -moz-appearance: none;
+   min-width: 78px;
+   min-height: 22px;
+   color: hsl(210,30%,85%);
+   text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
+   border: 1px solid hsla(210,8%,5%,.45);
+   border-radius: 3px;
+@@ -78,44 +76,58 @@
+ }
+ 
+ .devtools-toolbarbutton:not([checked=true]):hover:active {
+   border-color: hsla(210,8%,5%,.6);
+   background: -moz-linear-gradient(hsla(220,6%,10%,.3), hsla(212,7%,57%,.15) 65%, hsla(212,7%,57%,.3));
+   box-shadow: 0 0 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
+ }
+ 
++.devtools-menulist[open=true],
+ .devtools-toolbarbutton[checked=true] {
+   color: hsl(208,100%,60%) !important;
+   border-color: hsla(210,8%,5%,.6) !important;
+   background: -moz-linear-gradient(hsla(220,6%,10%,.6), hsla(210,11%,18%,.45) 75%, hsla(210,11%,30%,.4));
+   box-shadow: 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
+ }
+ 
+ .devtools-toolbarbutton[checked=true]:hover {
+   background-color: transparent !important;
+ }
+ 
+ .devtools-toolbarbutton[checked=true]:hover:active {
+   background-color: hsla(210,8%,5%,.2) !important;
+ }
+ 
++.devtools-toolbarbutton[type=menu] {
++  padding: 0;
++}
++
++.devtools-menulist > .menulist-label-box,
++.devtools-toolbarbutton[type=menu] > .toolbarbutton-text,
+ .devtools-toolbarbutton[type=menu-button] > .toolbarbutton-menubutton-button {
+   -moz-appearance: none;
+-  color: white;
+-  border-width: 0 1px 0 0;
+-  border-right: 1px solid hsla(210,8%,5%,.45);
+-  box-shadow: -1px 0 0 hsla(210,16%,76%,.15) inset, 1px 0 0 hsla(210,16%,76%,.15);
++  border: 0;
++  text-align: center;
+ }
+ 
++.devtools-menulist > .menulist-dropmarker,
+ .devtools-toolbarbutton[type=menu] > .toolbarbutton-menu-dropmarker,
+ .devtools-toolbarbutton[type=menu-button] > .toolbarbutton-menubutton-dropmarker {
+   -moz-appearance: none!important;
++  display: -moz-box;
+   list-style-image: url("chrome://browser/skin/devtools/dropmarker.png");
+   -moz-box-align: center;
++  -moz-box-pack: center;
++  min-width: 16px;
++  width: 16px;
++  padding: 0;
++  border-left: 1px solid hsla(210,8%,5%,.45)!important;
++  box-shadow: 1px 0 0 hsla(210,16%,76%,.15) inset, -1px 0 0 hsla(210,16%,76%,.15);
++  height: 22px;
+ }
+ 
+ /* Search input */
+ 
+ .devtools-searchinput {
+   -moz-appearance: none;
+   margin: 0 3px;
+   border: 1px solid hsla(210,8%,5%,.6);
+diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinstripe/devtools/common.css
+--- a/browser/themes/pinstripe/devtools/common.css
++++ b/browser/themes/pinstripe/devtools/common.css
+@@ -50,27 +50,25 @@
+   margin-bottom: -3px;
+   position: relative;
+ }
+ 
+ /* Toolbar and Toolbar items */
+ 
+ .devtools-toolbar {
+   -moz-appearance: none;
++  -moz-box-align: center;
+   padding: 4px 3px;
+   box-shadow: 0 1px 0 0 hsla(210, 16%, 76%, .2) inset;
+   background-image: url(background-noise-toolbar.png), -moz-linear-gradient(top, hsl(210,11%,36%), hsl(210,11%,18%));
+-}
+-
+-.devtools-toolbarlabel {
+-  margin: 7px 6px;
+   color: hsl(210,30%,85%);
+   text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
+ }
+ 
++.devtools-menulist,
+ .devtools-toolbarbutton {
+   -moz-appearance: none;
+   min-width: 78px;
+   min-height: 22px;
+   color: hsl(210,30%,85%);
+   text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
+   border: 1px solid hsla(210,8%,5%,.45);
+   border-radius: @toolbarbuttonCornerRadius@;
+@@ -84,41 +82,55 @@
+ }
+ 
+ .devtools-toolbarbutton:not([checked=true]):hover:active {
+   border-color: hsla(210,8%,5%,.6);
+   background: -moz-linear-gradient(hsla(220,6%,10%,.3), hsla(212,7%,57%,.15) 65%, hsla(212,7%,57%,.3));
+   box-shadow: 0 0 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
+ }
+ 
++.devtools-menulist[open=true],
+ .devtools-toolbarbutton[checked=true] {
+   color: hsl(208,100%,60%) !important;
+   border-color: hsla(210,8%,5%,.6);
+   background: -moz-linear-gradient(hsla(220,6%,10%,.6), hsla(210,11%,18%,.45) 75%, hsla(210,11%,30%,.4));
+   box-shadow: 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
+ }
+ 
+ .devtools-toolbarbutton[checked=true]:hover:active {
+   background-color: hsla(210,8%,5%,.2);
+ }
+ 
++.devtools-toolbarbutton[type=menu] {
++  padding: 0;
++}
++
++.devtools-menulist > .menulist-label-box,
++.devtools-toolbarbutton[type=menu] > .toolbarbutton-text,
+ .devtools-toolbarbutton[type=menu-button] > .toolbarbutton-menubutton-button {
+   -moz-appearance: none;
+-  color: white;
+-  border-width: 0 1px 0 0;
+-  border-right: 1px solid hsla(210,8%,5%,.45);
+-  box-shadow: -1px 0 0 hsla(210,16%,76%,.15) inset, 1px 0 0 hsla(210,16%,76%,.15);
+   padding: 0 1px;
++  border: 0;
++  text-align: center;
+ }
+ 
++.devtools-menulist > .menulist-dropmarker,
+ .devtools-toolbarbutton[type=menu] > .toolbarbutton-menu-dropmarker,
+ .devtools-toolbarbutton[type=menu-button] > .toolbarbutton-menubutton-dropmarker {
+   -moz-appearance: none !important;
++  display: -moz-box;
+   list-style-image: url("chrome://browser/skin/devtools/dropmarker.png");
+   -moz-box-align: center;
++  -moz-box-pack: center;
++  min-width: 16px;
++  width: 16px;
++  padding: 0;
++  border-left: 1px solid hsla(210,8%,5%,.45)!important;
++  box-shadow: 1px 0 0 hsla(210,16%,76%,.15) inset, -1px 0 0 hsla(210,16%,76%,.15);
++  height: 22px;
+   margin: 0 3px;
+ }
+ 
+ /* Search input */
+ 
+ .devtools-searchinput {
+   -moz-appearance: none;
+   margin: 0 3px;

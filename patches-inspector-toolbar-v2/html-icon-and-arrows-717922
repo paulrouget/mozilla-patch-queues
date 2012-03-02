@@ -1,21 +1,21 @@
 # HG changeset patch
-# Parent c6158d757dcbf32e760f924a2cfc2da7b0d4b0c6
+# Parent e55cb408e71bfce18828ab3cc16ea07558d9dc0c
 Bug 717922 - In the PageInspector toolbar, move the HTML Tree button in front of the breadcrumbs display
 
 diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
 --- a/browser/base/content/browser.xul
 +++ b/browser/base/content/browser.xul
-@@ -999,17 +999,16 @@
+@@ -1002,18 +1002,16 @@
+                      tooltiptext="&inspectCloseButton.tooltiptext;"/>
  #endif
        <toolbarbutton id="inspector-inspect-toolbutton"
                       class="devtools-toolbarbutton"
-                      accesskey="&inspectButton.accesskey;"
                       tooltiptext="&inspectButton.tooltiptext;"
                       command="Inspector:Inspect"/>
        <toolbarbutton id="inspector-treepanel-toolbutton"
                       class="devtools-toolbarbutton"
 -                     label="&htmlPanel.label;"
-                      accesskey="&htmlPanel.accesskey;"
+-                     accesskey="&htmlPanel.accesskey;"
                       tooltiptext="&htmlPanel.tooltiptext;"
                       command="Inspector:HTMLPanel"/>
        <arrowscrollbox id="inspector-breadcrumbs"
@@ -23,10 +23,11 @@ diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
                        clicktoscroll="true"/>
        <hbox id="inspector-tools">
          <toolbarbutton id="inspector-3D-button"
+                        class="devtools-toolbarbutton"
 diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
 --- a/browser/devtools/highlighter/inspector.jsm
 +++ b/browser/devtools/highlighter/inspector.jsm
-@@ -1630,16 +1630,22 @@ HTMLBreadcrumbs.prototype = {
+@@ -1762,16 +1762,32 @@ HTMLBreadcrumbs.prototype = {
  
      // Siblings menu
      this.menu = this.IUI.chromeDoc.createElement("menupopup");
@@ -41,6 +42,16 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
 +    this.container._scrollButtonUp.collapsed = true;
 +    this.container._scrollButtonDown.collapsed = true;
 +
++    this.onscrollboxreflow = function() {
++      if (this.container._scrollButtonDown.collapsed)
++        this.container.removeAttribute("overflows");
++      else
++        this.container.setAttribute("overflows", true);
++    }.bind(this);
++
++    this.container.addEventListener("underflow", this.onscrollboxreflow, false);
++    this.container.addEventListener("overflow", this.onscrollboxreflow, false);
++
      this.menu.addEventListener("popuphiding", (function() {
        while (this.menu.hasChildNodes()) {
          this.menu.removeChild(this.menu.firstChild);
@@ -49,10 +60,31 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
        button.removeAttribute("siblings-menu-open");
      }).bind(this), false);
    },
+@@ -1939,16 +1955,20 @@ HTMLBreadcrumbs.prototype = {
+     }
+   },
+ 
+   /**
+    * Remove nodes and delete properties.
+    */
+   destroy: function BC_destroy()
+   {
++    this.container.removeEventListener("underflow", this.onscrollboxreflow, false);
++    this.container.removeEventListener("overflow", this.onscrollboxreflow, false);
++    this.onscrollboxreflow = null;
++
+     this.empty();
+     this.container.removeEventListener("mousedown", this, true);
+     this.menu.parentNode.removeChild(this.menu);
+     this.container = null;
+     this.nodeHierarchy = null;
+   },
+ 
+   /**
 diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/en-US/chrome/browser/browser.dtd
 --- a/browser/locales/en-US/chrome/browser/browser.dtd
 +++ b/browser/locales/en-US/chrome/browser/browser.dtd
-@@ -595,19 +595,15 @@ just addresses the organization to follo
+@@ -602,19 +602,11 @@ just addresses the organization to follo
  <!ENTITY syncSetup.accesskey          "Y">
  <!ENTITY syncSyncNowItem.label        "Sync Now">
  <!ENTITY syncSyncNowItem.accesskey    "S">
@@ -67,16 +99,15 @@ diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/
 -
  <!-- LOCALIZATION NOTE (htmlPanel.tooltiptext): The text that appears when a user
  hovers over the HTML panel's toolbar button. -->
--<!ENTITY htmlPanel.tooltiptext        "HTML panel">
-+<!ENTITY htmlPanel.tooltiptext        "HTML panel (&htmlPanel.accesskey;)">
- 
- <!-- LOCALIZATION NOTE (htmlPanel.accesskey): The key bound to the HTML panel's
- toolbar button -->
- <!ENTITY htmlPanel.accesskey          "H">
+ <!ENTITY htmlPanel.tooltiptext        "HTML panel">
+-
+-<!-- LOCALIZATION NOTE (htmlPanel.accesskey): The key bound to the HTML panel's
+-toolbar button -->
+-<!ENTITY htmlPanel.accesskey          "H">
 diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
 --- a/browser/themes/gnomestripe/browser.css
 +++ b/browser/themes/gnomestripe/browser.css
-@@ -2086,36 +2086,81 @@ html|*#highlighter-nodeinfobar-id {
+@@ -2095,36 +2095,81 @@ html|*#highlighter-nodeinfobar-pseudo-cl
    -moz-transition-property: background-color;
    -moz-transition-duration: 500ms;
    background-color: rgba(0,0,0,0);
@@ -160,9 +191,9 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
    padding: 0 9px;
  }
  
-@@ -2131,16 +2176,17 @@ html|*#highlighter-nodeinfobar-id {
- .inspector-breadcrumbs-classes {
-   color: #8d99a6;
+@@ -2148,16 +2193,17 @@ html|*#highlighter-nodeinfobar-pseudo-cl
+ .inspector-breadcrumbs-pseudo-classes {
+   color: hsl(20, 100%, 85%);
  }
  
  /* Highlighter toolbar - breadcrumbs - LTR */
@@ -178,7 +209,7 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
  
  .inspector-breadcrumbs-button[siblings-menu-open]:not([checked]),
  .inspector-breadcrumbs-button:not([checked]):hover:active {
-@@ -2173,16 +2219,20 @@ html|*#highlighter-nodeinfobar-id {
+@@ -2190,16 +2236,20 @@ html|*#highlighter-nodeinfobar-pseudo-cl
  .inspector-breadcrumbs-button:first-of-type[checked]:hover:active {
    -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start-selected-pressed.png") 1 13 2 13 fill stretch;
  }
@@ -199,7 +230,7 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
  .inspector-breadcrumbs-button:last-of-type[checked] {
    -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected.png") 1 13 2 13 fill stretch;
  }
-@@ -2191,16 +2241,17 @@ html|*#highlighter-nodeinfobar-id {
+@@ -2208,16 +2258,17 @@ html|*#highlighter-nodeinfobar-pseudo-cl
  .inspector-breadcrumbs-button:last-of-type[checked]:hover:active {
    -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected-pressed.png") 1 13 2 13 fill stretch;
  }
@@ -217,7 +248,7 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
  
  .inspector-breadcrumbs-button[siblings-menu-open]:not([checked]):-moz-locale-dir(rtl),
  .inspector-breadcrumbs-button:not([checked]):hover:active:-moz-locale-dir(rtl) {
-@@ -2233,31 +2284,55 @@ html|*#highlighter-nodeinfobar-id {
+@@ -2250,32 +2301,56 @@ html|*#highlighter-nodeinfobar-pseudo-cl
  .inspector-breadcrumbs-button:first-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
    -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start-selected-pressed.png") 1 13 2 13 fill stretch;
  }
@@ -268,11 +299,12 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
 +
  #inspector-tree-splitter {
    -moz-appearance: none;
-   height: 4px;
-   border-top: 1px solid hsla(210,8%,5%,.45);
-   border-bottom: 1px solid hsla(210,8%,5%,.45);
-   background: -moz-linear-gradient(top, hsl(210,11%,36%), hsl(210,11%,18%));
- }
+   border-top: 1px solid black;
+   border-bottom-width: 0;
+   min-height: 3px;
+   height: 3px;
+   margin-bottom: -3px;
+   position: relative;
 diff --git a/browser/themes/gnomestripe/devtools/breadcrumbs-scrollbutton.png b/browser/themes/gnomestripe/devtools/breadcrumbs-scrollbutton.png
 new file mode 100644
 index 0000000000000000000000000000000000000000..722438060a89a64789e73bfd79b7a50546c61b4b
@@ -315,15 +347,15 @@ j|L|<*AGFVpzXA*Z|5Kl~6^V5Y00000NkvXXu0mjflR<IX
 diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
 --- a/browser/themes/gnomestripe/jar.mn
 +++ b/browser/themes/gnomestripe/jar.mn
-@@ -89,16 +89,17 @@ browser.jar:
-   skin/classic/browser/devtools/arrows.png            (devtools/arrows.png)
-   skin/classic/browser/devtools/goto-mdn.png          (devtools/goto-mdn.png)
-   skin/classic/browser/devtools/csshtmltree.css       (devtools/csshtmltree.css)
-   skin/classic/browser/devtools/webconsole.css                  (devtools/webconsole.css)
+@@ -94,16 +94,17 @@ browser.jar:
    skin/classic/browser/devtools/webconsole_networkpanel.css     (devtools/webconsole_networkpanel.css)
    skin/classic/browser/devtools/webconsole.png                  (devtools/webconsole.png)
    skin/classic/browser/devtools/gcli.css              (devtools/gcli.css)
+   skin/classic/browser/devtools/htmlpanel.css         (devtools/htmlpanel.css)
    skin/classic/browser/devtools/orion.css             (devtools/orion.css)
+   skin/classic/browser/devtools/orion-container.css   (devtools/orion-container.css)
+   skin/classic/browser/devtools/orion-task.png        (devtools/orion-task.png)
+   skin/classic/browser/devtools/orion-breakpoint.png  (devtools/orion-breakpoint.png)
 +  skin/classic/browser/devtools/breadcrumbs-scrollbutton.png                 (devtools/breadcrumbs-scrollbutton.png)
    skin/classic/browser/devtools/breadcrumbs/ltr-end-pressed.png              (devtools/breadcrumbs/ltr-end-pressed.png)
    skin/classic/browser/devtools/breadcrumbs/ltr-end-selected-pressed.png     (devtools/breadcrumbs/ltr-end-selected-pressed.png)
@@ -333,10 +365,10 @@ diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.
    skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png  (devtools/breadcrumbs/ltr-middle-selected-pressed.png)
    skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected.png          (devtools/breadcrumbs/ltr-middle-selected.png)
    skin/classic/browser/devtools/breadcrumbs/ltr-middle.png                   (devtools/breadcrumbs/ltr-middle.png)
-@@ -120,16 +121,17 @@ browser.jar:
-   skin/classic/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
+@@ -126,16 +127,17 @@ browser.jar:
    skin/classic/browser/devtools/splitview.css         (devtools/splitview.css)
    skin/classic/browser/devtools/styleeditor.css       (devtools/styleeditor.css)
+   skin/classic/browser/devtools/debugger.css          (devtools/debugger.css)
    skin/classic/browser/devtools/magnifying-glass.png  (devtools/magnifying-glass.png)
    skin/classic/browser/devtools/itemToggle.png        (devtools/itemToggle.png)
    skin/classic/browser/devtools/itemArrow-rtl.png     (devtools/itemArrow-rtl.png)
@@ -354,7 +386,7 @@ diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.
 diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
 --- a/browser/themes/pinstripe/browser.css
 +++ b/browser/themes/pinstripe/browser.css
-@@ -2833,30 +2833,80 @@ html|*#highlighter-nodeinfobar-id {
+@@ -2842,30 +2842,80 @@ html|*#highlighter-nodeinfobar-pseudo-cl
    -moz-transition-property: background-color;
    -moz-transition-duration: 500ms;
    background-color: rgba(0,0,0,0);
@@ -437,9 +469,9 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
    padding: 0 9px;
  }
  
-@@ -2872,16 +2922,17 @@ html|*#highlighter-nodeinfobar-id {
- .inspector-breadcrumbs-classes {
-   color: #8d99a6;
+@@ -2889,16 +2939,17 @@ html|*#highlighter-nodeinfobar-pseudo-cl
+ .inspector-breadcrumbs-pseudo-classes {
+   color: hsl(20, 100%, 85%);
  }
  
  /* Highlighter toolbar - breadcrumbs - LTR */
@@ -455,7 +487,7 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
  
  .inspector-breadcrumbs-button[siblings-menu-open]:not([checked]),
  .inspector-breadcrumbs-button:not([checked]):hover:active {
-@@ -2914,16 +2965,20 @@ html|*#highlighter-nodeinfobar-id {
+@@ -2931,16 +2982,20 @@ html|*#highlighter-nodeinfobar-pseudo-cl
  .inspector-breadcrumbs-button:first-of-type[checked]:hover:active {
    -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start-selected-pressed.png") 1 13 2 13 fill stretch;
  }
@@ -476,7 +508,7 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
  .inspector-breadcrumbs-button:last-of-type[checked] {
    -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected.png") 1 13 2 13 fill stretch;
  }
-@@ -2932,16 +2987,17 @@ html|*#highlighter-nodeinfobar-id {
+@@ -2949,16 +3004,17 @@ html|*#highlighter-nodeinfobar-pseudo-cl
  .inspector-breadcrumbs-button:last-of-type[checked]:hover:active {
    -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected-pressed.png") 1 13 2 13 fill stretch;
  }
@@ -494,7 +526,7 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
  
  .inspector-breadcrumbs-button[siblings-menu-open]:not([checked]):-moz-locale-dir(rtl),
  .inspector-breadcrumbs-button:not([checked]):hover:active:-moz-locale-dir(rtl) {
-@@ -2974,32 +3030,56 @@ html|*#highlighter-nodeinfobar-id {
+@@ -2991,32 +3047,56 @@ html|*#highlighter-nodeinfobar-pseudo-cl
  .inspector-breadcrumbs-button:first-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
    -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start-selected-pressed.png") 1 13 2 13 fill stretch;
  }
@@ -545,12 +577,12 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
 +
  #inspector-tree-splitter {
    -moz-appearance: none;
-   height: 4px;
-   min-height: 4px;
-   border-top: 1px solid hsla(210,8%,5%,.45);
-   border-bottom: 1px solid hsla(210,8%,5%,.45);
-   background: url(devtools/background-noise-toolbar.png), -moz-linear-gradient(top, hsl(210,11%,36%), hsl(210,11%,18%));
- }
+   border-top: 1px solid black;
+   border-bottom-width: 0;
+   min-height: 3px;
+   height: 3px;
+   margin-bottom: -3px;
+   position: relative;
 diff --git a/browser/themes/pinstripe/devtools/breadcrumbs-scrollbutton.png b/browser/themes/pinstripe/devtools/breadcrumbs-scrollbutton.png
 new file mode 100644
 index 0000000000000000000000000000000000000000..722438060a89a64789e73bfd79b7a50546c61b4b
@@ -593,11 +625,11 @@ j|L|<*AGFVpzXA*Z|5Kl~6^V5Y00000NkvXXu0mjflR<IX
 diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
 --- a/browser/themes/pinstripe/jar.mn
 +++ b/browser/themes/pinstripe/jar.mn
-@@ -129,16 +129,17 @@ browser.jar:
-   skin/classic/browser/devtools/goto-mdn.png                (devtools/goto-mdn.png)
-   skin/classic/browser/devtools/csshtmltree.css             (devtools/csshtmltree.css)
-   skin/classic/browser/devtools/gcli.css                    (devtools/gcli.css)
+@@ -134,16 +134,17 @@ browser.jar:
    skin/classic/browser/devtools/orion.css                   (devtools/orion.css)
+   skin/classic/browser/devtools/orion-container.css         (devtools/orion-container.css)
+   skin/classic/browser/devtools/orion-task.png              (devtools/orion-task.png)
+   skin/classic/browser/devtools/orion-breakpoint.png        (devtools/orion-breakpoint.png)
    skin/classic/browser/devtools/toolbarbutton-close.png     (devtools/toolbarbutton-close.png)
  * skin/classic/browser/devtools/webconsole.css                  (devtools/webconsole.css)
    skin/classic/browser/devtools/webconsole_networkpanel.css     (devtools/webconsole_networkpanel.css)
@@ -611,16 +643,16 @@ diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
    skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png  (devtools/breadcrumbs/ltr-middle-selected-pressed.png)
    skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected.png          (devtools/breadcrumbs/ltr-middle-selected.png)
    skin/classic/browser/devtools/breadcrumbs/ltr-middle.png                   (devtools/breadcrumbs/ltr-middle.png)
-@@ -161,16 +162,17 @@ browser.jar:
-   skin/classic/browser/devtools/splitview.css               (devtools/splitview.css)
+@@ -167,16 +168,17 @@ browser.jar:
    skin/classic/browser/devtools/styleeditor.css             (devtools/styleeditor.css)
-   skin/classic/browser/devtools/magnifying-glass.png	    (devtools/magnifying-glass.png)
-   skin/classic/browser/devtools/itemToggle.png		    (devtools/itemToggle.png)
-   skin/classic/browser/devtools/itemArrow-rtl.png	    (devtools/itemArrow-rtl.png)
-   skin/classic/browser/devtools/itemArrow-ltr.png	    (devtools/itemArrow-ltr.png)
+   skin/classic/browser/devtools/debugger.css                (devtools/debugger.css)
+   skin/classic/browser/devtools/magnifying-glass.png        (devtools/magnifying-glass.png)
+   skin/classic/browser/devtools/itemToggle.png              (devtools/itemToggle.png)
+   skin/classic/browser/devtools/itemArrow-rtl.png           (devtools/itemArrow-rtl.png)
+   skin/classic/browser/devtools/itemArrow-ltr.png           (devtools/itemArrow-ltr.png)
    skin/classic/browser/devtools/background-noise-toolbar.png (devtools/background-noise-toolbar.png)
-   skin/classic/browser/devtools/inspect-button.png    (devtools/inspect-button.png)
-+  skin/classic/browser/devtools/treepanel-button.png  (devtools/treepanel-button.png)
+   skin/classic/browser/devtools/inspect-button.png          (devtools/inspect-button.png)
++  skin/classic/browser/devtools/treepanel-button.png        (devtools/treepanel-button.png)
  #ifdef MOZ_SERVICES_SYNC
    skin/classic/browser/sync-throbber.png
    skin/classic/browser/sync-16.png
@@ -632,7 +664,7 @@ diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
 diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/browser.css
 --- a/browser/themes/winstripe/browser.css
 +++ b/browser/themes/winstripe/browser.css
-@@ -2766,37 +2766,82 @@ html|*#highlighter-nodeinfobar-id {
+@@ -2789,37 +2789,82 @@ html|*#highlighter-nodeinfobar-pseudo-cl
    -moz-transition-property: background-color;
    -moz-transition-duration: 500ms;
    background-color: rgba(0,0,0,0);
@@ -717,9 +749,9 @@ diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/bro
  }
  
  .inspector-breadcrumbs-button[checked] > .inspector-breadcrumbs-tag {
-@@ -2811,16 +2856,17 @@ html|*#highlighter-nodeinfobar-id {
- .inspector-breadcrumbs-classes {
-   color: #8d99a6;
+@@ -2842,16 +2887,17 @@ html|*#highlighter-nodeinfobar-pseudo-cl
+ .inspector-breadcrumbs-pseudo-classes {
+   color: hsl(20, 100%, 85%);
  }
  
  /* Highlighter toolbar - breadcrumbs - LTR */
@@ -735,7 +767,7 @@ diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/bro
  
  .inspector-breadcrumbs-button[siblings-menu-open]:not([checked]),
  .inspector-breadcrumbs-button:not([checked]):hover:active {
-@@ -2853,16 +2899,20 @@ html|*#highlighter-nodeinfobar-id {
+@@ -2884,16 +2930,20 @@ html|*#highlighter-nodeinfobar-pseudo-cl
  .inspector-breadcrumbs-button:first-of-type[checked]:hover:active {
    -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-start-selected-pressed.png") 2 13 2 13 fill stretch;
  }
@@ -756,7 +788,7 @@ diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/bro
  .inspector-breadcrumbs-button:last-of-type[checked] {
    -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected.png") 2 13 2 13 fill stretch;
  }
-@@ -2871,16 +2921,17 @@ html|*#highlighter-nodeinfobar-id {
+@@ -2902,16 +2952,17 @@ html|*#highlighter-nodeinfobar-pseudo-cl
  .inspector-breadcrumbs-button:last-of-type[checked]:hover:active {
    -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/ltr-end-selected-pressed.png") 2 13 2 13 fill stretch;
  }
@@ -774,7 +806,7 @@ diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/bro
  
  .inspector-breadcrumbs-button[siblings-menu-open]:not([checked]):-moz-locale-dir(rtl),
  .inspector-breadcrumbs-button:not([checked]):hover:active:-moz-locale-dir(rtl) {
-@@ -2913,32 +2964,56 @@ html|*#highlighter-nodeinfobar-id {
+@@ -2944,32 +2995,56 @@ html|*#highlighter-nodeinfobar-pseudo-cl
  .inspector-breadcrumbs-button:first-of-type[checked]:hover:active:-moz-locale-dir(rtl) {
    -moz-border-image: url("chrome://browser/skin/devtools/breadcrumbs/rtl-start-selected-pressed.png") 2 13 2 13 fill stretch;
  }
@@ -825,12 +857,12 @@ diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/bro
 +
  #inspector-tree-splitter {
    -moz-appearance: none;
-   height: 4px;
-   min-height: 4px;
-   border-top: 1px solid hsla(211,68%,6%,.5);
-   border-bottom: 1px solid hsla(211,68%,6%,.5);
-   background: -moz-linear-gradient(top, hsl(209,18%,34%), hsl(210,24%,16%));
- }
+   border-top: 1px solid black;
+   border-bottom-width: 0;
+   min-height: 3px;
+   height: 3px;
+   margin-bottom: -3px;
+   position: relative;
 diff --git a/browser/themes/winstripe/devtools/breadcrumbs-scrollbutton.png b/browser/themes/winstripe/devtools/breadcrumbs-scrollbutton.png
 new file mode 100644
 index 0000000000000000000000000000000000000000..722438060a89a64789e73bfd79b7a50546c61b4b
@@ -873,11 +905,11 @@ j|L|<*AGFVpzXA*Z|5Kl~6^V5Y00000NkvXXu0mjflR<IX
 diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
 --- a/browser/themes/winstripe/jar.mn
 +++ b/browser/themes/winstripe/jar.mn
-@@ -113,16 +113,17 @@ browser.jar:
-         skin/classic/browser/devtools/goto-mdn.png                  (devtools/goto-mdn.png)
-         skin/classic/browser/devtools/csshtmltree.css               (devtools/csshtmltree.css)
-         skin/classic/browser/devtools/gcli.css                      (devtools/gcli.css)
+@@ -119,16 +119,17 @@ browser.jar:
          skin/classic/browser/devtools/orion.css                     (devtools/orion.css)
+         skin/classic/browser/devtools/orion-container.css           (devtools/orion-container.css)
+         skin/classic/browser/devtools/orion-task.png                (devtools/orion-task.png)
+         skin/classic/browser/devtools/orion-breakpoint.png          (devtools/orion-breakpoint.png)
          skin/classic/browser/devtools/toolbarbutton-close.png       (devtools/toolbarbutton-close.png)
          skin/classic/browser/devtools/webconsole.css                  (devtools/webconsole.css)
          skin/classic/browser/devtools/webconsole_networkpanel.css     (devtools/webconsole_networkpanel.css)
@@ -891,10 +923,10 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png  (devtools/breadcrumbs/ltr-middle-selected-pressed.png)
          skin/classic/browser/devtools/breadcrumbs/ltr-middle-selected.png          (devtools/breadcrumbs/ltr-middle-selected.png)
          skin/classic/browser/devtools/breadcrumbs/ltr-middle.png                   (devtools/breadcrumbs/ltr-middle.png)
-@@ -144,16 +145,17 @@ browser.jar:
-         skin/classic/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
+@@ -151,16 +152,17 @@ browser.jar:
          skin/classic/browser/devtools/splitview.css                 (devtools/splitview.css)
          skin/classic/browser/devtools/styleeditor.css               (devtools/styleeditor.css)
+         skin/classic/browser/devtools/debugger.css                  (devtools/debugger.css)
          skin/classic/browser/devtools/magnifying-glass.png          (devtools/magnifying-glass.png)
          skin/classic/browser/devtools/itemToggle.png                (devtools/itemToggle.png)
          skin/classic/browser/devtools/itemArrow-rtl.png             (devtools/itemArrow-rtl.png)
@@ -909,11 +941,11 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/browser/sync-bg.png
          skin/classic/browser/sync-desktopIcon.png
          skin/classic/browser/sync-mobileIcon.png
-@@ -277,16 +279,17 @@ browser.jar:
-         skin/classic/aero/browser/devtools/goto-mdn.png              (devtools/goto-mdn.png)
-         skin/classic/aero/browser/devtools/csshtmltree.css           (devtools/csshtmltree.css)
-         skin/classic/aero/browser/devtools/gcli.css                  (devtools/gcli.css)
+@@ -290,16 +292,17 @@ browser.jar:
          skin/classic/aero/browser/devtools/orion.css                 (devtools/orion.css)
+         skin/classic/aero/browser/devtools/orion-container.css       (devtools/orion-container.css)
+         skin/classic/aero/browser/devtools/orion-task.png            (devtools/orion-task.png)
+         skin/classic/aero/browser/devtools/orion-breakpoint.png      (devtools/orion-breakpoint.png)
          skin/classic/aero/browser/devtools/toolbarbutton-close.png   (devtools/toolbarbutton-close.png)
          skin/classic/aero/browser/devtools/webconsole.css                  (devtools/webconsole.css)
          skin/classic/aero/browser/devtools/webconsole_networkpanel.css     (devtools/webconsole_networkpanel.css)
@@ -927,10 +959,10 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/aero/browser/devtools/breadcrumbs/ltr-middle-selected-pressed.png  (devtools/breadcrumbs/ltr-middle-selected-pressed.png)
          skin/classic/aero/browser/devtools/breadcrumbs/ltr-middle-selected.png          (devtools/breadcrumbs/ltr-middle-selected.png)
          skin/classic/aero/browser/devtools/breadcrumbs/ltr-middle.png                   (devtools/breadcrumbs/ltr-middle.png)
-@@ -308,16 +311,17 @@ browser.jar:
-         skin/classic/aero/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
+@@ -322,16 +325,17 @@ browser.jar:
          skin/classic/aero/browser/devtools/splitview.css             (devtools/splitview.css)
          skin/classic/aero/browser/devtools/styleeditor.css           (devtools/styleeditor.css)
+         skin/classic/aero/browser/devtools/debugger.css              (devtools/debugger.css)
          skin/classic/aero/browser/devtools/magnifying-glass.png      (devtools/magnifying-glass.png)
          skin/classic/aero/browser/devtools/itemToggle.png            (devtools/itemToggle.png)
          skin/classic/aero/browser/devtools/itemArrow-rtl.png         (devtools/itemArrow-rtl.png)
@@ -945,85 +977,16 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/aero/browser/sync-bg.png
          skin/classic/aero/browser/sync-desktopIcon.png
          skin/classic/aero/browser/sync-mobileIcon.png
-diff --git a/toolkit/content/widgets/scrollbox.xml b/toolkit/content/widgets/scrollbox.xml
---- a/toolkit/content/widgets/scrollbox.xml
-+++ b/toolkit/content/widgets/scrollbox.xml
-@@ -515,26 +515,28 @@
-           if (event.detail == 1)
-             return;
-         }
-         else {    // horizontal scrollbox
-           if (event.detail == 0)
-             return;
-         }
- 
-+        this.removeAttribute("overflows");
-         this._scrollButtonUp.collapsed = true;
-         this._scrollButtonDown.collapsed = true;
-         try {
-           // See bug 341047 and comments in overflow handler as to why 
-           // try..catch is needed here
-           let childNodes = this._getScrollableElements();
-           if (childNodes && childNodes.length)
-             this.ensureElementIsVisible(childNodes[0], false);
-         }
-         catch(e) {
-+          this.setAttribute("overflows", true);
-           this._scrollButtonUp.collapsed = false;
-           this._scrollButtonDown.collapsed = false;
-         }
-       ]]></handler>
- 
-       <handler event="overflow" phase="capturing"><![CDATA[
-         // filter underflow events which were dispatched on nested scrollboxes
-         if (event.target != this)
-@@ -549,28 +551,30 @@
-           if (event.detail == 1)
-             return;
-         }
-         else {    // horizontal scrollbox
-           if (event.detail == 0)
-             return;
-         }
- 
-+        this.setAttribute("overflows", true);
-         this._scrollButtonUp.collapsed = false;
-         this._scrollButtonDown.collapsed = false;
-         try {
-           // See bug 341047, the overflow event is dispatched when the 
-           // scrollbox already is mostly destroyed. This causes some code in
-           // _updateScrollButtonsDisabledState() to throw an error. It also
-           // means that the scrollbarbuttons were uncollapsed when that should
-           // not be happening, because the whole overflow event should not be
-           // happening in that case.
-           this._updateScrollButtonsDisabledState();
-         } 
-         catch(e) {
-+          this.removeAttribute("overflows");
-           this._scrollButtonUp.collapsed = true;
-           this._scrollButtonDown.collapsed = true;
-         }
-       ]]></handler>
- 
-       <handler event="scroll" action="this._updateScrollButtonsDisabledState()"/>
-     </handlers>
-   </binding>
-@@ -650,17 +654,17 @@
-         stop: function arrowSmoothScroll_stop() {
-           window.mozCancelAnimationFrame(this.requestHandle);
-           this.requestHandle = 0;
-         },
-         sample: function arrowSmoothScroll_handleEvent(timeStamp) {
-           const scrollIndex = this.scrollbox._scrollIndex;
-           const timePassed = timeStamp - this.lastFrameTime;
-           this.lastFrameTime = timeStamp;
--          
-+
-           const scrollDelta = 0.5 * timePassed * scrollIndex;
-           this.scrollbox.scrollPosition += scrollDelta;
- 
-           window.mozRequestAnimationFrame(this);
-         }
-       })]]></field>
- 
-       <method name="_startScroll">
+diff --git a/testing/peptest/tests/firefox/server/mozilla.org/index.html.orig b/testing/peptest/tests/firefox/server/mozilla.org/index.html.orig
+deleted file mode 100644
+--- a/testing/peptest/tests/firefox/server/mozilla.org/index.html.orig
++++ /dev/null
+@@ -1,8 +0,0 @@
+-<html>
+-<body id="home">
+-<div id="header">
+-Test mozilla home page.
+-</div>
+-</body>
+-</html>
+-

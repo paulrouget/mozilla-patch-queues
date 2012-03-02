@@ -1,53 +1,39 @@
-Bug 704110 - The WebConsole should use the DevTools CSS theme (dark theme) / common.css
+# vim: se ft=diff :
+# HG changeset patch
+# User Paul Rouget <paul@mozilla.com>
+# Date 1330103432 -3600
+rebased
+
+# HG changeset patch
+# User Paul Rouget <paul@mozilla.com>
+# Date 1330103432 -3600
+# Node ID bb35c037f19a7a384d0c638aee3fffd568a17ce6
+# Parent 5724c5ba0f84ef3e2928717e7900c9e11e3d1c13
+rebased
 
 diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
 --- a/browser/base/content/browser.xul
 +++ b/browser/base/content/browser.xul
-@@ -996,16 +996,17 @@
+@@ -998,6 +998,7 @@
               hidden="true">
-       <vbox flex="1">
-         <resizer id="inspector-top-resizer" flex="1" 
-                  dir="top" disabled="true"
-                  element="inspector-tree-box"/>
-         <hbox>
  #ifdef XP_MACOSX
-           <toolbarbutton id="highlighter-closebutton"
-+                         class="devtools-closebutton"
-                          oncommand="InspectorUI.closeInspectorUI(false);"
-                          tooltiptext="&inspectCloseButton.tooltiptext;"/>
+       <toolbarbutton id="highlighter-closebutton"
++					 class="devtools-closebutton"
+                      oncommand="InspectorUI.closeInspectorUI(false);"
+                      tooltiptext="&inspectCloseButton.tooltiptext;"/>
  #endif
-           <toolbarbutton id="inspector-inspect-toolbutton"
-                          class="devtools-toolbarbutton"
-                          label="&inspectButton.label;"
-                          accesskey="&inspectButton.accesskey;"
-                          command="Inspector:Inspect"/>
-@@ -1023,16 +1024,17 @@
-                            class="devtools-toolbarbutton"
-                            label="&inspectStyleButton.label;"
-                            accesskey="&inspectStyleButton.accesskey;"
-                            command="Inspector:Sidebar"/>
-             <!-- registered tools go here -->
-           </hbox>
+@@ -1031,6 +1032,7 @@
+       </hbox>
  #ifndef XP_MACOSX
-           <toolbarbutton id="highlighter-closebutton"
-+                         class="devtools-closebutton"
-                          oncommand="InspectorUI.closeInspectorUI(false);"
-                          tooltiptext="&inspectCloseButton.tooltiptext;"/>
+       <toolbarbutton id="highlighter-closebutton"
++					 class="devtools-closebutton"
+                      oncommand="InspectorUI.closeInspectorUI(false);"
+                      tooltiptext="&inspectCloseButton.tooltiptext;"/>
  #endif
-         </hbox>
-       </vbox>
-     </toolbar>
-     <toolbar id="addon-bar"
-              toolbarname="&addonBarCmd.label;" accesskey="&addonBarCmd.accesskey;"
 diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
 --- a/browser/themes/gnomestripe/browser.css
 +++ b/browser/themes/gnomestripe/browser.css
-@@ -1953,28 +1953,16 @@ panel[dimmed="true"] {
- }
- 
- /* Highlighter */
- 
- .highlighter-veil {
+@@ -1963,18 +1963,6 @@ panel[dimmed="true"] {
    background-color: rgba(25, 25, 25, 0.5);
  }
  
@@ -66,20 +52,10 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
  #highlighter-veil-transparentbox {
    box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
    outline: 1px dashed rgba(255,255,255,0.5);
-   outline-offset: -1px;
- }
- 
- #highlighter-veil-container[locked] > #highlighter-veil-middlebox > #highlighter-veil-transparentbox {
-   box-shadow: 0 0 0 1px black;
 diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gnomestripe/devtools/common.css
 --- a/browser/themes/gnomestripe/devtools/common.css
 +++ b/browser/themes/gnomestripe/devtools/common.css
-@@ -52,48 +52,63 @@
-   text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
-   border: 1px solid hsla(210,8%,5%,.45);
-   border-radius: 3px;
-   background: -moz-linear-gradient(hsla(212,7%,57%,.35), hsla(212,7%,57%,.1)) padding-box;
-   box-shadow: 0 1px 0 hsla(210,16%,76%,.15) inset, 0 0 0 1px hsla(210,16%,76%,.15) inset, 0 1px 0 hsla(210,16%,76%,.15);
+@@ -57,27 +57,42 @@
    margin: 0 3px;
  }
  
@@ -126,10 +102,7 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
  /* Search input */
  
  .devtools-searchinput {
-   -moz-appearance: none;
-   margin: 0 3px;
-   border: 1px solid hsla(210,8%,5%,.6);
-   border-radius: 2px;
+@@ -88,7 +103,7 @@
    background-color: transparent;
    background-image: url(magnifying-glass.png), -moz-linear-gradient(hsla(210,16%,76%,.15), hsla(210,16%,76%,.35));
    background-repeat: no-repeat;
@@ -138,17 +111,7 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
    padding-top: 0;
    padding-bottom: 0;
    -moz-padding-start: 18px;
-   -moz-padding-end: 12px;
-   box-shadow: 0 1px 1px hsla(210,8%,5%,.3) inset,
-               0 0 0 1px hsla(210,16%,76%,.1) inset,
-               0 1px 0 hsla(210,16%,76%,.15);
-   color: hsl(210,30%,85%);
-@@ -105,8 +120,22 @@
- 
- .devtools-searchinput > .textbox-input-box > .textbox-search-icons {
-   display: none;
- }
- 
+@@ -110,3 +125,17 @@
  .devtools-searchinput > .textbox-input-box > .textbox-input:-moz-placeholder {
    color: hsl(208,10%,66%);
  }
@@ -179,12 +142,7 @@ gEMW*`iexmBX9)GM)t?{Uw*+L6r>mdKI;Vst0CvtYJ^%m!
 diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
 --- a/browser/themes/gnomestripe/jar.mn
 +++ b/browser/themes/gnomestripe/jar.mn
-@@ -121,16 +121,17 @@ browser.jar:
-   skin/classic/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
-   skin/classic/browser/devtools/splitview.css         (devtools/splitview.css)
-   skin/classic/browser/devtools/styleeditor.css       (devtools/styleeditor.css)
-   skin/classic/browser/devtools/debugger.css          (devtools/debugger.css)
-   skin/classic/browser/devtools/magnifying-glass.png  (devtools/magnifying-glass.png)
+@@ -130,6 +130,7 @@ browser.jar:
    skin/classic/browser/devtools/itemToggle.png        (devtools/itemToggle.png)
    skin/classic/browser/devtools/itemArrow-rtl.png     (devtools/itemArrow-rtl.png)
    skin/classic/browser/devtools/itemArrow-ltr.png     (devtools/itemArrow-ltr.png)
@@ -192,20 +150,10 @@ diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.
  #ifdef MOZ_SERVICES_SYNC
    skin/classic/browser/sync-16-throbber.png
    skin/classic/browser/sync-16.png
-   skin/classic/browser/sync-24-throbber.png
-   skin/classic/browser/sync-32.png
-   skin/classic/browser/sync-bg.png
-   skin/classic/browser/sync-128.png
-   skin/classic/browser/sync-desktopIcon.png
 diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
 --- a/browser/themes/pinstripe/browser.css
 +++ b/browser/themes/pinstripe/browser.css
-@@ -2680,36 +2680,16 @@ panel[dimmed="true"] {
- 
- 
- /* Highlighter */
- 
- .highlighter-veil {
+@@ -2690,26 +2690,6 @@ panel[dimmed="true"] {
    background-color: rgba(25, 25, 25, 0.5);
  }
  
@@ -232,20 +180,10 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
  #highlighter-veil-transparentbox {
    box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
    outline: 1px dashed rgba(255,255,255,0.5);
-   outline-offset: -1px;
- }
- 
- #highlighter-veil-container[locked] > #highlighter-veil-middlebox > #highlighter-veil-transparentbox {
-   box-shadow: 0 0 0 1px black;
 diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinstripe/devtools/common.css
 --- a/browser/themes/pinstripe/devtools/common.css
 +++ b/browser/themes/pinstripe/devtools/common.css
-@@ -51,50 +51,68 @@
-   min-width: 78px;
-   min-height: 22px;
-   color: hsl(210,30%,85%);
-   text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
-   border: 1px solid hsla(210,8%,5%,.45);
+@@ -56,29 +56,47 @@
    border-radius: @toolbarbuttonCornerRadius@;
    background: -moz-linear-gradient(hsla(212,7%,57%,.35), hsla(212,7%,57%,.1)) padding-box;
    box-shadow: 0 1px 0 hsla(210,16%,76%,.15) inset, 0 0 0 1px hsla(210,16%,76%,.15) inset, 0 1px 0 hsla(210,16%,76%,.15);
@@ -296,10 +234,7 @@ diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinst
  /* Search input */
  
  .devtools-searchinput {
-   -moz-appearance: none;
-   margin: 0 3px;
-   background-color: transparent;
-   border: 1px solid hsla(210,8%,5%,.6);
+@@ -89,7 +107,7 @@
    border-radius: 20px;
    background-image: url(magnifying-glass.png), -moz-linear-gradient(hsla(210,16%,76%,.15), hsla(210,16%,76%,.35));
    background-repeat: no-repeat;
@@ -308,17 +243,7 @@ diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinst
    padding-top: 0;
    padding-bottom: 0;
    -moz-padding-start: 18px;
-   -moz-padding-end: 12px;
-   box-shadow: 0 1px 1px hsla(210,8%,5%,.3) inset,
-               0 0 0 1px hsla(210,16%,76%,.1) inset,
-               0 1px 0 hsla(210,16%,76%,.15);
-   color: hsl(210,30%,85%);
-@@ -106,8 +124,30 @@
- 
- .devtools-searchinput > .textbox-input-box > .textbox-search-icons {
-   display: none;
- }
- 
+@@ -111,3 +129,25 @@
  .devtools-searchinput > .textbox-input-box > .textbox-input:-moz-placeholder {
    color: hsl(208,10%,66%);
  }
@@ -357,33 +282,18 @@ gEMW*`iexmBX9)GM)t?{Uw*+L6r>mdKI;Vst0CvtYJ^%m!
 diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
 --- a/browser/themes/pinstripe/jar.mn
 +++ b/browser/themes/pinstripe/jar.mn
-@@ -161,16 +161,17 @@ browser.jar:
-   skin/classic/browser/devtools/breadcrumbs/rtl-start-selected.png           (devtools/breadcrumbs/rtl-start-selected.png)
-   skin/classic/browser/devtools/splitview.css               (devtools/splitview.css)
-   skin/classic/browser/devtools/styleeditor.css             (devtools/styleeditor.css)
-   skin/classic/browser/devtools/debugger.css                (devtools/debugger.css)
-   skin/classic/browser/devtools/magnifying-glass.png	    (devtools/magnifying-glass.png)
-   skin/classic/browser/devtools/itemToggle.png		    (devtools/itemToggle.png)
-   skin/classic/browser/devtools/itemArrow-rtl.png	    (devtools/itemArrow-rtl.png)
-   skin/classic/browser/devtools/itemArrow-ltr.png	    (devtools/itemArrow-ltr.png)
-+  skin/classic/browser/devtools/dropmarker.png        (devtools/dropmarker.png)
+@@ -170,6 +170,7 @@ browser.jar:
+   skin/classic/browser/devtools/itemToggle.png              (devtools/itemToggle.png)
+   skin/classic/browser/devtools/itemArrow-rtl.png           (devtools/itemArrow-rtl.png)
+   skin/classic/browser/devtools/itemArrow-ltr.png           (devtools/itemArrow-ltr.png)
++  skin/classic/browser/devtools/dropmarker.png              (devtools/dropmarker.png)
    skin/classic/browser/devtools/background-noise-toolbar.png (devtools/background-noise-toolbar.png)
  #ifdef MOZ_SERVICES_SYNC
    skin/classic/browser/sync-throbber.png
-   skin/classic/browser/sync-16.png
-   skin/classic/browser/sync-32.png
-   skin/classic/browser/sync-bg.png
-   skin/classic/browser/sync-128.png
-   skin/classic/browser/sync-desktopIcon.png
 diff --git a/toolkit/themes/gnomestripe/global/toolbarbutton.css b/toolkit/themes/gnomestripe/global/toolbarbutton.css
 --- a/toolkit/themes/gnomestripe/global/toolbarbutton.css
 +++ b/toolkit/themes/gnomestripe/global/toolbarbutton.css
-@@ -154,16 +154,17 @@ toolbarbutton[type="menu-button"][disabl
-   border-style: none;
-   padding: 0 !important;
- }
- 
- .toolbarbutton-menubutton-button {
+@@ -159,6 +159,7 @@ toolbarbutton[type="menu-button"][disabl
    -moz-box-align: center;
    -moz-box-pack: center;
    -moz-box-orient: vertical;
@@ -391,8 +301,4 @@ diff --git a/toolkit/themes/gnomestripe/global/toolbarbutton.css b/toolkit/theme
  }
  
  /* .......... dropmarker .......... */
- 
- .toolbarbutton-menubutton-dropmarker {
-   border: none !important;
-   background-color: transparent !important;
-   padding: 3px;
+
