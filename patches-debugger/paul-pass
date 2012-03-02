@@ -1,5 +1,5 @@
 # HG changeset patch
-# Parent d320ba88cd68cede545bc3438fbca51886b5aeaa
+# Parent de0c3ef73261692112cd4aa38f93d2df8459f18e
 
 diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
 --- a/browser/base/content/browser.xul
@@ -107,16 +107,12 @@ diff --git a/browser/devtools/debugger/debugger.xul b/browser/devtools/debugger/
 diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gnomestripe/devtools/common.css
 --- a/browser/themes/gnomestripe/devtools/common.css
 +++ b/browser/themes/gnomestripe/devtools/common.css
-@@ -48,27 +48,25 @@
-   margin-bottom: -3px;
-   position: relative;
- }
+@@ -51,24 +51,21 @@
  
  /* Toolbar and Toolbar items */
  
  .devtools-toolbar {
    -moz-appearance: none;
-+  -moz-box-align: center;
    padding: 4px 3px;
    box-shadow: 0 1px 0 0 hsla(210, 16%, 76%, .2) inset;
    background: -moz-linear-gradient(top, hsl(210,11%,36%), hsl(210,11%,18%));
@@ -137,7 +133,7 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
    text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
    border: 1px solid hsla(210,8%,5%,.45);
    border-radius: 3px;
-@@ -78,44 +76,58 @@
+@@ -78,44 +75,58 @@
  }
  
  .devtools-toolbarbutton:not([checked=true]):hover:active {
@@ -181,7 +177,8 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
 +.devtools-menulist > .menulist-dropmarker,
  .devtools-toolbarbutton[type=menu] > .toolbarbutton-menu-dropmarker,
  .devtools-toolbarbutton[type=menu-button] > .toolbarbutton-menubutton-dropmarker {
-   -moz-appearance: none!important;
+-  -moz-appearance: none!important;
++  -moz-appearance: none !important;
 +  display: -moz-box;
    list-style-image: url("chrome://browser/skin/devtools/dropmarker.png");
    -moz-box-align: center;
@@ -189,7 +186,7 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
 +  min-width: 16px;
 +  width: 16px;
 +  padding: 0;
-+  border-left: 1px solid hsla(210,8%,5%,.45)!important;
++  border-left: 1px solid hsla(210,8%,5%,.45) !important;
 +  box-shadow: 1px 0 0 hsla(210,16%,76%,.15) inset, -1px 0 0 hsla(210,16%,76%,.15);
 +  height: 22px;
  }
@@ -203,16 +200,12 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
 diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinstripe/devtools/common.css
 --- a/browser/themes/pinstripe/devtools/common.css
 +++ b/browser/themes/pinstripe/devtools/common.css
-@@ -50,27 +50,25 @@
-   margin-bottom: -3px;
-   position: relative;
- }
+@@ -53,75 +53,106 @@
  
  /* Toolbar and Toolbar items */
  
  .devtools-toolbar {
    -moz-appearance: none;
-+  -moz-box-align: center;
    padding: 4px 3px;
    box-shadow: 0 1px 0 0 hsla(210, 16%, 76%, .2) inset;
    background-image: url(background-noise-toolbar.png), -moz-linear-gradient(top, hsl(210,11%,36%), hsl(210,11%,18%));
@@ -233,7 +226,14 @@ diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinst
    text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
    border: 1px solid hsla(210,8%,5%,.45);
    border-radius: @toolbarbuttonCornerRadius@;
-@@ -84,41 +82,55 @@
+   background: -moz-linear-gradient(hsla(212,7%,57%,.35), hsla(212,7%,57%,.1)) padding-box;
+   box-shadow: 0 1px 0 hsla(210,16%,76%,.15) inset, 0 0 0 1px hsla(210,16%,76%,.15) inset, 0 1px 0 hsla(210,16%,76%,.15);
+   padding: 0 1px;
++  margin: 0 3px;
+ }
+ 
+ .devtools-toolbarbutton > .toolbarbutton-text {
+   margin: 1px 6px;
  }
  
  .devtools-toolbarbutton:not([checked=true]):hover:active {
@@ -258,6 +258,10 @@ diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinst
 +  padding: 0;
 +}
 +
++/* Same look for:
++ *  <toolbarbutton type=menu>, <toolbarbutton type=menu-button>, <menulist>
++ */
++
 +.devtools-menulist > .menulist-label-box,
 +.devtools-toolbarbutton[type=menu] > .toolbarbutton-text,
  .devtools-toolbarbutton[type=menu-button] > .toolbarbutton-menubutton-button {
@@ -266,6 +270,7 @@ diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinst
 -  border-width: 0 1px 0 0;
 -  border-right: 1px solid hsla(210,8%,5%,.45);
 -  box-shadow: -1px 0 0 hsla(210,16%,76%,.15) inset, 1px 0 0 hsla(210,16%,76%,.15);
++  -moz-box-orient: horizontal;
    padding: 0 1px;
 +  border: 0;
 +  text-align: center;
@@ -275,21 +280,39 @@ diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinst
  .devtools-toolbarbutton[type=menu] > .toolbarbutton-menu-dropmarker,
  .devtools-toolbarbutton[type=menu-button] > .toolbarbutton-menubutton-dropmarker {
    -moz-appearance: none !important;
++  background: transparent;
 +  display: -moz-box;
    list-style-image: url("chrome://browser/skin/devtools/dropmarker.png");
    -moz-box-align: center;
+-  margin: 0 3px;
 +  -moz-box-pack: center;
 +  min-width: 16px;
 +  width: 16px;
-+  padding: 0;
-+  border-left: 1px solid hsla(210,8%,5%,.45)!important;
-+  box-shadow: 1px 0 0 hsla(210,16%,76%,.15) inset, -1px 0 0 hsla(210,16%,76%,.15);
 +  height: 22px;
-   margin: 0 3px;
++  padding: 0;
++  margin: 0;
++  box-shadow: 1px 0 0 hsla(210,16%,76%,.15) inset, -1px 0 0 hsla(210,16%,76%,.15);
++  -moz-border-left-colors: none;
++
++  /* !important for type=menu */
++  border-width: 0 0 0 1px !important;
++  border-style: solid !important;
++  border-color: hsla(210,8%,5%,.45) !important;
  }
  
++.devtools-menulist:-moz-locale-dir(rtl) > .menulist-dropmarker,
++.devtools-toolbarbutton[type=menu]:-moz-locale-dir(rtl) > .toolbarbutton-menu-dropmarker,
++.devtools-toolbarbutton[type=menu-button]:-moz-locale-dir(rtl) > .toolbarbutton-menubutton-dropmarker {
++  border-width: 0 1px 0 0;
++  -moz-border-right-colors: none;
++}
++
++
  /* Search input */
  
  .devtools-searchinput {
    -moz-appearance: none;
    margin: 0 3px;
+   background-color: transparent;
+   border: 1px solid hsla(210,8%,5%,.6);
+   border-radius: 20px;
