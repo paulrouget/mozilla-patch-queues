@@ -1,11 +1,11 @@
 # HG changeset patch
-# Parent a0e8be430b3ee405329e1b2290a3dc7641f6e8a1
-Bug 717916 - Add an Inspect button to the infobar
+# Parent 6d3ea9ebe8d08d5474e4c0916458404f09893797
+Bug 717916 - Add an Inspect button and a node menu to the infobar
 
 diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlighter.css
 --- a/browser/base/content/highlighter.css
 +++ b/browser/base/content/highlighter.css
-@@ -49,28 +49,48 @@
+@@ -49,28 +49,49 @@
    -moz-transition-timing-function: linear;
  }
  
@@ -44,6 +44,7 @@ diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlig
  
  html|*#highlighter-nodeinfobar-id,
  html|*#highlighter-nodeinfobar-classes,
++html|*#highlighter-nodeinfobar-pseudo-classes,
  html|*#highlighter-nodeinfobar-tagname {
    -moz-user-select: text;
    cursor: text;
@@ -332,7 +333,8 @@ uV<TgClk2*5>pu1v$W4N<B%V2l9$;kPuNGKg&%W<B$W%{PKbLh*2~7Y420teN
 diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
 --- a/browser/themes/gnomestripe/jar.mn
 +++ b/browser/themes/gnomestripe/jar.mn
-@@ -128,16 +128,17 @@ browser.jar:
+@@ -126,16 +126,17 @@ browser.jar:
+   skin/classic/browser/devtools/splitview.css         (devtools/splitview.css)
    skin/classic/browser/devtools/styleeditor.css       (devtools/styleeditor.css)
    skin/classic/browser/devtools/debugger.css          (devtools/debugger.css)
    skin/classic/browser/devtools/magnifying-glass.png  (devtools/magnifying-glass.png)
@@ -340,7 +342,6 @@ diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.
    skin/classic/browser/devtools/itemArrow-rtl.png     (devtools/itemArrow-rtl.png)
    skin/classic/browser/devtools/itemArrow-ltr.png     (devtools/itemArrow-ltr.png)
    skin/classic/browser/devtools/inspect-button.png    (devtools/inspect-button.png)
-   skin/classic/browser/devtools/treepanel-button.png  (devtools/treepanel-button.png)
 +  skin/classic/browser/devtools/dropmarker.png        (devtools/dropmarker.png)
  #ifdef MOZ_SERVICES_SYNC
    skin/classic/browser/sync-16-throbber.png
@@ -466,7 +467,8 @@ uV<TgClk2*5>pu1v$W4N<B%V2l9$;kPuNGKg&%W<B$W%{PKbLh*2~7Y420teN
 diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
 --- a/browser/themes/pinstripe/jar.mn
 +++ b/browser/themes/pinstripe/jar.mn
-@@ -169,16 +169,17 @@ browser.jar:
+@@ -167,16 +167,17 @@ browser.jar:
+   skin/classic/browser/devtools/styleeditor.css             (devtools/styleeditor.css)
    skin/classic/browser/devtools/debugger.css                (devtools/debugger.css)
    skin/classic/browser/devtools/magnifying-glass.png        (devtools/magnifying-glass.png)
    skin/classic/browser/devtools/itemToggle.png              (devtools/itemToggle.png)
@@ -474,7 +476,6 @@ diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
    skin/classic/browser/devtools/itemArrow-ltr.png           (devtools/itemArrow-ltr.png)
    skin/classic/browser/devtools/background-noise-toolbar.png (devtools/background-noise-toolbar.png)
    skin/classic/browser/devtools/inspect-button.png          (devtools/inspect-button.png)
-   skin/classic/browser/devtools/treepanel-button.png        (devtools/treepanel-button.png)
 +  skin/classic/browser/devtools/dropmarker.png              (devtools/dropmarker.png)
  #ifdef MOZ_SERVICES_SYNC
    skin/classic/browser/sync-throbber.png
@@ -600,7 +601,8 @@ uV<TgClk2*5>pu1v$W4N<B%V2l9$;kPuNGKg&%W<B$W%{PKbLh*2~7Y420teN
 diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
 --- a/browser/themes/winstripe/jar.mn
 +++ b/browser/themes/winstripe/jar.mn
-@@ -153,16 +153,17 @@ browser.jar:
+@@ -151,16 +151,17 @@ browser.jar:
+         skin/classic/browser/devtools/splitview.css                 (devtools/splitview.css)
          skin/classic/browser/devtools/styleeditor.css               (devtools/styleeditor.css)
          skin/classic/browser/devtools/debugger.css                  (devtools/debugger.css)
          skin/classic/browser/devtools/magnifying-glass.png          (devtools/magnifying-glass.png)
@@ -608,7 +610,6 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/browser/devtools/itemArrow-rtl.png             (devtools/itemArrow-rtl.png)
          skin/classic/browser/devtools/itemArrow-ltr.png             (devtools/itemArrow-ltr.png)
          skin/classic/browser/devtools/inspect-button.png            (devtools/inspect-button.png)
-         skin/classic/browser/devtools/treepanel-button.png          (devtools/treepanel-button.png)
 +        skin/classic/browser/devtools/dropmarker.png                (devtools/dropmarker.png)
  #ifdef MOZ_SERVICES_SYNC
          skin/classic/browser/sync-throbber.png
@@ -618,7 +619,8 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/browser/sync-bg.png
          skin/classic/browser/sync-desktopIcon.png
          skin/classic/browser/sync-mobileIcon.png
-@@ -326,16 +327,17 @@ browser.jar:
+@@ -322,16 +323,17 @@ browser.jar:
+         skin/classic/aero/browser/devtools/splitview.css             (devtools/splitview.css)
          skin/classic/aero/browser/devtools/styleeditor.css           (devtools/styleeditor.css)
          skin/classic/aero/browser/devtools/debugger.css              (devtools/debugger.css)
          skin/classic/aero/browser/devtools/magnifying-glass.png      (devtools/magnifying-glass.png)
@@ -626,7 +628,6 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/aero/browser/devtools/itemArrow-rtl.png         (devtools/itemArrow-rtl.png)
          skin/classic/aero/browser/devtools/itemArrow-ltr.png         (devtools/itemArrow-ltr.png)
          skin/classic/aero/browser/devtools/inspect-button.png        (devtools/inspect-button.png)
-         skin/classic/aero/browser/devtools/treepanel-button.png      (devtools/treepanel-button.png)
 +        skin/classic/aero/browser/devtools/dropmarker.png            (devtools/dropmarker.png)
  #ifdef MOZ_SERVICES_SYNC
          skin/classic/aero/browser/sync-throbber.png

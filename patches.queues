@@ -1,9 +1,5 @@
-global-dev-toolbar
-infobar-v2
 inspector-toolbar-v2
-layout-stuff
 node-picker
+reviews
+ruleview-stuff
 style-editor-css-nits
-webconsole-style
-sandbox
-debugger

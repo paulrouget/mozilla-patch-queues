@@ -1,11 +1,11 @@
 # HG changeset patch
-# Parent 5724c5ba0f84ef3e2928717e7900c9e11e3d1c13
+# Parent 5d523da125b07fa072b9185bb2570318ac71a17f
 Bug 717923 - Use an icon for the inspect button
 
 diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
 --- a/browser/base/content/browser.xul
 +++ b/browser/base/content/browser.xul
-@@ -998,18 +998,17 @@
+@@ -998,18 +998,16 @@
               hidden="true">
  #ifdef XP_MACOSX
        <toolbarbutton id="highlighter-closebutton"
@@ -16,7 +16,6 @@ diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
                       class="devtools-toolbarbutton"
 -                     label="&inspectButton.label;"
 -                     accesskey="&inspectButton.accesskey;"
-+                     tooltiptext="&inspectButton.tooltiptext;"
                       command="Inspector:Inspect"/>
        <toolbarbutton id="inspector-treepanel-toolbutton"
                       class="devtools-toolbarbutton"
@@ -41,10 +40,39 @@ diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlig
 +.devtools-toolbarbutton:not([label]) > .toolbarbutton-text {
 +  display: none;
 +}
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -99,16 +99,25 @@ function InspectorUI(aWindow)
+ {
+   this.chromeWin = aWindow;
+   this.chromeDoc = aWindow.document;
+   this.tabbrowser = aWindow.gBrowser;
+   this.tools = {};
+   this.toolEvents = {};
+   this.store = new InspectorStore();
+   this.INSPECTOR_NOTIFICATIONS = INSPECTOR_NOTIFICATIONS;
++
++  // Set the tooltip of the inspect button.
++  let keysbundle = Services.strings.createBundle(
++    "chrome://global/locale/keys.properties");
++  let returnString = keysbundle.GetStringFromName("VK_RETURN");
++  let tooltip = this.strings.formatStringFromName("inspectButton.tooltiptext",
++    [returnString], 1);
++  let button = this.chromeDoc.getElementById("inspector-inspect-toolbutton");
++  button.setAttribute("tooltiptext", tooltip);
+ }
+ 
+ InspectorUI.prototype = {
+   browser: null,
+   tools: null,
+   toolEvents: null,
+   inspecting: false,
+   ruleViewEnabled: true,
 diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/en-US/chrome/browser/browser.dtd
 --- a/browser/locales/en-US/chrome/browser/browser.dtd
 +++ b/browser/locales/en-US/chrome/browser/browser.dtd
-@@ -208,18 +208,17 @@ can reach it easily. -->
+@@ -208,18 +208,16 @@ can reach it easily. -->
    -  "Scratchpad" in your locale. You should feel free to find a close
    -  approximation to it or choose a word (or words) that means
    -  "simple discardable text editor". -->
@@ -55,7 +83,6 @@ diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/
  
 -<!ENTITY inspectButton.label            "Inspect">
 -<!ENTITY inspectButton.accesskey        "I">
-+<!ENTITY inspectButton.tooltiptext      "Inspect">
  <!ENTITY inspectCloseButton.tooltiptext "Close Inspector">
  
  <!ENTITY inspectorHTMLCopyInner.label       "Copy Inner HTML">
@@ -64,6 +91,25 @@ diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/
  <!ENTITY inspectorHTMLCopyOuter.label       "Copy Outer HTML">
  <!ENTITY inspectorHTMLCopyOuter.accesskey   "O">
  
+diff --git a/browser/locales/en-US/chrome/browser/devtools/inspector.properties b/browser/locales/en-US/chrome/browser/devtools/inspector.properties
+--- a/browser/locales/en-US/chrome/browser/devtools/inspector.properties
++++ b/browser/locales/en-US/chrome/browser/devtools/inspector.properties
+@@ -20,8 +20,15 @@ breadcrumbs.siblings=Siblings
+ # LOCALIZATION NOTE (htmlPanel): Used in the Inspector tool's openInspectorUI
+ # method when registering the HTML panel.
+ 
+ # LOCALIZATION NOTE (ruleView.*): Button label, accesskey and tooltip text
+ # associated with the Highlighter's CSS Rule View in the Style Sidebar.
+ ruleView.label=Rules
+ ruleView.accesskey=R
+ ruleView.tooltiptext=View and Edit CSS
++
++# LOCALIZATION NOTE (inspectButton.tooltiptext):
++# This button appears in the Inspector Toolbar. inspectButton is stateful,
++# if it's pressed users can select an element with the mouse. Pressing the
++# "Return" key # changes that state. %S is the keyboard shortcut (VK_RETURN in
++# chrome://global/locale/keys.properties).
++inspectButton.tooltiptext=Select element with mouse (%S)
 diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
 --- a/browser/themes/gnomestripe/browser.css
 +++ b/browser/themes/gnomestripe/browser.css
@@ -202,7 +248,7 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
 diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinstripe/devtools/common.css
 --- a/browser/themes/pinstripe/devtools/common.css
 +++ b/browser/themes/pinstripe/devtools/common.css
-@@ -57,16 +57,24 @@
+@@ -57,16 +57,20 @@
    background: -moz-linear-gradient(hsla(212,7%,57%,.35), hsla(212,7%,57%,.1)) padding-box;
    box-shadow: 0 1px 0 hsla(210,16%,76%,.15) inset, 0 0 0 1px hsla(210,16%,76%,.15) inset, 0 1px 0 hsla(210,16%,76%,.15);
  }
@@ -213,10 +259,6 @@ diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinst
  
 +.devtools-toolbarbutton:not([label]) {
 +  min-width: 32px;
-+}
-+
-+.devtools-toolbarbutton:not([label]) > .toolbarbutton-text {
-+  display: none;
 +}
 +
  .devtools-toolbarbutton:not([checked]):hover:active {
@@ -312,7 +354,7 @@ diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/bro
 diff --git a/browser/themes/winstripe/devtools/common.css b/browser/themes/winstripe/devtools/common.css
 --- a/browser/themes/winstripe/devtools/common.css
 +++ b/browser/themes/winstripe/devtools/common.css
-@@ -56,16 +56,24 @@
+@@ -56,16 +56,20 @@
    box-shadow: 0 1px 0 hsla(209,29%,72%,.15) inset, 0 0 0 1px hsla(209,29%,72%,.1) inset, 0 0 0 1px hsla(209,29%,72%,.1), 0 1px 0 hsla(210,16%,76%,.1);
    -moz-margin-end: 3px;
  }
@@ -323,10 +365,6 @@ diff --git a/browser/themes/winstripe/devtools/common.css b/browser/themes/winst
  
 +.devtools-toolbarbutton:not([label]) {
 +  min-width: 32px;
-+}
-+
-+.devtools-toolbarbutton:not([label]) > .toolbarbutton-text {
-+  display: none;
 +}
 +
  .devtools-toolbarbutton:not([checked]):hover:active {

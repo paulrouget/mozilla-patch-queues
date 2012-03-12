@@ -1,16 +1,16 @@
 # HG changeset patch
-# Parent e55cb408e71bfce18828ab3cc16ea07558d9dc0c
+# Parent c3ed4660987edfab7d70b2796eff23628bf5a304
 Bug 717922 - In the PageInspector toolbar, move the HTML Tree button in front of the breadcrumbs display
 
 diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
 --- a/browser/base/content/browser.xul
 +++ b/browser/base/content/browser.xul
-@@ -1002,18 +1002,16 @@
+@@ -1001,18 +1001,16 @@
+                      oncommand="InspectorUI.closeInspectorUI(false);"
                       tooltiptext="&inspectCloseButton.tooltiptext;"/>
  #endif
        <toolbarbutton id="inspector-inspect-toolbutton"
                       class="devtools-toolbarbutton"
-                      tooltiptext="&inspectButton.tooltiptext;"
                       command="Inspector:Inspect"/>
        <toolbarbutton id="inspector-treepanel-toolbutton"
                       class="devtools-toolbarbutton"
@@ -27,7 +27,7 @@ diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
 diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
 --- a/browser/devtools/highlighter/inspector.jsm
 +++ b/browser/devtools/highlighter/inspector.jsm
-@@ -1762,16 +1762,32 @@ HTMLBreadcrumbs.prototype = {
+@@ -1771,16 +1771,32 @@ HTMLBreadcrumbs.prototype = {
  
      // Siblings menu
      this.menu = this.IUI.chromeDoc.createElement("menupopup");
@@ -60,7 +60,7 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
        button.removeAttribute("siblings-menu-open");
      }).bind(this), false);
    },
-@@ -1939,16 +1955,20 @@ HTMLBreadcrumbs.prototype = {
+@@ -1948,16 +1964,20 @@ HTMLBreadcrumbs.prototype = {
      }
    },
  
@@ -84,7 +84,7 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
 diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/en-US/chrome/browser/browser.dtd
 --- a/browser/locales/en-US/chrome/browser/browser.dtd
 +++ b/browser/locales/en-US/chrome/browser/browser.dtd
-@@ -602,19 +602,11 @@ just addresses the organization to follo
+@@ -601,19 +601,11 @@ just addresses the organization to follo
  <!ENTITY syncSetup.accesskey          "Y">
  <!ENTITY syncSyncNowItem.label        "Sync Now">
  <!ENTITY syncSyncNowItem.accesskey    "S">
