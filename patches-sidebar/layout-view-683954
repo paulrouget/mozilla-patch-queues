@@ -1,12 +1,14 @@
+# vim: se ft=diff :
 # HG changeset patch
-# Parent 65949c2558efd76c475d38a38b6e4e81bbafe98e
+# Parent c95282a997af8014a5bfd8a9b7b1205db688943c
+# User Paul Rouget <paul@mozilla.com>
+# Date 1331559596 -3600
 Bug 683954 - [Layout] Implement an abstract view of the layout of the selected node
 
 diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
 --- a/browser/app/profile/firefox.js
 +++ b/browser/app/profile/firefox.js
-@@ -1035,16 +1035,20 @@ pref("services.sync.prefs.sync.xpinstall
- pref("devtools.errorconsole.enabled", false);
+@@ -1038,16 +1038,20 @@ pref("devtools.errorconsole.enabled", fa
  
  // Enable the Inspector
  pref("devtools.inspector.enabled", true);
@@ -14,11 +16,11 @@ diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
  pref("devtools.inspector.htmlPanelOpen", false);
  pref("devtools.inspector.sidebarOpen", false);
  pref("devtools.inspector.activeSidebar", "ruleview");
-+pref("devtools.inspector.layoutViewOpen", false);
-+
+ 
 +// Enable the Layout View
 +pref("devtools.layoutview.enabled", false);
- 
++pref("devtools.layoutview.open", false);
++
  // Enable the Debugger
  pref("devtools.debugger.enabled", false);
  
@@ -26,57 +28,11 @@ diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
  pref("devtools.debugger.ui.height", 250);
  
  // Enable the style inspector
-diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browser-sets.inc
---- a/browser/base/content/browser-sets.inc
-+++ b/browser/base/content/browser-sets.inc
-@@ -157,16 +157,18 @@
-     <command id="Inspector:HTMLPanel"
-              oncommand="InspectorUI.toggleHTMLPanel();"/>
-     <command id="Inspector:CopyInner"
-              oncommand="InspectorUI.copyInnerHTML();"/>
-     <command id="Inspector:CopyOuter"
-              oncommand="InspectorUI.copyOuterHTML();"/>
-     <command id="Inspector:DeleteNode"
-              oncommand="InspectorUI.deleteNode();"/>
-+    <command id="Inspector:LayoutView"
-+             oncommand="InspectorUI.toggleLayoutView();"/>
-   </commandset>
- 
-   <broadcasterset id="mainBroadcasterSet">
-     <broadcaster id="viewBookmarksSidebar" autoCheck="false" label="&bookmarksButton.label;"
-                  type="checkbox" group="sidebar" sidebarurl="chrome://browser/content/bookmarks/bookmarksPanel.xul"
-                  oncommand="toggleSidebar('viewBookmarksSidebar');"/>
- 
-     <!-- for both places and non-places, the sidebar lives at
-diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
---- a/browser/base/content/browser.xul
-+++ b/browser/base/content/browser.xul
-@@ -1025,16 +1025,21 @@
-                        tabindex="0"
-                        command="Inspector:Tilt"/>
-         <toolbarbutton id="inspector-style-button"
-                        class="devtools-toolbarbutton"
-                        label="&inspectStyleButton.label;"
-                        accesskey="&inspectStyleButton.accesskey;"
-                        tabindex="0"
-                        command="Inspector:Sidebar"/>
-+        <toolbarbutton id="inspector-layout-button"
-+                       hidden="true"
-+                       class="devtools-toolbarbutton"
-+                       tooltiptext="&layoutView.tooltip;"
-+                       command="Inspector:LayoutView"/>
-         <!-- registered tools go here -->
-       </hbox>
- #ifndef XP_MACOSX
-       <toolbarbutton id="highlighter-closebutton"
-                      oncommand="InspectorUI.closeInspectorUI(false);"
-                      tooltiptext="&inspectCloseButton.tooltiptext;"/>
- #endif
-     </toolbar>
+ pref("devtools.styleinspector.enabled", true);
 diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlighter.css
 --- a/browser/base/content/highlighter.css
 +++ b/browser/base/content/highlighter.css
-@@ -86,8 +86,13 @@ html|*#highlighter-nodeinfobar-tagname {
+@@ -95,8 +95,20 @@ html|*#highlighter-nodeinfobar-tagname {
  
  html|*#highlighter-nodeinfobar-tagname {
    text-transform: lowercase;
@@ -86,9 +42,16 @@ diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlig
    display: none;
  }
 +
-+#inspector-layoutview-panel > iframe {
-+  width: 240px;
-+  height: 155px;
++#inspector-layoutview-container > iframe {
++  -moz-transition-property: height;
++  -moz-transition-duration: 0.1s;
++  /* header size */
++  height: 22px;
++}
++
++#inspector-layoutview-container > iframe[open] {
++  /* header size + layout view size: 22px + 155px */
++  height: 177px;
 +}
 diff --git a/browser/devtools/Makefile.in b/browser/devtools/Makefile.in
 --- a/browser/devtools/Makefile.in
@@ -107,102 +70,19 @@ diff --git a/browser/devtools/Makefile.in b/browser/devtools/Makefile.in
    $(NULL)
  
  include $(topsrcdir)/config/rules.mk
-diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/highlighter/highlighter.jsm
---- a/browser/devtools/highlighter/highlighter.jsm
-+++ b/browser/devtools/highlighter/highlighter.jsm
-@@ -238,27 +238,27 @@ Highlighter.prototype = {
- 
-     if (oldNode !== this.node) {
-       this.updateInfobar();
-     }
- 
-     this.invalidateSize(!!aScroll);
- 
-     if (oldNode !== this.node) {
--      this.emitEvent("nodeselected");
-+      this.emitEvent("nodeselected", [this.node]);
-     }
-   },
- 
-   /**
-    * Notify that a pseudo-class lock was toggled on the highlighted element
-    *
-    * @param aPseudo - The pseudo-class to toggle, e.g. ":hover".
-    */
-   pseudoClassLockToggled: function Highlighter_pseudoClassLockToggled(aPseudo)
--  {  
-+  {
-     this.emitEvent("pseudoclasstoggled", [aPseudo]);
-     this.updateInfobar();
-   },
- 
-   /**
-    * Update the highlighter size and position.
-    */
-   invalidateSize: function Highlighter_invalidateSize(aScroll)
-@@ -461,20 +461,20 @@ Highlighter.prototype = {
-     let tagNameLabel = this.chromeDoc.createElementNS("http://www.w3.org/1999/xhtml", "span");
-     tagNameLabel.id = "highlighter-nodeinfobar-tagname";
- 
-     let idLabel = this.chromeDoc.createElementNS("http://www.w3.org/1999/xhtml", "span");
-     idLabel.id = "highlighter-nodeinfobar-id";
- 
-     let classesBox = this.chromeDoc.createElementNS("http://www.w3.org/1999/xhtml", "span");
-     classesBox.id = "highlighter-nodeinfobar-classes";
--    
-+
-     let pseudoClassesBox = this.chromeDoc.createElementNS("http://www.w3.org/1999/xhtml", "span");
-     pseudoClassesBox.id = "highlighter-nodeinfobar-pseudo-classes";
--    
-+
-     // Add some content to force a better boundingClientRect down below.
-     pseudoClassesBox.textContent = "&nbsp;";
- 
-     nodeInfobar.appendChild(tagNameLabel);
-     nodeInfobar.appendChild(idLabel);
-     nodeInfobar.appendChild(classesBox);
-     nodeInfobar.appendChild(pseudoClassesBox);
-     container.appendChild(arrowBoxTop);
-@@ -506,23 +506,23 @@ Highlighter.prototype = {
-    */
-   openPseudoClassMenu: function Highlighter_openPseudoClassMenu()
-   {
-     let menu = this.chromeDoc.createElement("menupopup");
-     menu.id = "infobar-context-menu";
- 
-     let popupSet = this.chromeDoc.getElementById("mainPopupSet");
-     popupSet.appendChild(menu);
--    
-+
-     let fragment = this.buildPseudoClassMenu();
-     menu.appendChild(fragment);
- 
-     menu.openPopup(this.nodeInfo.pseudoClassesBox, "end_before", 0, 0, true, false);
--  },  
--  
-+  },
-+
-   /**
-    * Create the menuitems for toggling the selection's pseudo-class state
-    *
-    * @returns DocumentFragment. The menuitems for toggling pseudo-classes.
-    */
-   buildPseudoClassMenu: function IUI_buildPseudoClassesMenu()
-   {
-     let fragment = this.chromeDoc.createDocumentFragment();
 diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
 --- a/browser/devtools/highlighter/inspector.jsm
 +++ b/browser/devtools/highlighter/inspector.jsm
-@@ -50,16 +50,17 @@ const Cr = Components.results;
+@@ -51,16 +51,17 @@ const Ci = Components.interfaces;
+ const Cr = Components.results;
  
  var EXPORTED_SYMBOLS = ["InspectorUI"];
  
  Cu.import("resource://gre/modules/Services.jsm");
  Cu.import("resource://gre/modules/XPCOMUtils.jsm");
  Cu.import("resource:///modules/TreePanel.jsm");
- Cu.import("resource:///modules/devtools/CssRuleView.jsm");
  Cu.import("resource:///modules/highlighter.jsm");
-+Cu.import("resource:///modules/LayoutView.jsm");
++Cu.import("resource:///modules/devtools/LayoutView.jsm");
  Cu.import("resource:///modules/devtools/LayoutHelpers.jsm");
  
  // Inspector notifications dispatched through the nsIObserverService.
@@ -211,106 +91,64 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
    // screen.
    OPENED: "inspector-opened",
  
-@@ -272,16 +273,32 @@ InspectorUI.prototype = {
-     } else {
-       this.treePanel.open();
-       Services.prefs.setBoolPref("devtools.inspector.htmlPanelOpen", true);
-       this.store.setValue(this.winID, "htmlPanelOpen", true);
-     }
-   },
+@@ -1411,16 +1412,22 @@ function InspectorStyleSidebar(aOptions)
  
-   /**
-+   * Toggle the LayoutView.
-+   */
-+  toggleLayoutView: function IUI_toggleLayoutView()
-+  {
-+    if (this.layoutview.isOpen()) {
-+      this.layoutview.close();
-+      Services.prefs.setBoolPref("devtools.inspector.layoutViewOpen", false);
-+      this.store.setValue(this.winID, "layoutViewOpen", false);
-+    } else {
-+      this.layoutview.open();
-+      Services.prefs.setBoolPref("devtools.inspector.layoutViewOpen", true);
-+      this.store.setValue(this.winID, "layoutViewOpen", true);
-+    }
-+  },
-+
-+  /**
-    * Is the inspector UI open? Simply check if the toolbar is visible or not.
-    *
-    * @returns boolean
-    */
-   get isInspectorOpen()
+ InspectorStyleSidebar.prototype = {
+ 
+   get visible() !this._box.hasAttribute("hidden"),
+   get activePanel() this._deck.selectedPanel._toolID,
+ 
+   destroy: function ISS_destroy()
    {
-     return this.toolbar && !this.toolbar.hidden && this.highlighter;
-   },
-@@ -440,16 +457,19 @@ InspectorUI.prototype = {
-         Services.prefs.getBoolPref("devtools.inspector.htmlPanelOpen"));
- 
-       this.store.setValue(this.winID, "sidebarOpen",
-         Services.prefs.getBoolPref("devtools.inspector.sidebarOpen"));
- 
-       this.store.setValue(this.winID, "activeSidebar",
-         Services.prefs.getCharPref("devtools.inspector.activeSidebar"));
- 
-+      this.store.setValue(this.winID, "layoutViewOpen",
-+        Services.prefs.getBoolPref("devtools.inspector.layoutViewOpen"));
++    // close the Layout View
++    if (this._layoutview) {
++      this._layoutview.destroy();
++      this._layoutview = null;
++    }
 +
-       this.win.addEventListener("pagehide", this, true);
+     for each (let toolID in Object.getOwnPropertyNames(this._tools)) {
+       this.removeTool(toolID);
      }
+     delete this._tools;
+     this._teardown();
    },
  
    /**
-    * Browse nodes according to the breadcrumbs layout, only for some specific
-    * elements of the UI.
+@@ -1520,20 +1527,29 @@ InspectorStyleSidebar.prototype = {
+     this._box.removeAttribute("hidden");
+     this._splitter.removeAttribute("hidden");
+     this._toggleButton.checked = true;
+ 
+     this._showDefault();
+ 
+     this._inspector._setStoreValue("sidebarOpen", true);
+     Services.prefs.setBoolPref("devtools.inspector.sidebarOpen", true);
++
++    // Instantiate the Layout View if needed.
++    if (Services.prefs.getBoolPref("devtools.layoutview.enabled")
++        && !this._layoutview) {
++      this._layoutview = new LayoutView({
++        document: this._chromeDoc,
++        inspector: this._inspector,
++      });
++    }
+   },
+ 
+   /**
+-   * Hides the sidebar, updating the stored visiblity pref.
++   * Hides the sidebar, updating the stored visibility pref.
     */
-@@ -493,16 +513,21 @@ InspectorUI.prototype = {
+   hide: function ISS_hide()
    {
-     // if currently editing an attribute value, closing the
-     // highlighter/HTML panel dismisses the editor
-     if (this.treePanel && this.treePanel.editingContext)
-       this.treePanel.closeEditor();
- 
-     this.treePanel.destroy();
- 
-+    if (this.layoutview) {
-+      this.layoutview.destroy()
-+      this.layoutview = null;
-+    }
-+
-     if (this.closing || !this.win || !this.browser) {
-       return;
-     }
- 
-     let winId = new String(this.winID); // retain this to notify observers.
- 
-     this.closing = true;
-     this.toolbar.hidden = true;
-@@ -736,16 +761,20 @@ InspectorUI.prototype = {
-     if (this.store.getValue(this.winID, "htmlPanelOpen")) {
-       this.treePanel.open();
-     }
- 
-     if (this.store.getValue(this.winID, "sidebarOpen")) {
-       this.showSidebar();
-     }
- 
-+    if (this.layoutview && this.store.getValue(this.winID, "layoutViewOpen")) {
-+      this.layoutview.open();
-+    }
-+
-     Services.obs.notifyObservers({wrappedJSObject: this},
-                                  INSPECTOR_NOTIFICATIONS.OPENED, null);
+     this._teardown();
+     this._inspector._setStoreValue("sidebarOpen", false);
+     Services.prefs.setBoolPref("devtools.inspector.sidebarOpen", false);
    },
  
-   /**
-    * Main callback handler for events.
-    *
-    * @param event
 diff --git a/browser/devtools/jar.mn b/browser/devtools/jar.mn
 --- a/browser/devtools/jar.mn
 +++ b/browser/devtools/jar.mn
-@@ -4,15 +4,16 @@ browser.jar:
+@@ -4,14 +4,15 @@ browser.jar:
  *   content/browser/scratchpad.xul                (scratchpad/scratchpad.xul)
      content/browser/scratchpad.js                 (scratchpad/scratchpad.js)
      content/browser/splitview.css                 (shared/splitview.css)
@@ -319,19 +157,18 @@ diff --git a/browser/devtools/jar.mn b/browser/devtools/jar.mn
      content/browser/devtools/csshtmltree.xul      (styleinspector/csshtmltree.xul)
      content/browser/devtools/cssruleview.xul      (styleinspector/cssruleview.xul)
      content/browser/devtools/styleinspector.css   (styleinspector/styleinspector.css)
-+*   content/browser/devtools/layoutview/view.html (layoutview/view.html)
++*   content/browser/devtools/layoutview/view.xhtml  (layoutview/view.xhtml)
      content/browser/orion.js                      (sourceeditor/orion/orion.js)
  *   content/browser/source-editor-overlay.xul     (sourceeditor/source-editor-overlay.xul)
  *   content/browser/debugger.xul                  (debugger/debugger.xul)
      content/browser/debugger.css                  (debugger/debugger.css)
-     content/browser/debugger.js                   (debugger/debugger.js)
+     content/browser/debugger-controller.js        (debugger/debugger-controller.js)
      content/browser/debugger-view.js              (debugger/debugger-view.js)
- 
 diff --git a/browser/devtools/layoutview/LayoutView.jsm b/browser/devtools/layoutview/LayoutView.jsm
 new file mode 100644
 --- /dev/null
 +++ b/browser/devtools/layoutview/LayoutView.jsm
-@@ -0,0 +1,230 @@
+@@ -0,0 +1,319 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 +/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 +/* ***** BEGIN LICENSE BLOCK *****
@@ -373,37 +210,71 @@ new file mode 100644
 +
 +"use strict";
 +
-+var EXPORTED_SYMBOLS = ["LayoutView"];
-+
 +const Cu = Components.utils;
++Cu.import("resource://gre/modules/Services.jsm");
++Cu.import("resource:///modules/inspector.jsm");
 +Cu.import("resource:///modules/devtools/LayoutHelpers.jsm");
 +
-+function LayoutView(aIUI)
-+{
-+  this.chromeDoc = aIUI.chromeWin.document;
-+  this.browser = aIUI.chromeWin.gBrowser;
-+  this.highlighter = aIUI.highlighter;
++var EXPORTED_SYMBOLS = ["LayoutView"];
 +
-+  this._init();
++function LayoutView(aOptions)
++{
++  this.chromeDoc = aOptions.document;
++  this.inspector = aOptions.inspector;
++  this.browser = this.inspector.chromeWindow.gBrowser;
++
++  this.init();
 +}
 +
 +LayoutView.prototype = {
-+  _init: function LV__init() {
-+    this.button = this.chromeDoc.getElementById("inspector-layout-button");
++  init: function LV_init() {
 +
 +    this.update = this.update.bind(this);
-+    this.onPopupShown = this.onPopupShown.bind(this);
-+    this.onPopupHiding = this.onPopupHiding.bind(this);
-+    this.onDocumentReady = this.onDocumentReady.bind(this);
++    this.onMessage = this.onMessage.bind(this);
 +
-+    this._isOpen = false;
++    this.isOpen = false;
 +    this.documentReady = false;
 +
-+    this.highlighter.addListener("nodeselected", this.update);
-+    this.browser.addEventListener("MozAfterPaint", this.update, true);
++    // Is the layout view was open before?
++    // If there's nothing in the store, then it's the first time
++    // it is open, we fallback to the preference.
++    if (this.inspector._getStoreValue("layoutview-is-open") == null) {
++      this.inspector._setStoreValue("layoutview-is-open",
++        Services.prefs.getBoolPref("devtools.layoutview.open"));
++    }
++
++    // We update the values when:
++    //  a node is locked
++    //  we get the MozAfterPaint event and the node is locked
++    function onLock() {
++      this.undim();
++      this.update();
++      // We make sure we never add 2 listeners.
++      if (!this.trackingPaint) {
++        this.browser.addEventListener("MozAfterPaint", this.update, true);
++        this.trackingPaint = true;
++      }
++    }
++
++    function onUnlock() {
++      this.browser.removeEventListener("MozAfterPaint", this.update, true);
++      this.trackingPaint = false;
++      this.dim();
++    }
++
++    this.onLock = onLock.bind(this);
++    this.onUnlock = onUnlock.bind(this);
++    this.inspector.on("locked", this.onLock);
++    this.inspector.on("unlocked", this.onUnlock);
++
++    // Build the layout view in the sidebar.
++    this.buildView();
++
++    // Get messages from the iframe.
++    this.inspector.chromeWindow.addEventListener("message", this.onMessage, true);
 +
 +    // Store for the different dimensions of the node.
-+    // 'selector' refers to the element that holds the value in view.html;
++    // 'selector' refers to the element that holds the value in view.xhtml;
 +    // 'property' is what we are measuring;
 +    // 'value' is the computed dimension, computed in update().
 +    this.map = {
@@ -444,112 +315,167 @@ new file mode 100644
 +                  property: "border-right-width",
 +                  value: undefined},
 +    };
-+
-+    this.buildPanel();
 +  },
 +
 +  /**
 +   * Destroy the nodes. Remove listeners.
 +   */
 +  destroy: function LV_destroy() {
-+    this.close();
-+
-+    this.iframe = null;
-+    this.button.removeAttribute("label");
-+    this.button = null;
-+    this.highlighter.removeListener("nodeselected", this.update);
++    this.inspector.removeListener("locked", this.onLock);
++    this.inspector.removeListener("unlocked", this.onUnlock);
 +    this.browser.removeEventListener("MozAfterPaint", this.update, true);
-+    this.panel.removeEventListener("popupshown", this.onPopupShown, true);
-+    this.panel.removeEventListener("popuphiding", this.onPopupHiding, true);
-+    this.panel.parentNode.removeChild(this.panel);
++    this.inspector.chromeWindow.removeEventListener("message", this.onMessage, true);
++    this.close();
++    this.iframe = null;
++    this.view.parentNode.removeChild(this.view);
 +  },
 +
 +  /**
-+   * Build the panel (temporary solution. See bug 674887):
++   * Build the Layout container:
 +   *
-+   * <panel id="inspector-layoutview-panel"
-+   *        noautofocus="true"
-+   *        noautofocus="true"
-+   *        type="arrow"
-+   *        position="before_end">
-+   *  <iframe src="chrome://browser/content/devtools/layoutview/view.html"/>
-+   * </panel>
++   * <vbox id="inspector-layoutview-container">
++   *  <iframe src="chrome://browser/content/devtools/layoutview/view.xhtml"/>
++   * </vbox>
 +   */
-+  buildPanel: function LV_buildPanel() {
-+    let popupset = this.chromeDoc.getElementById("mainPopupSet");
-+
++  buildView: function LV_buildPanel() {
 +    this.iframe = this.chromeDoc.createElement("iframe");
-+    this.iframe.setAttribute("src", "chrome://browser/content/devtools/layoutview/view.html");
-+    this.iframe.setAttribute("style", "width: 240px; height: 155px");
++    this.iframe.setAttribute("src", "chrome://browser/content/devtools/layoutview/view.xhtml");
 +
-+    this.iframe.addEventListener("DOMContentLoaded", this.onDocumentReady, true);
++    this.view = this.chromeDoc.createElement("vbox");
++    this.view.id = "inspector-layoutview-container";
++    this.view.appendChild(this.iframe);
 +
-+    this.panel = this.chromeDoc.createElement("panel");
-+    this.panel.setAttribute("noautofocus", true);
-+    this.panel.setAttribute("noautohide", true);
-+    this.panel.setAttribute("type", "arrow");
-+    this.panel.setAttribute("position", "before_end");
-+    this.panel.appendChild(this.iframe);
-+
-+    this.panel.addEventListener("popupshown", this.onPopupShown, true);
-+    this.panel.addEventListener("popuphiding", this.onPopupHiding, true);
-+
-+    popupset.appendChild(this.panel);
++    let sidebar = this.chromeDoc.getElementById("devtools-sidebar-box");
++    sidebar.appendChild(this.view);
 +  },
 +
-+  onDocumentReady: function LV_onDocumentReady () {
++  /**
++   * Called when the iframe is loaded.
++   */
++  onDocumentReady: function LV_onDocumentReady() {
 +    this.documentReady = true;
++    this.doc = this.iframe.contentDocument;
++
++    // We can't do that earlier because open() and close() need to do stuff
++    // inside the iframe.
++
++    if (this.inspector.locked)
++      this.onLock();
++    else
++      this.onUnlock();
++
++    if (this.inspector._getStoreValue("layoutview-is-open")) {
++      this.open();
++    } else {
++      this.close();
++    }
++
++  },
++
++  /**
++   * This is where we get messages from the layout view iframe.
++   */
++  onMessage: function LV_onMessage(e) {
++    switch (e.data) {
++      case "layoutview-toggle-view":
++        this.toggle(true);
++        break;
++      case "layoutview-ready":
++        this.onDocumentReady();
++        break;
++      default:
++        break;
++    }
++  },
++
++  /**
++   * Open the view container.
++   *
++   * @param aUserAction Is the action triggered by the user (click on the
++   * open/close button in the view)
++   */
++  open: function LV_open(aUserAction) {
++    this.isOpen = true;
++    if (this.documentReady)
++      this.doc.body.classList.add("open");
++    if (aUserAction) {
++      this.inspector._setStoreValue("layoutview-is-open", true);
++      Services.prefs.setBoolPref("devtools.layoutview.open", true);
++    }
++    this.iframe.setAttribute("open", "true");
 +    this.update();
 +  },
 +
-+  onPopupShown: function LV_onPopupShown () {
-+    this._isOpen = true;
-+    this.button.setAttribute("checked", true);
-+    this.update();
++  /**
++   * Close the view container.
++   *
++   * @param aUserAction Is the action triggered by the user (click on the
++   * open/close button in the view)
++   */
++  close: function LV_close(aUserAction) {
++    this.isOpen = false;
++    if (this.documentReady)
++      this.doc.body.classList.remove("open");
++    if (aUserAction) {
++      this.inspector._setStoreValue("layoutview-is-open", false);
++      Services.prefs.setBoolPref("devtools.layoutview.open", false);
++    }
++    this.iframe.removeAttribute("open");
 +  },
 +
-+  onPopupHiding: function LV_onPopupHiding () {
-+    this._isOpen = false;
-+    this.button.removeAttribute("checked");
++  /**
++   * Toggle view container state (open/close).
++   *
++   * @param aUserAction Is the action triggered by the user (click on the
++   * open/close button in the view)
++   */
++  toggle: function LV_toggle(aUserAction) {
++    this.isOpen ? this.close(aUserAction):this.open(aUserAction);
 +  },
 +
-+  isOpen: function LV_isOpen() {
-+    return this._isOpen;
++  /**
++   * Hide the layout boxes. No node are selected.
++   */
++  dim: function LV_dim() {
++    if (!this.documentReady) return;
++    this.doc.body.classList.add("dim");
 +  },
 +
-+  open: function LV_open() {
-+    this.panel.openPopup(this.button);
-+  },
-+
-+  close: function LV_close() {
-+    this.panel.hidePopup();
++  /**
++   * Show the layout boxes. A node is selected.
++   */
++  undim: function LV_dim() {
++    if (!this.documentReady) return;
++    this.doc.body.classList.remove("dim");
 +  },
 +
 +  /**
 +   * Compute the dimensions of the node and update the values in
-+   * the layoutview/view.html document.
++   * the layoutview/view.xhtml document.
 +   */
 +  update: function LV_update() {
-+    let node = this.highlighter.node;
-+    let clientRect = node.getBoundingClientRect();
++    let node = this.inspector.selection;
++    if (!node || !this.documentReady) return;
 +
++    // First, we update the first part of the layout view, with
++    // the size of the element.
++
++    let clientRect = node.getBoundingClientRect();
 +    let width = Math.round(clientRect.width);
 +    let height = Math.round(clientRect.height);
++    this.doc.querySelector("#element-size").textContent =  width + "x" + height;
 +
-+    this.button.setAttribute("label", width + "x" + height);
++    // If the view is closed, no need to do anything more.
++    if (!this.isOpen) return;
 +
-+    if (!this.isOpen() || !this.documentReady) return;
-+
-+    let doc = this.iframe.contentDocument;
-+    let win = this.iframe.contentWindow;
-+
-+    let style = win.getComputedStyle(node);
++    // We compute and update the values of margins & co.
++    let style = this.browser.contentWindow.getComputedStyle(node);;
 +
 +    for (let i in this.map) {
 +      let selector = this.map[i].selector;
 +      let property = this.map[i].property;
 +      this.map[i].value = parseInt(style.getPropertyValue(property));
-+      let span = doc.querySelector(selector);
++      let span = this.doc.querySelector(selector);
 +      span.textContent = this.map[i].value;
 +    }
 +
@@ -559,14 +485,14 @@ new file mode 100644
 +    height -= this.map.borderTop.value + this.map.borderBottom.value +
 +              this.map.paddingTop.value + this.map.paddingBottom.value;
 +
-+    doc.querySelector(".size > span").textContent = width + "x" + height;
++    this.doc.querySelector(".size > span").textContent = width + "x" + height;
 +  },
 +}
 diff --git a/browser/devtools/layoutview/Makefile.in b/browser/devtools/layoutview/Makefile.in
 new file mode 100644
 --- /dev/null
 +++ b/browser/devtools/layoutview/Makefile.in
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,53 @@
 +#
 +# ***** BEGIN LICENSE BLOCK *****
 +# Version: MPL 1.1/GPL 2.0/LGPL 2.1
@@ -612,15 +538,14 @@ new file mode 100644
 +
 +include $(DEPTH)/config/autoconf.mk
 +
-+EXTRA_JS_MODULES = \
-+	LayoutView.jsm \
-+	$(NULL)
-+
 +ifdef ENABLE_TESTS
 +	DIRS += test
 +endif
 +
 +include $(topsrcdir)/config/rules.mk
++
++libs::
++	$(NSINSTALL) $(srcdir)/*.jsm $(FINAL_TARGET)/modules/devtools
 diff --git a/browser/devtools/layoutview/test/Makefile.in b/browser/devtools/layoutview/test/Makefile.in
 new file mode 100644
 --- /dev/null
@@ -683,7 +608,7 @@ diff --git a/browser/devtools/layoutview/test/browser_layoutview.js b/browser/de
 new file mode 100644
 --- /dev/null
 +++ b/browser/devtools/layoutview/test/browser_layoutview.js
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,134 @@
 +/* Any copyright is dedicated to the Public Domain.
 +   http://creativecommons.org/publicdomain/zero/1.0/ */
 +
@@ -691,12 +616,15 @@ new file mode 100644
 +  waitForExplicitFinish();
 +
 +  Services.prefs.setBoolPref("devtools.layoutview.enabled", true);
++  Services.prefs.setBoolPref("devtools.inspector.sidebarOpen", true);
 +
 +  let doc;
 +  let node;
++  let view;
 +
 +  // Expected values:
-+  let res = [
++  let res1 = [
++        {selector: "#element-size",              value: "160x160"},
 +        {selector: ".size > span",               value: "100x100"},
 +        {selector: ".margin.top > span",         value: 30},
 +        {selector: ".margin.left > span",        value: 30},
@@ -711,7 +639,23 @@ new file mode 100644
 +        {selector: ".border.bottom > span",      value: 10},
 +        {selector: ".border.right > span",       value: 10},
 +  ];
-+  let bbox = "160x160";
++
++  let res2 = [
++        {selector: "#element-size",              value: "160x210"},
++        {selector: ".size > span",               value: "100x150"},
++        {selector: ".margin.top > span",         value: 30},
++        {selector: ".margin.left > span",        value: 30},
++        {selector: ".margin.bottom > span",      value: 30},
++        {selector: ".margin.right > span",       value: 50},
++        {selector: ".padding.top > span",        value: 20},
++        {selector: ".padding.left > span",       value: 20},
++        {selector: ".padding.bottom > span",     value: 20},
++        {selector: ".padding.right > span",      value: 20},
++        {selector: ".border.top > span",         value: 10},
++        {selector: ".border.left > span",        value: 10},
++        {selector: ".border.bottom > span",      value: 10},
++        {selector: ".border.right > span",       value: 10},
++  ];
 +
 +  gBrowser.selectedTab = gBrowser.addTab();
 +  gBrowser.selectedBrowser.addEventListener("load", function onload() {
@@ -742,30 +686,47 @@ new file mode 100644
 +    let highlighter = InspectorUI.highlighter;
 +    highlighter.highlight(node);
 +    highlighter.lock();
-+    executeSoon(function() {
-+      InspectorUI.layoutview.iframe.addEventListener("DOMContentLoaded", viewReady, false);
-+      InspectorUI.toggleLayoutView();
-+    });
++
++    window.addEventListener("message", viewReady, true);
 +  }
 +
-+  function viewReady() {
++  function viewReady(e) {
++    if (e.data != "layoutview-ready") return;
++
 +    info("Layout view ready");
 +
-+    let view = InspectorUI.layoutview;
-+    view.panel.removeEventListener("popupshown", viewReady, false);
++    view = InspectorUI._sidebar._layoutview;
 +
++    ok(!!view, "LayoutView document is alive.");
++
++    view.open();
++
++    ok(view.iframe.getAttribute("open"), "true", "View is open.");
++
++    test1();
++  }
++
++  function test1() {
 +    let viewdoc = view.iframe.contentDocument;
-+    ok(view, "LayoutView document is alive.");
 +
-+    for (let i = 0; i < res.length; i++) {
-+      let elt = viewdoc.querySelector(res[i].selector);
-+      is(elt.textContent, res[i].value, res[i].selector + " has the right value.");
++    for (let i = 0; i < res1.length; i++) {
++      let elt = viewdoc.querySelector(res1[i].selector);
++      is(elt.textContent, res1[i].value, res1[i].selector + " has the right value.");
 +    }
 +
-+    let button = document.getElementById("inspector-layout-button");
-+    let label = button.getAttribute("label");
++    InspectorUI.selection.style.height = "150px";
++    InspectorUI.selection.style.marginRight = "50px";
 +
-+    is(label, bbox, "Layout button reports the right size");
++    setTimeout(test2, 200); // Should be enough to get a MozAfterPaint event
++  }
++
++  function test2() {
++    let viewdoc = view.iframe.contentDocument;
++
++    for (let i = 0; i < res2.length; i++) {
++      let elt = viewdoc.querySelector(res2[i].selector);
++      is(elt.textContent, res2[i].value, res2[i].selector + " has the right value after style update.");
++    }
 +
 +    executeSoon(function() {
 +      Services.obs.addObserver(finishUp,
@@ -776,19 +737,18 @@ new file mode 100644
 +
 +  function finishUp() {
 +    Services.prefs.clearUserPref("devtools.layoutview.enabled");
++    Services.prefs.clearUserPref("devtools.inspector.sidebarOpen");
 +    Services.obs.removeObserver(finishUp, InspectorUI.INSPECTOR_NOTIFICATIONS.CLOSED);
-+    doc = node = null;
 +    gBrowser.removeCurrentTab();
 +    finish();
 +  }
 +}
-diff --git a/browser/devtools/layoutview/view.html b/browser/devtools/layoutview/view.html
+diff --git a/browser/devtools/layoutview/view.xhtml b/browser/devtools/layoutview/view.xhtml
 new file mode 100644
 --- /dev/null
-+++ b/browser/devtools/layoutview/view.html
-@@ -0,0 +1,253 @@
-+<!DOCTYPE html>
-+
++++ b/browser/devtools/layoutview/view.xhtml
+@@ -0,0 +1,326 @@
++<?xml version="1.0" encoding="UTF-8"?>
 +#ifdef 0
 +<!-- ***** BEGIN LICENSE BLOCK *****
 +   - Version: MPL 1.1/GPL 2.0/LGPL 2.1
@@ -827,219 +787,340 @@ new file mode 100644
 +   -
 +   - ***** END LICENSE BLOCK ***** -->
 +#endif
++<!DOCTYPE html [
++<!ENTITY % layoutviewDTD SYSTEM "chrome://browser/locale/devtools/layoutview.dtd" >
++ %layoutviewDTD;
++]>
 +
-+<meta charset="utf8">
++<html xmlns="http://www.w3.org/1999/xhtml"
++      xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
++  <head>
++    <title>Layout View</title>
 +
-+<script type="application/javascript;version=1.8">
-+  let elts;
-+  let tooltip;
++    <script type="application/javascript;version=1.8">
++    <![CDATA[
++      let elts;
++      let tooltip;
 +
-+  window.onload = function() {
-+    elts = document.querySelectorAll("*[tooltip]");
-+    tooltip = document.querySelector(".tooltip");
-+    for (let i = 0; i < elts.length; i++) {
-+      let elt = elts[i];
-+      elt.addEventListener("mouseover", onmouseover, true);
-+      elt.addEventListener("mouseout", onmouseout, true);
-+    }
-+  }
++      const Ci = Components.interfaces;
++      const Cc = Components.classes;
 +
-+  window.onunload = function() {
-+    if (elts) {
-+      for (let i = 0; i < elts.length; i++) {
-+        let elt = elts[i];
-+        elt.removeEventListener("mouseover", onmouseover, true);
-+        elt.removeEventListener("mouseout", onmouseout, true);
++      window.onload = function() {
++
++        // Tooltip mechanism
++        elts = document.querySelectorAll("*[tooltip]");
++        tooltip = document.querySelector(".tooltip");
++        for (let i = 0; i < elts.length; i++) {
++          let elt = elts[i];
++          elt.addEventListener("mouseover", onmouseover, true);
++          elt.addEventListener("mouseout", onmouseout, true);
++        }
++
++        // Mark document as RTL or LTR:
++        let chromeReg = Cc["@mozilla.org/chrome/chrome-registry;1"].
++          getService(Ci.nsIXULChromeRegistry);
++        let dir = chromeReg.isLocaleRTL("global");
++        document.body.setAttribute("dir", dir ? "rtl" : "ltr");
++
++        window.parent.postMessage("layoutview-ready", "*");
 +      }
-+    }
-+  }
 +
-+  function onmouseover(e) {
-+    tooltip.textContent = e.target.getAttribute("tooltip");
-+  }
++      window.onunload = function() {
++        if (elts) {
++          for (let i = 0; i < elts.length; i++) {
++            let elt = elts[i];
++            elt.removeEventListener("mouseover", onmouseover, true);
++            elt.removeEventListener("mouseout", onmouseout, true);
++          }
++        }
++      }
 +
-+  function onmouseout(e) {
-+    tooltip.textContent = "";
-+  }
-+</script>
++      function onmouseover(e) {
++        tooltip.textContent = e.target.getAttribute("tooltip");
++      }
 +
-+<link rel="stylesheet" href="chrome://browser/skin/devtools/layoutview.css" type="text/css">
++      function onmouseout(e) {
++        tooltip.textContent = "";
++      }
 +
-+<style>
-+  body, html {
-+    height: 100%;
-+    width: 100%;
-+  }
++      function toggleView() {
++        window.parent.postMessage("layoutview-toggle-view", "*");
++      }
++    ]]>
++    </script>
 +
-+  body {
-+    margin: 0;
-+  }
++    <link rel="stylesheet" href="chrome://browser/skin/devtools/layoutview.css" type="text/css"/>
 +
-+  #main {
-+    margin: 10px;
-+    -moz-box-sizing: border-box;
-+    width: -moz-calc(100% - 2 * 10px);
-+    position: absolute;
-+    font: 10px/12px monospace;
-+    border-width: 1px;
-+  }
++    <style>
++      body, html {
++        height: 100%;
++        width: 100%;
++        overflow: hidden;
++      }
 +
-+  #margins {
-+    padding: 28px;
-+  }
++      body {
++        margin: 0;
++        padding: 0;
++      }
 +
-+  #content {
-+    height: 20px;
-+    border-width: 1px;
-+  }
++      #header {
++        -moz-box-sizing: border-box;
++        font: 12px/14px monospace;
++        width: 100%;
++        padding: 3px 4px;
++        display: -moz-box;
++      }
 +
-+  #padding {
-+    border-width: 25px;
-+  }
++      body[dir=rtl] > #header {
++        -moz-box-direction: reverse;
++      }
 +
-+  #borders {
-+    border-width: 2px;
-+    box-shadow: 0 0 16px black;
-+  }
++      #header > span {
++        display: -moz-box;
++      }
 +
-+  #main > p {
-+    position: absolute;
-+    pointer-events: none;
-+  }
++      #element-size {
++        -moz-box-flex: 1;
++      }
 +
-+  #main > p {
-+    margin: 0;
-+    text-align: center;
-+  }
++      body[dir=rtl] > #header > #element-size {
++        -moz-box-pack: end;
++      }
 +
-+  #main > p > span {
-+    vertical-align: middle;
-+    pointer-events: auto;
-+    cursor: default;
-+  }
++      #header:focus {
++        outline: none;
++      }
 +
-+  .border.top {
-+    left: 0; top: 23px;
-+    width: 98px;
-+  }
++      #main {
++        margin: 10px;
++        -moz-box-sizing: border-box;
++        width: -moz-calc(100% - 2 * 10px);
++        position: absolute;
++        border-width: 1px;
++        font: 10px/12px monospace;
++      }
 +
-+  .border.bottom {
-+    right: 0; bottom: 22px;
-+    width: 98px;
-+    top: auto;
-+  }
++      #margins {
++        padding: 28px;
++      }
 +
-+  .border.left {
-+    top: 42px; left: 0;
-+    width: 56px;
-+  }
++      #content {
++        height: 20px;
++        border-width: 1px;
++      }
 +
-+  .border.right{
-+    bottom: 42px; right: 0;
-+    width: 56px;
-+    top: auto;
-+  }
++      #padding {
++        border-width: 25px;
++      }
 +
-+  .top, .bottom {
-+    width: -moz-calc(100% - 2px);
-+    text-align: center;
-+  }
++      #borders {
++        border-width: 2px;
++        box-shadow: 0 0 16px black;
++      }
 +
-+  .margin.top {
-+    top: 8px;
-+  }
++      #main > p {
++        position: absolute;
++        pointer-events: none;
++      }
 +
-+  .margin.bottom {
-+    bottom: 6px;
-+  }
++      #main > p {
++        margin: 0;
++        text-align: center;
++      }
 +
-+  .padding.top {
-+    top: 35px;
-+  }
++      #main > p > span {
++        vertical-align: middle;
++        pointer-events: auto;
++        cursor: default;
++      }
 +
-+  .padding.bottom {
-+    bottom: 35px;
-+  }
++      .border.top {
++        left: 0; top: 23px;
++        width: 98px;
++      }
 +
-+  .size,
-+  .margin.left,
-+  .margin.right,
-+  .padding.left,
-+  .padding.right {
-+    top: 0;
-+    line-height: 132px;
-+  }
++      .border.bottom {
++        right: 0; bottom: 22px;
++        width: 98px;
++        top: auto;
++      }
 +
-+  .size {
-+    width: -moz-calc(100% - 2px);
-+  }
++      .border.left {
++        top: 42px; left: 0;
++        width: 56px;
++      }
 +
-+  .margin.right,
-+  .margin.left {
-+    width: 28px;
-+  }
++      .border.right{
++        bottom: 42px; right: 0;
++        width: 56px;
++        top: auto;
++      }
 +
-+  .padding.right,
-+  .padding.left {
-+    width: 25px;
-+  }
++      .top, .bottom {
++        width: -moz-calc(100% - 2px);
++        text-align: center;
++      }
 +
-+  .margin.right {
-+    right: 0;
-+  }
++      .margin.top {
++        top: 8px;
++      }
 +
-+  .margin.left {
-+    left: 0;
-+  }
++      .margin.bottom {
++        bottom: 6px;
++      }
 +
-+  .padding.left {
-+    left: 30px;
-+  }
++      .padding.top {
++        top: 35px;
++      }
 +
-+  .padding.right {
-+    right: 30px;
-+  }
++      .padding.bottom {
++        bottom: 35px;
++      }
 +
-+  .tooltip {
-+    position: absolute;
-+    bottom: 0;
-+    right: 2px;
-+    pointer-events: none;
-+  }
-+</style>
++      .size,
++      .margin.left,
++      .margin.right,
++      .padding.left,
++      .padding.right {
++        top: 0;
++        line-height: 132px;
++      }
 +
++      .size {
++        width: -moz-calc(100% - 2px);
++      }
 +
-+<div id="main">
++      .margin.right,
++      .margin.left {
++        width: 28px;
++      }
 +
-+  <div id="margins" tooltip="margins">
-+    <div id="borders" tooltip="borders">
-+      <div id="padding" tooltip="padding">
-+        <div id="content" tooltip="content">
++      .padding.right,
++      .padding.left {
++        width: 25px;
++      }
++
++      .margin.right {
++        right: 0;
++      }
++
++      .margin.left {
++        left: 0;
++      }
++
++      .padding.left {
++        left: 30px;
++      }
++
++      .padding.right {
++        right: 30px;
++      }
++
++      .tooltip {
++        position: absolute;
++        bottom: 0;
++        right: 2px;
++        pointer-events: none;
++      }
++
++      body.dim > #main,
++      body.dim > #header > #element-size {
++        visibility: hidden;
++      }
++    </style>
++
++  </head>
++  <body>
++
++    <!-- Header: always visible, even when the view is closed. -->
++    <a onclick="toggleView()" href="#" id="header">
++        <span>&elementSize.label;</span>
++        <span id="element-size"></span>
++        <span id="togglebutton"></span>
++    </a>
++
++    <!-- Boxes: hidden when the view is closed. -->
++    <div id="main">
++
++      <div id="margins" tooltip="&margins.tooltip;">
++        <div id="borders" tooltip="&borders.tooltip;">
++          <div id="padding" tooltip="&padding.tooltip;">
++            <div id="content" tooltip="&content.tooltip;">
++            </div>
++          </div>
 +        </div>
 +      </div>
++
++      <p class="border top"><span tooltip="border-top"></span></p>
++      <p class="border right"><span tooltip="border-right"></span></p>
++      <p class="border bottom"><span tooltip="border-bottom"></span></p>
++      <p class="border left"><span tooltip="border-left"></span></p>
++
++      <p class="margin top"><span tooltip="margin-top"></span></p>
++      <p class="margin right"><span tooltip="margin-right"></span></p>
++      <p class="margin bottom"><span tooltip="margin-bottom"></span></p>
++      <p class="margin left"><span tooltip="margin-left"></span></p>
++
++      <p class="padding top"><span tooltip="padding-top"></span></p>
++      <p class="padding right"><span tooltip="padding-right"></span></p>
++      <p class="padding bottom"><span tooltip="padding-bottom"></span></p>
++      <p class="padding left"><span tooltip="padding-left"></span></p>
++
++      <p class="size"><span tooltip="&content.tooltip;"></span></p>
++
++      <span class="tooltip"></span>
++
 +    </div>
-+  </div>
 +
-+  <p class="border top"><span tooltip="border-top"></span></p>
-+  <p class="border right"><span tooltip="border-right"></span></p>
-+  <p class="border bottom"><span tooltip="border-bottom"></span></p>
-+  <p class="border left"><span tooltip="border-left"></span></p>
++  </body>
++</html>
+diff --git a/browser/locales/en-US/chrome/browser/devtools/layoutview.dtd b/browser/locales/en-US/chrome/browser/devtools/layoutview.dtd
+new file mode 100644
+--- /dev/null
++++ b/browser/locales/en-US/chrome/browser/devtools/layoutview.dtd
+@@ -0,0 +1,21 @@
++<!-- LOCALIZATION NOTE : FILE This file contains the Layout View strings.
++  - The Layout View is the panel accessible at the bottom of the Inspector
++  - sidebar. -->
 +
-+  <p class="margin top"><span tooltip="margin-top"></span></p>
-+  <p class="margin right"><span tooltip="margin-right"></span></p>
-+  <p class="margin bottom"><span tooltip="margin-bottom"></span></p>
-+  <p class="margin left"><span tooltip="margin-left"></span></p>
++<!-- LOCALIZATION NOTE : FILE The correct localization of this file might be to
++  - keep it in English, or another language commonly spoken among web developers.
++  - You want to make that choice consistent across the developer tools.
++  - A good criteria is the language in which you'd find the best
++  - documentation on web development on the web. -->
 +
-+  <p class="padding top"><span tooltip="padding-top"></span></p>
-+  <p class="padding right"><span tooltip="padding-right"></span></p>
-+  <p class="padding bottom"><span tooltip="padding-bottom"></span></p>
-+  <p class="padding left"><span tooltip="padding-left"></span></p>
++<!ENTITY elementSize.label      "Element Size: ">
 +
-+  <p class="size"><span tooltip="content"></span></p>
 +
-+  <span class="tooltip"></span>
++<!-- LOCALIZATION NOTE (*.tooltip): These tooltips are not regular tooltips.
++  -  The text appears on the bottom right corner of the layout view when
++  -  the corresponding box is hovered. -->
 +
-+</div>
++<!ENTITY margins.tooltip        "margins">
++<!ENTITY borders.tooltip        "borders">
++<!ENTITY padding.tooltip        "padding">
++<!ENTITY content.tooltip        "content">
+diff --git a/browser/locales/jar.mn b/browser/locales/jar.mn
+--- a/browser/locales/jar.mn
++++ b/browser/locales/jar.mn
+@@ -26,16 +26,17 @@
+     locale/browser/devtools/scratchpad.dtd            (%chrome/browser/devtools/scratchpad.dtd)
+     locale/browser/devtools/styleeditor.properties    (%chrome/browser/devtools/styleeditor.properties)
+     locale/browser/devtools/styleeditor.dtd           (%chrome/browser/devtools/styleeditor.dtd)
+     locale/browser/devtools/styleinspector.properties (%chrome/browser/devtools/styleinspector.properties)
+     locale/browser/devtools/styleinspector.dtd        (%chrome/browser/devtools/styleinspector.dtd)
+     locale/browser/devtools/webConsole.dtd            (%chrome/browser/devtools/webConsole.dtd)
+     locale/browser/devtools/sourceeditor.properties   (%chrome/browser/devtools/sourceeditor.properties)
+     locale/browser/devtools/sourceeditor.dtd          (%chrome/browser/devtools/sourceeditor.dtd)
++    locale/browser/devtools/layoutview.dtd            (%chrome/browser/devtools/layoutview.dtd)
+     locale/browser/newTab.dtd                      (%chrome/browser/newTab.dtd)
+     locale/browser/newTab.properties               (%chrome/browser/newTab.properties)
+     locale/browser/openLocation.dtd                (%chrome/browser/openLocation.dtd)
+     locale/browser/openLocation.properties         (%chrome/browser/openLocation.properties)
+ *   locale/browser/pageInfo.dtd                    (%chrome/browser/pageInfo.dtd)
+     locale/browser/pageInfo.properties             (%chrome/browser/pageInfo.properties)
+     locale/browser/quitDialog.properties           (%chrome/browser/quitDialog.properties)
+ *   locale/browser/safeMode.dtd                    (%chrome/browser/safeMode.dtd)
 diff --git a/browser/themes/gnomestripe/devtools/layout-background.png b/browser/themes/gnomestripe/devtools/layout-background.png
 new file mode 100644
 index 0000000000000000000000000000000000000000..87b0b855d2573ecca3a4d7ded942c63bd03521e4
@@ -1107,11 +1188,41 @@ z90P4nVuiCW1ZrY}5UQje!iwQM(nyuT1^{QS)kOAe1+0OMsXf$8mU5@=TO8L)ROhy&
 zpLxGS9#CP6j@$i8tm$fhgVMFV(0NMPc7w2}SkGEt?x=iXIlekQzM8gnB?ir1HZ})e
 zxTAvuuS)B-T#xr0{SWr`4+cvAkz1{vyHY6+Uw&mgD_`{I?ot7@K$-+~TkL-TO@Sk$
 
+diff --git a/browser/themes/gnomestripe/devtools/layout-buttons.png b/browser/themes/gnomestripe/devtools/layout-buttons.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..a5904654909b4767962fd68a5e4d926d3dab3aa8
+GIT binary patch
+literal 1237
+zc$@*%1S<Q9P)<h;3K|Lk000e1NJLTq001Na000sQ1^@s6Gb4N`00001b5ch_0Itp)
+z=>Px#24YJ`L;(K){{a7>y{D4^000SaNLh0L01FcU01FcV0GgZ_00007bV*G`2iyb@
+z3_3FC)$uj}00dP@L_t(Y$IX^&Y!p=#$A5QU_5m%sEzCFpnp(hul|&OFqCg-9g$i1s
+ziIudVq96%rVnTx91M&eSX-FU@pixn`LeaK1wiXg%FeZ&cN-#kljoaD>WV=h--KC}7
+zK6dB&Vejg&U)&l#c$3N8nYsUS&;NhUoO9uSHiV`db|4#YtGg{ttO<+)VRh$0*l_?k
+z>o=CIE8VpDiMjI&Y|~+LyRX-5ZEpPSTuak=fYO&XKev8k*|NFw3LZkF>5#;{eXDok
+zTuW1X>-UX63Qadky!Ag+xILZ$A#CG-Ojlhg&5Up;G`p(&#X5l6hStiy-tK7a=O0gY
+z+_*LfO#O=uXYrDf{K_|Xx#kxXW>#(~t#ttTp1iy;FabD)z@8Q{Nn8jqp|JS?ZjWcA
+zdgnG78X9Z^hJXwp7jUG&W58WtyyM2TydxjHztUUZ5(DxbfJ+DwYy0^^{+Ze@+}&Ni
+z;dGc47A?$qwet1wv#ZyR04@L_Y_ZVLU>9%&aPB{NxP0026$>OxT9g+8T<sTs={$5`
+zUp>$p8XDAuuoVF=hhi&E9IbIgBH?DhPr`r`$Vp)sRm@}ET|VQ)(V8{StXeBln2)F=
+zoq6cMKHrv#Dt-G~yZfb-;|Xs>#+RQSf4HH}>jUCy?TErAHWC6EiG;5Mmw~Zhz;9~0
+zk-P7}p;b?<SXn5goB(MGVaqIge%04NC*Y4n!gGYcummy=n8AQwYPvB7bT-s^^@;K5
+z(w%$W^#OeH(UC`5n(D7A8)Is%sjws!iUY&IXfWVUN-GZ^+~4=|mWtVL?Ap@<ObH=o
+z0(vmu@6dE(6d0Bg&5~EK<UAPg$28sO2ijVi>Jc{ELICAV8_*vN_+zQqWGJSR%u?i^
+zG|jkE2&9xqC9z9wsF>ZCZ};V%)v4yjZ-VNzFVz_<)?wNF@1g023oxp7?0WK*@~s1P
+z-jfA)f`RPnz59Do*IJ(wp=F+?8zm`g?7%%W_W-$?Zdkw1Q&{DYlv5UG?0~Ut$2%{S
+zl~)XZ_wA{iI`7FbDa}#0$KwD(DgXbJWqz-r^+KKyV)b+itdug2ltcgIP$CpIO*aJK
+zT(@D<lCtvGCL7Mw&N%(mXCW!gi$JXYv^NU~D#rz2lU9Y0;|{0u=6~s75}9KOnVgvA
+zcF&50!<j(*{MqI^p`iioO8cc@(=^+GTdL<cEFsGB<mJr*IcZHyX;o}mDkbdNfM{QD
+zkA3U*x3#S7?5BZZAnWp_Uqhy84yanRNWEVG6l=P%G%GuMc}3L@t*^JouIf{?`%mAD
+zL`#wJ>0E$N*r?ES<I%;BEnQQ+_q}NT94$*A>}g6IAG{MBJ67{y=FRI@e*#!kykx`f
+z>b-r1MGNnOOtU8n(cR_CJ$|fa{vRDT&I(O8a)HH)eTMqA(;0SPTot%v-jo23t0TyC
+zjvry*ci>v`Jd_E{R5eDVorj4QGonJqgRt`#mb)4)8RTK500000NkvXXu0mjfw*E~O
+
 diff --git a/browser/themes/gnomestripe/devtools/layoutview.css b/browser/themes/gnomestripe/devtools/layoutview.css
 new file mode 100644
 --- /dev/null
 +++ b/browser/themes/gnomestripe/devtools/layoutview.css
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,87 @@
 +/* ***** BEGIN LICENSE BLOCK *****
 + * Version: MPL 1.1/GPL 2.0/LGPL 2.1
 + *
@@ -1150,12 +1261,18 @@ new file mode 100644
 +
 +body {
 +  background: url(layout-background.png), -moz-radial-gradient(50% 70%, circle cover, hsl(210,53%,45%) 0%, hsl(210,54%,33%) 100%);
++  color: hsl(210,100%,85%);
++  border-top: 1px solid black;
++  -moz-box-sizing: border-box;
++}
++
++#element-size {
++  color: hsl(210,100%,95%);
 +}
 +
 +#main {
-+  color: hsl(210,100%,85%);
 +  border-color: hsla(210,100%,85%,0.7);
-+  border-style: dotted 
++  border-style: dotted;
 +}
 +
 +#main > .border {
@@ -1182,6 +1299,40 @@ new file mode 100644
 +  border-style: solid;
 +  border-color: hsl(210,100%,85%);
 +}
++
++#togglebutton {
++  background-image: url(layout-buttons.png);
++  width: 18px;
++  height: 18px;
++  margin-top: -3px;
++}
++
++body.open > #header > #togglebutton {
++  background-position: -18px 0;
++}
+diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
+--- a/browser/themes/gnomestripe/jar.mn
++++ b/browser/themes/gnomestripe/jar.mn
+@@ -127,16 +127,19 @@ browser.jar:
+   skin/classic/browser/devtools/styleeditor.css       (devtools/styleeditor.css)
+   skin/classic/browser/devtools/debugger.css          (devtools/debugger.css)
+   skin/classic/browser/devtools/magnifying-glass.png  (devtools/magnifying-glass.png)
+   skin/classic/browser/devtools/itemToggle.png        (devtools/itemToggle.png)
+   skin/classic/browser/devtools/itemArrow-rtl.png     (devtools/itemArrow-rtl.png)
+   skin/classic/browser/devtools/itemArrow-ltr.png     (devtools/itemArrow-ltr.png)
+   skin/classic/browser/devtools/inspect-button.png    (devtools/inspect-button.png)
+   skin/classic/browser/devtools/dropmarker.png        (devtools/dropmarker.png)
++  skin/classic/browser/devtools/layout-background.png (devtools/layout-background.png)
++  skin/classic/browser/devtools/layoutview.css        (devtools/layoutview.css)
++  skin/classic/browser/devtools/layout-buttons.png    (devtools/layout-buttons.png)
+ #ifdef MOZ_SERVICES_SYNC
+   skin/classic/browser/sync-16-throbber.png
+   skin/classic/browser/sync-16.png
+   skin/classic/browser/sync-24-throbber.png
+   skin/classic/browser/sync-32.png
+   skin/classic/browser/sync-bg.png
+   skin/classic/browser/sync-128.png
+   skin/classic/browser/sync-desktopIcon.png
 diff --git a/browser/themes/pinstripe/devtools/layout-background.png b/browser/themes/pinstripe/devtools/layout-background.png
 new file mode 100644
 index 0000000000000000000000000000000000000000..87b0b855d2573ecca3a4d7ded942c63bd03521e4
@@ -1249,11 +1400,41 @@ z90P4nVuiCW1ZrY}5UQje!iwQM(nyuT1^{QS)kOAe1+0OMsXf$8mU5@=TO8L)ROhy&
 zpLxGS9#CP6j@$i8tm$fhgVMFV(0NMPc7w2}SkGEt?x=iXIlekQzM8gnB?ir1HZ})e
 zxTAvuuS)B-T#xr0{SWr`4+cvAkz1{vyHY6+Uw&mgD_`{I?ot7@K$-+~TkL-TO@Sk$
 
+diff --git a/browser/themes/pinstripe/devtools/layout-buttons.png b/browser/themes/pinstripe/devtools/layout-buttons.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..a5904654909b4767962fd68a5e4d926d3dab3aa8
+GIT binary patch
+literal 1237
+zc$@*%1S<Q9P)<h;3K|Lk000e1NJLTq001Na000sQ1^@s6Gb4N`00001b5ch_0Itp)
+z=>Px#24YJ`L;(K){{a7>y{D4^000SaNLh0L01FcU01FcV0GgZ_00007bV*G`2iyb@
+z3_3FC)$uj}00dP@L_t(Y$IX^&Y!p=#$A5QU_5m%sEzCFpnp(hul|&OFqCg-9g$i1s
+ziIudVq96%rVnTx91M&eSX-FU@pixn`LeaK1wiXg%FeZ&cN-#kljoaD>WV=h--KC}7
+zK6dB&Vejg&U)&l#c$3N8nYsUS&;NhUoO9uSHiV`db|4#YtGg{ttO<+)VRh$0*l_?k
+z>o=CIE8VpDiMjI&Y|~+LyRX-5ZEpPSTuak=fYO&XKev8k*|NFw3LZkF>5#;{eXDok
+zTuW1X>-UX63Qadky!Ag+xILZ$A#CG-Ojlhg&5Up;G`p(&#X5l6hStiy-tK7a=O0gY
+z+_*LfO#O=uXYrDf{K_|Xx#kxXW>#(~t#ttTp1iy;FabD)z@8Q{Nn8jqp|JS?ZjWcA
+zdgnG78X9Z^hJXwp7jUG&W58WtyyM2TydxjHztUUZ5(DxbfJ+DwYy0^^{+Ze@+}&Ni
+z;dGc47A?$qwet1wv#ZyR04@L_Y_ZVLU>9%&aPB{NxP0026$>OxT9g+8T<sTs={$5`
+zUp>$p8XDAuuoVF=hhi&E9IbIgBH?DhPr`r`$Vp)sRm@}ET|VQ)(V8{StXeBln2)F=
+zoq6cMKHrv#Dt-G~yZfb-;|Xs>#+RQSf4HH}>jUCy?TErAHWC6EiG;5Mmw~Zhz;9~0
+zk-P7}p;b?<SXn5goB(MGVaqIge%04NC*Y4n!gGYcummy=n8AQwYPvB7bT-s^^@;K5
+z(w%$W^#OeH(UC`5n(D7A8)Is%sjws!iUY&IXfWVUN-GZ^+~4=|mWtVL?Ap@<ObH=o
+z0(vmu@6dE(6d0Bg&5~EK<UAPg$28sO2ijVi>Jc{ELICAV8_*vN_+zQqWGJSR%u?i^
+zG|jkE2&9xqC9z9wsF>ZCZ};V%)v4yjZ-VNzFVz_<)?wNF@1g023oxp7?0WK*@~s1P
+z-jfA)f`RPnz59Do*IJ(wp=F+?8zm`g?7%%W_W-$?Zdkw1Q&{DYlv5UG?0~Ut$2%{S
+zl~)XZ_wA{iI`7FbDa}#0$KwD(DgXbJWqz-r^+KKyV)b+itdug2ltcgIP$CpIO*aJK
+zT(@D<lCtvGCL7Mw&N%(mXCW!gi$JXYv^NU~D#rz2lU9Y0;|{0u=6~s75}9KOnVgvA
+zcF&50!<j(*{MqI^p`iioO8cc@(=^+GTdL<cEFsGB<mJr*IcZHyX;o}mDkbdNfM{QD
+zkA3U*x3#S7?5BZZAnWp_Uqhy84yanRNWEVG6l=P%G%GuMc}3L@t*^JouIf{?`%mAD
+zL`#wJ>0E$N*r?ES<I%;BEnQQ+_q}NT94$*A>}g6IAG{MBJ67{y=FRI@e*#!kykx`f
+z>b-r1MGNnOOtU8n(cR_CJ$|fa{vRDT&I(O8a)HH)eTMqA(;0SPTot%v-jo23t0TyC
+zjvry*ci>v`Jd_E{R5eDVorj4QGonJqgRt`#mb)4)8RTK500000NkvXXu0mjfw*E~O
+
 diff --git a/browser/themes/pinstripe/devtools/layoutview.css b/browser/themes/pinstripe/devtools/layoutview.css
 new file mode 100644
 --- /dev/null
 +++ b/browser/themes/pinstripe/devtools/layoutview.css
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,88 @@
 +/* ***** BEGIN LICENSE BLOCK *****
 + * Version: MPL 1.1/GPL 2.0/LGPL 2.1
 + *
@@ -1292,12 +1473,18 @@ new file mode 100644
 +
 +body {
 +  background: url(layout-background.png), -moz-radial-gradient(50% 70%, circle cover, hsl(210,53%,45%) 0%, hsl(210,54%,33%) 100%);
++  color: hsl(210,100%,85%);
++  border-top: 1px solid black;
++  -moz-box-sizing: border-box;
++}
++
++#element-size {
++  color: hsl(210,100%,95%);
 +}
 +
 +#main {
-+  color: hsl(210,100%,85%);
 +  border-color: hsla(210,100%,85%,0.7);
-+  border-style: dotted 
++  border-style: dotted;
 +}
 +
 +#main > .border {
@@ -1324,6 +1511,41 @@ new file mode 100644
 +  border-style: solid;
 +  border-color: hsl(210,100%,85%);
 +}
++
++#togglebutton {
++  background-image: url(layout-buttons.png);
++  width: 18px;
++  height: 18px;
++  margin-top: -3px;
++}
++
++body.open > #header > #togglebutton {
++  background-position: -18px 0;
++}
++
+diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
+--- a/browser/themes/pinstripe/jar.mn
++++ b/browser/themes/pinstripe/jar.mn
+@@ -168,16 +168,19 @@ browser.jar:
+   skin/classic/browser/devtools/debugger.css                (devtools/debugger.css)
+   skin/classic/browser/devtools/magnifying-glass.png        (devtools/magnifying-glass.png)
+   skin/classic/browser/devtools/itemToggle.png              (devtools/itemToggle.png)
+   skin/classic/browser/devtools/itemArrow-rtl.png           (devtools/itemArrow-rtl.png)
+   skin/classic/browser/devtools/itemArrow-ltr.png           (devtools/itemArrow-ltr.png)
+   skin/classic/browser/devtools/background-noise-toolbar.png (devtools/background-noise-toolbar.png)
+   skin/classic/browser/devtools/inspect-button.png          (devtools/inspect-button.png)
+   skin/classic/browser/devtools/dropmarker.png              (devtools/dropmarker.png)
++  skin/classic/browser/devtools/layout-background.png       (devtools/layout-background.png)
++  skin/classic/browser/devtools/layoutview.css              (devtools/layoutview.css)
++  skin/classic/browser/devtools/layout-buttons.png          (devtools/layout-buttons.png)
+ #ifdef MOZ_SERVICES_SYNC
+   skin/classic/browser/sync-throbber.png
+   skin/classic/browser/sync-16.png
+   skin/classic/browser/sync-32.png
+   skin/classic/browser/sync-bg.png
+   skin/classic/browser/sync-128.png
+   skin/classic/browser/sync-desktopIcon.png
+   skin/classic/browser/sync-mobileIcon.png
 diff --git a/browser/themes/winstripe/devtools/layout-background.png b/browser/themes/winstripe/devtools/layout-background.png
 new file mode 100644
 index 0000000000000000000000000000000000000000..87b0b855d2573ecca3a4d7ded942c63bd03521e4
@@ -1391,11 +1613,41 @@ z90P4nVuiCW1ZrY}5UQje!iwQM(nyuT1^{QS)kOAe1+0OMsXf$8mU5@=TO8L)ROhy&
 zpLxGS9#CP6j@$i8tm$fhgVMFV(0NMPc7w2}SkGEt?x=iXIlekQzM8gnB?ir1HZ})e
 zxTAvuuS)B-T#xr0{SWr`4+cvAkz1{vyHY6+Uw&mgD_`{I?ot7@K$-+~TkL-TO@Sk$
 
+diff --git a/browser/themes/winstripe/devtools/layout-buttons.png b/browser/themes/winstripe/devtools/layout-buttons.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..a5904654909b4767962fd68a5e4d926d3dab3aa8
+GIT binary patch
+literal 1237
+zc$@*%1S<Q9P)<h;3K|Lk000e1NJLTq001Na000sQ1^@s6Gb4N`00001b5ch_0Itp)
+z=>Px#24YJ`L;(K){{a7>y{D4^000SaNLh0L01FcU01FcV0GgZ_00007bV*G`2iyb@
+z3_3FC)$uj}00dP@L_t(Y$IX^&Y!p=#$A5QU_5m%sEzCFpnp(hul|&OFqCg-9g$i1s
+ziIudVq96%rVnTx91M&eSX-FU@pixn`LeaK1wiXg%FeZ&cN-#kljoaD>WV=h--KC}7
+zK6dB&Vejg&U)&l#c$3N8nYsUS&;NhUoO9uSHiV`db|4#YtGg{ttO<+)VRh$0*l_?k
+z>o=CIE8VpDiMjI&Y|~+LyRX-5ZEpPSTuak=fYO&XKev8k*|NFw3LZkF>5#;{eXDok
+zTuW1X>-UX63Qadky!Ag+xILZ$A#CG-Ojlhg&5Up;G`p(&#X5l6hStiy-tK7a=O0gY
+z+_*LfO#O=uXYrDf{K_|Xx#kxXW>#(~t#ttTp1iy;FabD)z@8Q{Nn8jqp|JS?ZjWcA
+zdgnG78X9Z^hJXwp7jUG&W58WtyyM2TydxjHztUUZ5(DxbfJ+DwYy0^^{+Ze@+}&Ni
+z;dGc47A?$qwet1wv#ZyR04@L_Y_ZVLU>9%&aPB{NxP0026$>OxT9g+8T<sTs={$5`
+zUp>$p8XDAuuoVF=hhi&E9IbIgBH?DhPr`r`$Vp)sRm@}ET|VQ)(V8{StXeBln2)F=
+zoq6cMKHrv#Dt-G~yZfb-;|Xs>#+RQSf4HH}>jUCy?TErAHWC6EiG;5Mmw~Zhz;9~0
+zk-P7}p;b?<SXn5goB(MGVaqIge%04NC*Y4n!gGYcummy=n8AQwYPvB7bT-s^^@;K5
+z(w%$W^#OeH(UC`5n(D7A8)Is%sjws!iUY&IXfWVUN-GZ^+~4=|mWtVL?Ap@<ObH=o
+z0(vmu@6dE(6d0Bg&5~EK<UAPg$28sO2ijVi>Jc{ELICAV8_*vN_+zQqWGJSR%u?i^
+zG|jkE2&9xqC9z9wsF>ZCZ};V%)v4yjZ-VNzFVz_<)?wNF@1g023oxp7?0WK*@~s1P
+z-jfA)f`RPnz59Do*IJ(wp=F+?8zm`g?7%%W_W-$?Zdkw1Q&{DYlv5UG?0~Ut$2%{S
+zl~)XZ_wA{iI`7FbDa}#0$KwD(DgXbJWqz-r^+KKyV)b+itdug2ltcgIP$CpIO*aJK
+zT(@D<lCtvGCL7Mw&N%(mXCW!gi$JXYv^NU~D#rz2lU9Y0;|{0u=6~s75}9KOnVgvA
+zcF&50!<j(*{MqI^p`iioO8cc@(=^+GTdL<cEFsGB<mJr*IcZHyX;o}mDkbdNfM{QD
+zkA3U*x3#S7?5BZZAnWp_Uqhy84yanRNWEVG6l=P%G%GuMc}3L@t*^JouIf{?`%mAD
+zL`#wJ>0E$N*r?ES<I%;BEnQQ+_q}NT94$*A>}g6IAG{MBJ67{y=FRI@e*#!kykx`f
+z>b-r1MGNnOOtU8n(cR_CJ$|fa{vRDT&I(O8a)HH)eTMqA(;0SPTot%v-jo23t0TyC
+zjvry*ci>v`Jd_E{R5eDVorj4QGonJqgRt`#mb)4)8RTK500000NkvXXu0mjfw*E~O
+
 diff --git a/browser/themes/winstripe/devtools/layoutview.css b/browser/themes/winstripe/devtools/layoutview.css
 new file mode 100644
 --- /dev/null
 +++ b/browser/themes/winstripe/devtools/layoutview.css
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,88 @@
 +/* ***** BEGIN LICENSE BLOCK *****
 + * Version: MPL 1.1/GPL 2.0/LGPL 2.1
 + *
@@ -1434,12 +1686,18 @@ new file mode 100644
 +
 +body {
 +  background: url(layout-background.png), -moz-radial-gradient(50% 70%, circle cover, hsl(210,53%,45%) 0%, hsl(210,54%,33%) 100%);
++  color: hsl(210,100%,85%);
++  border-top: 1px solid black;
++  -moz-box-sizing: border-box;
++}
++
++#element-size {
++  color: hsl(210,100%,95%);
 +}
 +
 +#main {
-+  color: hsl(210,100%,85%);
 +  border-color: hsla(210,100%,85%,0.7);
-+  border-style: dotted 
++  border-style: dotted;
 +}
 +
 +#main > .border {
@@ -1466,3 +1724,58 @@ new file mode 100644
 +  border-style: solid;
 +  border-color: hsl(210,100%,85%);
 +}
++
++#togglebutton {
++  background-image: url(layout-buttons.png);
++  width: 18px;
++  height: 18px;
++  margin-top: -3px;
++}
++
++body.open > #header > #togglebutton {
++  background-position: -18px 0;
++}
++
+diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
+--- a/browser/themes/winstripe/jar.mn
++++ b/browser/themes/winstripe/jar.mn
+@@ -154,16 +154,19 @@ browser.jar:
+         skin/classic/browser/devtools/styleeditor.css               (devtools/styleeditor.css)
+         skin/classic/browser/devtools/debugger.css                  (devtools/debugger.css)
+         skin/classic/browser/devtools/magnifying-glass.png          (devtools/magnifying-glass.png)
+         skin/classic/browser/devtools/itemToggle.png                (devtools/itemToggle.png)
+         skin/classic/browser/devtools/itemArrow-rtl.png             (devtools/itemArrow-rtl.png)
+         skin/classic/browser/devtools/itemArrow-ltr.png             (devtools/itemArrow-ltr.png)
+         skin/classic/browser/devtools/inspect-button.png            (devtools/inspect-button.png)
+         skin/classic/browser/devtools/dropmarker.png                (devtools/dropmarker.png)
++        skin/classic/browser/devtools/layout-background.png         (devtools/layout-background.png)
++        skin/classic/browser/devtools/layoutview.css                (devtools/layoutview.css)
++        skin/classic/browser/devtools/layout-buttons.png            (devtools/layout-buttons.png)
+ #ifdef MOZ_SERVICES_SYNC
+         skin/classic/browser/sync-throbber.png
+         skin/classic/browser/sync-16.png
+         skin/classic/browser/sync-32.png
+         skin/classic/browser/sync-128.png
+         skin/classic/browser/sync-bg.png
+         skin/classic/browser/sync-desktopIcon.png
+         skin/classic/browser/sync-mobileIcon.png
+@@ -328,16 +331,19 @@ browser.jar:
+         skin/classic/aero/browser/devtools/styleeditor.css           (devtools/styleeditor.css)
+         skin/classic/aero/browser/devtools/debugger.css              (devtools/debugger.css)
+         skin/classic/aero/browser/devtools/magnifying-glass.png      (devtools/magnifying-glass.png)
+         skin/classic/aero/browser/devtools/itemToggle.png            (devtools/itemToggle.png)
+         skin/classic/aero/browser/devtools/itemArrow-rtl.png         (devtools/itemArrow-rtl.png)
+         skin/classic/aero/browser/devtools/itemArrow-ltr.png         (devtools/itemArrow-ltr.png)
+         skin/classic/aero/browser/devtools/inspect-button.png        (devtools/inspect-button.png)
+         skin/classic/aero/browser/devtools/dropmarker.png            (devtools/dropmarker.png)
++        skin/classic/aero/browser/devtools/layout-background.png     (devtools/layout-background.png)
++        skin/classic/aero/browser/devtools/layoutview.css            (devtools/layoutview.css)
++        skin/classic/aero/browser/devtools/layout-buttons.png        (devtools/layout-buttons.png)
+ #ifdef MOZ_SERVICES_SYNC
+         skin/classic/aero/browser/sync-throbber.png
+         skin/classic/aero/browser/sync-16.png
+         skin/classic/aero/browser/sync-32.png
+         skin/classic/aero/browser/sync-128.png
+         skin/classic/aero/browser/sync-bg.png
+         skin/classic/aero/browser/sync-desktopIcon.png
+         skin/classic/aero/browser/sync-mobileIcon.png

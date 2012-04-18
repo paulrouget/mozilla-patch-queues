@@ -1,0 +1,132 @@
+# HG changeset patch
+# Parent ee4e0c98cb02323c040f439eea81a98b217d3003
+
+diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/highlighter/highlighter.jsm
+--- a/browser/devtools/highlighter/highlighter.jsm
++++ b/browser/devtools/highlighter/highlighter.jsm
+@@ -129,48 +129,57 @@ const PSEUDO_CLASSES = [":hover", ":acti
+  */
+ 
+ 
+ /**
+  * Constructor.
+  *
+  * @param object aWindow
+  */
+-function Highlighter(aWindow)
++function Highlighter(aWindow, aChromeContext)
+ {
+   this.chromeWin = aWindow;
+   this.tabbrowser = aWindow.gBrowser;
+   this.chromeDoc = aWindow.document;
+   this.browser = aWindow.gBrowser.selectedBrowser;
+   this.events = {};
+ 
++  this.chromeContext = !!aChromeContext;
++
+   this._init();
+ }
+ 
+ Highlighter.prototype = {
+   _init: function Highlighter__init()
+   {
+-    let stack = this.browser.parentNode;
+-    this.win = this.browser.contentWindow;
++    let topcontainer;
++    if (this.chromeContext) {
++      topcontainer = this.chromeDoc.querySelector("#tab-view-deck");
++      topcontainer.style.display = "-moz-stack";
++      this.win = this.chromeWin;
++    } else {
++      topcontainer = this.browser.parentNode;
++      this.win = this.browser.contentWindow;
++    }
+     this._highlighting = false;
+ 
+     this.highlighterContainer = this.chromeDoc.createElement("stack");
+     this.highlighterContainer.id = "highlighter-container";
+ 
+     this.veilContainer = this.chromeDoc.createElement("vbox");
+     this.veilContainer.id = "highlighter-veil-container";
+ 
+     // The controlsBox will host the different interactive
+     // elements of the highlighter (buttons, toolbars, ...).
+     let controlsBox = this.chromeDoc.createElement("box");
+     controlsBox.id = "highlighter-controls";
+     this.highlighterContainer.appendChild(this.veilContainer);
+     this.highlighterContainer.appendChild(controlsBox);
+ 
+-    stack.appendChild(this.highlighterContainer);
++    topcontainer.appendChild(this.highlighterContainer);
+ 
+     // The veil will make the whole page darker except
+     // for the region of the selected box.
+     this.buildVeil(this.veilContainer);
+ 
+     this.buildInfobar(controlsBox);
+ 
+     this.transitionDisabler = null;
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -280,17 +280,17 @@ InspectorUI.prototype = {
+   /**
+    * Open inspector UI and HTML tree. Add listeners for document scrolling,
+    * resize, tabContainer.TabSelect and others. If a node is provided, then
+    * start inspecting it.
+    *
+    * @param [optional] aNode
+    *        The node to inspect.
+    */
+-  openInspectorUI: function IUI_openInspectorUI(aNode)
++  openInspectorUI: function IUI_openInspectorUI(aNode, aChromeContext)
+   {
+     // InspectorUI is already up and running. Lock a node if asked (via context).
+     if (this.isInspectorOpen) {
+       if (aNode) {
+         this.inspectNode(aNode);
+         this.stopInspecting();
+       }
+       return;
+@@ -311,17 +311,21 @@ InspectorUI.prototype = {
+     if (aNode) {
+       // Add the observer to inspect the node after initialization finishes.
+       Services.obs.addObserver(boundInspectObserver,
+                                INSPECTOR_NOTIFICATIONS.OPENED,
+                                false);
+     }
+     // Start initialization.
+     this.browser = this.tabbrowser.selectedBrowser;
+-    this.win = this.browser.contentWindow;
++    if (aChromeContext) {
++      this.win = this.chromeWin;
++    } else {
++      this.win = this.browser.contentWindow;
++    }
+     this.winID = this.getWindowID(this.win);
+     this.toolbar = this.chromeDoc.getElementById("inspector-toolbar");
+     this.inspectMenuitem = this.chromeDoc.getElementById("Tools:Inspect");
+     this.inspectToolbutton =
+       this.chromeDoc.getElementById("inspector-inspect-toolbutton");
+ 
+     this.initTools();
+     this.chromeWin.Tilt.setup();
+@@ -346,17 +350,17 @@ InspectorUI.prototype = {
+ 
+     this.isDirty = false;
+ 
+     this.progressListener = new InspectorProgressListener(this);
+ 
+     this.chromeWin.addEventListener("keypress", this, false);
+ 
+     // initialize the highlighter
+-    this.highlighter = new Highlighter(this.chromeWin);
++    this.highlighter = new Highlighter(this.chromeWin, aChromeContext);
+ 
+     this.setupNavigationKeys();
+     this.highlighterReady();
+   },
+ 
+   /**
+    * Register the Rule View in the Sidebar.
+    */

@@ -1,0 +1,403 @@
+# HG changeset patch
+# Parent 4b87cffba4d5dea5ddea2e6de571cc39ce9ed31b
+Bug 735214 - [inspector] Give the focus to the toolbar and make the buttons tabbable. (Part A - shortcut)
+
+diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browser-sets.inc
+--- a/browser/base/content/browser-sets.inc
++++ b/browser/base/content/browser-sets.inc
+@@ -264,17 +264,17 @@
+     />
+     <key id="key_debugger" key="&debuggerMenu.commandkey;" command="Tools:Debugger"
+ #ifdef XP_MACOSX
+         modifiers="accel,alt"
+ #else
+         modifiers="accel,shift"
+ #endif
+     />
+-    <key id="key_inspect" key="&inspectMenu.commandkey;" command="Tools:Inspect"
++    <key id="key_inspect" key="&inspectMenu.commandkey;" command="Inspector:Inspect"
+ #ifdef XP_MACOSX
+         modifiers="accel,alt"
+ #else
+         modifiers="accel,shift"
+ #endif
+     />
+     <key id="key_scratchpad" keycode="&scratchpad.keycode;" modifiers="shift"
+          keytext="&scratchpad.keytext;" command="Tools:Scratchpad"/>
+diff --git a/browser/devtools/highlighter/Makefile.in b/browser/devtools/highlighter/Makefile.in
+--- a/browser/devtools/highlighter/Makefile.in
++++ b/browser/devtools/highlighter/Makefile.in
+@@ -40,18 +40,21 @@
+ DEPTH		= ../../..
+ topsrcdir	= @top_srcdir@
+ srcdir		= @srcdir@
+ VPATH		= @srcdir@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
+ EXTRA_JS_MODULES = \
+-	inspector.jsm \
+ 	domplate.jsm \
+ 	InsideOutBox.jsm \
+ 	TreePanel.jsm \
+ 	highlighter.jsm \
+ 	$(NULL)
+ 
++EXTRA_PP_JS_MODULES = \
++	inspector.jsm \
++	$(NULL)
++
+ TEST_DIRS += test
+ 
+ include $(topsrcdir)/config/rules.mk
+diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/highlighter/highlighter.jsm
+--- a/browser/devtools/highlighter/highlighter.jsm
++++ b/browser/devtools/highlighter/highlighter.jsm
+@@ -180,17 +180,16 @@ Highlighter.prototype = {
+     this.hide();
+   },
+ 
+   /**
+    * Destroy the nodes. Remove listeners.
+    */
+   destroy: function Highlighter_destroy()
+   {
+-    this.detachKeysListeners();
+     this.detachMouseListeners();
+     this.detachPageListeners();
+ 
+     this.chromeWin.clearTimeout(this.transitionDisabler);
+     this.boundCloseEventHandler = null;
+     this._contentRect = null;
+     this._highlightRect = null;
+     this._highlighting = false;
+@@ -295,30 +294,28 @@ Highlighter.prototype = {
+ 
+   /**
+    * Show the highlighter if it has been hidden.
+    */
+   show: function() {
+     if (!this.hidden) return;
+     this.veilContainer.removeAttribute("hidden");
+     this.nodeInfo.container.removeAttribute("hidden");
+-    this.attachKeysListeners();
+     this.attachPageListeners();
+     this.invalidateSize();
+     this.hidden = false;
+   },
+ 
+   /**
+    * Hide the highlighter, the veil and the infobar.
+    */
+   hide: function() {
+     if (this.hidden) return;
+     this.veilContainer.setAttribute("hidden", "true");
+     this.nodeInfo.container.setAttribute("hidden", "true");
+-    this.detachKeysListeners();
+     this.detachPageListeners();
+     this.hidden = true;
+   },
+ 
+   /**
+    * Is the highlighter visible?
+    *
+    * @return boolean
+@@ -771,28 +768,16 @@ Highlighter.prototype = {
+ 
+   detachPageListeners: function Highlighter_detachPageListeners()
+   {
+     this.browser.removeEventListener("resize", this, true);
+     this.browser.removeEventListener("scroll", this, true);
+     this.browser.removeEventListener("MozAfterPaint", this, true);
+   },
+ 
+-  attachKeysListeners: function Highlighter_attachKeysListeners()
+-  {
+-    this.browser.addEventListener("keypress", this, true);
+-    this.highlighterContainer.addEventListener("keypress", this, true);
+-  },
+-
+-  detachKeysListeners: function Highlighter_detachKeysListeners()
+-  {
+-    this.browser.removeEventListener("keypress", this, true);
+-    this.highlighterContainer.removeEventListener("keypress", this, true);
+-  },
+-
+   /**
+    * Generic event handler.
+    *
+    * @param nsIDOMEvent aEvent
+    *        The DOM event object.
+    */
+   handleEvent: function Highlighter_handleEvent(aEvent)
+   {
+@@ -812,24 +797,16 @@ Highlighter.prototype = {
+         this.invalidateSize();
+         break;
+       case "dblclick":
+       case "mousedown":
+       case "mouseup":
+         aEvent.stopPropagation();
+         aEvent.preventDefault();
+         break;
+-      case "keypress":
+-        switch (aEvent.keyCode) {
+-          case this.chromeWin.KeyEvent.DOM_VK_RETURN:
+-            this.locked ? this.unlock() : this.lock();
+-            aEvent.preventDefault();
+-            aEvent.stopPropagation();
+-            break;
+-        }
+     }
+   },
+ 
+   /**
+    * Disable the CSS transitions for a short time to avoid laggy animations
+    * during scrolling or resizing.
+    */
+   brieflyDisableTransitions: function Highlighter_brieflyDisableTransitions()
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -100,25 +100,17 @@ function InspectorUI(aWindow)
+ {
+   this.chromeWin = aWindow;
+   this.chromeDoc = aWindow.document;
+   this.tabbrowser = aWindow.gBrowser;
+   this.tools = {};
+   this.toolEvents = {};
+   this.store = new InspectorStore();
+   this.INSPECTOR_NOTIFICATIONS = INSPECTOR_NOTIFICATIONS;
+-
+-  // Set the tooltip of the inspect button.
+-  let keysbundle = Services.strings.createBundle(
+-    "chrome://global/locale/keys.properties");
+-  let returnString = keysbundle.GetStringFromName("VK_RETURN");
+-  let tooltip = this.strings.formatStringFromName("inspectButton.tooltiptext",
+-    [returnString], 1);
+-  let button = this.chromeDoc.getElementById("inspector-inspect-toolbutton");
+-  button.setAttribute("tooltiptext", tooltip);
++  this.buildInspectButtonTooltip();
+ }
+ 
+ InspectorUI.prototype = {
+   browser: null,
+   tools: null,
+   toolEvents: null,
+   inspecting: false,
+   ruleViewEnabled: true,
+@@ -136,16 +128,55 @@ InspectorUI.prototype = {
+     if (this.isInspectorOpen) {
+       this.closeInspectorUI();
+     } else {
+       this.openInspectorUI();
+     }
+   },
+ 
+   /**
++   * Add a tooltip to the inspect button. The tooltip includes the
++   * related keyboard shortcut.
++   */
++  buildInspectButtonTooltip: function IUI_buildInspectButtonTooltip()
++  {
++    let keysbundle = Services.strings.createBundle("chrome://global-platform/locale/platformKeys.properties");
++
++    let key = this.chromeDoc.getElementById("key_inspect");
++
++    let modifiersAttr = key.getAttribute("modifiers");
++
++    let combo = [];
++
++    if (modifiersAttr.match("accel"))
++#ifdef XP_MACOSX
++      combo.push(keysbundle.GetStringFromName("VK_META"));
++#else
++      combo.push(keysbundle.GetStringFromName("VK_CONTROL"));
++#endif
++    if (modifiersAttr.match("shift"))
++      combo.push(keysbundle.GetStringFromName("VK_SHIFT"));
++    if (modifiersAttr.match("alt"))
++      combo.push(keysbundle.GetStringFromName("VK_ALT"));
++    if (modifiersAttr.match("ctrl"))
++      combo.push(keysbundle.GetStringFromName("VK_CONTROL"));
++    if (modifiersAttr.match("meta"))
++      combo.push(keysbundle.GetStringFromName("VK_META"));
++
++    combo.push(key.getAttribute("key"));
++
++    let separator = keysbundle.GetStringFromName("MODIFIER_SEPARATOR");
++
++    let tooltip = this.strings.formatStringFromName("inspectButton.tooltiptext",
++      [combo.join(separator)], 1);
++    let button = this.chromeDoc.getElementById("inspector-inspect-toolbutton");
++    button.setAttribute("tooltiptext", tooltip);
++  },
++
++  /**
+    * Show the Sidebar.
+    */
+   showSidebar: function IUI_showSidebar()
+   {
+     this.sidebarBox.removeAttribute("hidden");
+     this.sidebarSplitter.removeAttribute("hidden");
+     this.stylingButton.checked = true;
+ 
+@@ -230,16 +261,21 @@ InspectorUI.prototype = {
+   },
+ 
+   /**
+    * Toggle the status of the inspector, starting or stopping it. Invoked
+    * from the toolbar's Inspect button.
+    */
+   toggleInspection: function IUI_toggleInspection()
+   {
++    if (!this.isInspectorOpen) {
++      this.openInspectorUI();
++      return;
++    }
++
+     if (this.inspecting) {
+       this.stopInspecting();
+     } else {
+       this.startInspecting();
+     }
+   },
+ 
+   /**
+diff --git a/browser/devtools/highlighter/test/browser_inspector_bug_672902_keyboard_shortcuts.js b/browser/devtools/highlighter/test/browser_inspector_bug_672902_keyboard_shortcuts.js
+--- a/browser/devtools/highlighter/test/browser_inspector_bug_672902_keyboard_shortcuts.js
++++ b/browser/devtools/highlighter/test/browser_inspector_bug_672902_keyboard_shortcuts.js
+@@ -99,17 +99,18 @@ function test()
+   }
+ 
+   function highlightParentNode()
+   {
+     InspectorUI.highlighter.removeListener("nodeselected", highlightParentNode);
+     is(InspectorUI.selection, node, "selected body element");
+ 
+     // Test that locking works.
+-    EventUtils.synthesizeKey("VK_RETURN", { });
++    synthesizeKeyFromKeyTag("key_inspect");
++
+     executeSoon(isTheNodeLocked);
+   }
+ 
+   function isTheNodeLocked()
+   {
+     ok(!InspectorUI.inspecting, "the node is locked");
+     Services.obs.addObserver(finishUp,
+                              InspectorUI.INSPECTOR_NOTIFICATIONS.CLOSED,
+diff --git a/browser/devtools/highlighter/test/browser_inspector_keybindings.js b/browser/devtools/highlighter/test/browser_inspector_keybindings.js
+--- a/browser/devtools/highlighter/test/browser_inspector_keybindings.js
++++ b/browser/devtools/highlighter/test/browser_inspector_keybindings.js
+@@ -35,31 +35,29 @@ function test()
+       InspectorUI.highlighter.addListener("nodeselected", lockNode);
+       InspectorUI.inspectNode(node);
+     });
+   }
+ 
+   function lockNode()
+   {
+     InspectorUI.highlighter.removeListener("nodeselected", lockNode);
+-    EventUtils.synthesizeKey("VK_RETURN", { });
+-
++    synthesizeKeyFromKeyTag("key_inspect");
+     executeSoon(isTheNodeLocked);
+   }
+ 
+   function isTheNodeLocked()
+   {
+     is(InspectorUI.selection, node, "selection matches node");
+     ok(!InspectorUI.inspecting, "the node is locked");
+     unlockNode();
+   }
+ 
+   function unlockNode() {
+-    EventUtils.synthesizeKey("VK_RETURN", { });
+-
++    synthesizeKeyFromKeyTag("key_inspect");
+     executeSoon(isTheNodeUnlocked);
+   }
+ 
+   function isTheNodeUnlocked()
+   {
+     ok(InspectorUI.inspecting, "the node is unlocked");
+ 
+     // Let's close the inspector
+diff --git a/browser/devtools/highlighter/test/browser_inspector_tab_switch.js b/browser/devtools/highlighter/test/browser_inspector_tab_switch.js
+--- a/browser/devtools/highlighter/test/browser_inspector_tab_switch.js
++++ b/browser/devtools/highlighter/test/browser_inspector_tab_switch.js
+@@ -184,17 +184,17 @@ function inspectorFocusTab2()
+   // Make sure the inspector is still open.
+   ok(!InspectorUI.inspecting, "Inspector is not highlighting");
+   ok(!InspectorUI.treePanel.isOpen(), "Inspector Tree Panel is not open");
+   ok(!InspectorUI.isSidebarOpen, "Inspector Sidebar is not open");
+   is(InspectorUI.store.length, 2, "Inspector.store.length is 2");
+   isnot(InspectorUI.selection, div, "selection does not match the div element");
+ 
+   // Make sure keybindings still sork
+-  EventUtils.synthesizeKey("VK_RETURN", { });
++  synthesizeKeyFromKeyTag("key_inspect");
+ 
+   executeSoon(function() {
+     ok(InspectorUI.inspecting, "Inspector is highlighting");
+     InspectorUI.toggleInspection();
+ 
+     // Switch back to tab 1.
+     Services.obs.addObserver(inspectorSecondFocusTab1,
+       InspectorUI.INSPECTOR_NOTIFICATIONS.TREEPANELREADY, false);
+diff --git a/browser/devtools/highlighter/test/head.js b/browser/devtools/highlighter/test/head.js
+--- a/browser/devtools/highlighter/test/head.js
++++ b/browser/devtools/highlighter/test/head.js
+@@ -84,8 +84,33 @@ function getHighlitNode()
+ function midPoint(aPointA, aPointB)
+ {
+   let pointC = { };
+   pointC.x = (aPointB.x - aPointA.x) / 2 + aPointA.x;
+   pointC.y = (aPointB.y - aPointA.y) / 2 + aPointA.y;
+   return pointC;
+ }
+ 
++function synthesizeKeyFromKeyTag(aKeyId) {
++  let key = document.getElementById(aKeyId);
++  isnot(key, null, "Successfully retrieved the <key> node");
++
++  let modifiersAttr = key.getAttribute("modifiers");
++
++  let name = null;
++
++  if (key.getAttribute("keycode"))
++    name = key.getAttribute("keycode");
++  else if (key.getAttribute("key"))
++    name = key.getAttribute("key");
++
++  isnot(name, null, "Successfully retrieved keycode/key");
++
++  let modifiers = {
++    shiftKey: modifiersAttr.match("shift"),
++    ctrlKey: modifiersAttr.match("ctrl"),
++    altKey: modifiersAttr.match("alt"),
++    metaKey: modifiersAttr.match("meta"),
++    accelKey: modifiersAttr.match("accel")
++  }
++
++  EventUtils.synthesizeKey(name, modifiers);
++}
+diff --git a/browser/locales/en-US/chrome/browser/devtools/inspector.properties b/browser/locales/en-US/chrome/browser/devtools/inspector.properties
+--- a/browser/locales/en-US/chrome/browser/devtools/inspector.properties
++++ b/browser/locales/en-US/chrome/browser/devtools/inspector.properties
+@@ -23,12 +23,11 @@ breadcrumbs.siblings=Siblings
+ # LOCALIZATION NOTE (ruleView.*): Button label, accesskey and tooltip text
+ # associated with the Highlighter's CSS Rule View in the Style Sidebar.
+ ruleView.label=Rules
+ ruleView.accesskey=R
+ ruleView.tooltiptext=View and Edit CSS
+ 
+ # LOCALIZATION NOTE (inspectButton.tooltiptext):
+ # This button appears in the Inspector Toolbar. inspectButton is stateful,
+-# if it's pressed users can select an element with the mouse. Pressing the
+-# "Return" key # changes that state. %S is the keyboard shortcut (VK_RETURN in
+-# chrome://global/locale/keys.properties).
++# if it's pressed users can select an element with the mouse.
++# %S is the keyboard shortcut.
+ inspectButton.tooltiptext=Select element with mouse (%S)

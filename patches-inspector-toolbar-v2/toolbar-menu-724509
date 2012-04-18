@@ -1,11 +1,11 @@
 # HG changeset patch
-# Parent e8a1d5f0ff38958512fe944c486179fd15962376
+# Parent b7b22181900f4ea83ac6582603fc39b834348d8b
 Bug 724509 - Add an Option menu in the Inspector Toolbar
 
 diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
 --- a/browser/app/profile/firefox.js
 +++ b/browser/app/profile/firefox.js
-@@ -1030,16 +1030,18 @@ pref("services.sync.prefs.sync.xpinstall
+@@ -1037,16 +1037,18 @@ pref("services.sync.prefs.sync.xpinstall
  pref("devtools.errorconsole.enabled", false);
  
  // Enable the Inspector
@@ -51,7 +51,7 @@ diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browse
 diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
 --- a/browser/base/content/browser.xul
 +++ b/browser/base/content/browser.xul
-@@ -996,16 +996,33 @@
+@@ -998,16 +998,35 @@
               class="devtools-toolbar"
               nowindowdrag="true"
               hidden="true">
@@ -62,6 +62,8 @@ diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
  #endif
 +      <toolbarbutton id="inspector-menu-toolbarbutton"
 +                     type="menu"
++                     tabindex="0"
++                     aria-label="&inspectMenuButton.arialabel;"
 +                     tooltiptext="&inspectMenuButton.tooltiptext;">
 +        <menupopup id="inspector-menu-popup"
 +                   position="before_start">
@@ -88,7 +90,7 @@ diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
 diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlighter.css
 --- a/browser/base/content/highlighter.css
 +++ b/browser/base/content/highlighter.css
-@@ -7,16 +7,20 @@
+@@ -7,16 +7,21 @@
    top: 0;
    left: 0;
  }
@@ -97,7 +99,8 @@ diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlig
    overflow: hidden;
  }
  
-+#highlighter-veil-container:not([dim]) .highlighter-veil {
++#highlighter-veil-container:not([dim]) > .highlighter-veil,
++#highlighter-veil-container:not([dim]) > hbox > .highlighter-veil {
 +  background-color: transparent;
 +}
 +
@@ -109,7 +112,7 @@ diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlig
    -moz-transition-duration: 0.1s;
    -moz-transition-timing-function: linear;
  }
-@@ -86,8 +90,12 @@ html|*#highlighter-nodeinfobar-tagname {
+@@ -95,8 +100,12 @@ html|*#highlighter-nodeinfobar-tagname {
  
  html|*#highlighter-nodeinfobar-tagname {
    text-transform: lowercase;
@@ -125,7 +128,7 @@ diff --git a/browser/base/content/highlighter.css b/browser/base/content/highlig
 diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/highlighter/highlighter.jsm
 --- a/browser/devtools/highlighter/highlighter.jsm
 +++ b/browser/devtools/highlighter/highlighter.jsm
-@@ -98,17 +98,23 @@ const PSEUDO_CLASSES = [":hover", ":acti
+@@ -99,17 +99,23 @@ const PSEUDO_CLASSES = [":hover", ":acti
   *   boolean isHidden();
   *
   *   // Redraw the highlighter if the visible portion of the node has changed.
@@ -150,7 +153,7 @@ diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/hig
   * Events:
   *
   *   "closed" - Highlighter is closing
-@@ -165,16 +171,17 @@ Highlighter.prototype = {
+@@ -166,16 +172,17 @@ Highlighter.prototype = {
      this.highlighterContainer.appendChild(this.veilContainer);
      this.highlighterContainer.appendChild(controlsBox);
  
@@ -168,7 +171,7 @@ diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/hig
      this.computeZoomFactor();
      this.unlock();
      this.hide();
-@@ -363,33 +370,62 @@ Highlighter.prototype = {
+@@ -362,33 +369,62 @@ Highlighter.prototype = {
    isNodeHighlightable: function Highlighter_isNodeHighlightable(aNode)
    {
      if (aNode.nodeType != aNode.ELEMENT_NODE) {
@@ -235,7 +238,7 @@ diff --git a/browser/devtools/highlighter/highlighter.jsm b/browser/devtools/hig
 diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
 --- a/browser/devtools/highlighter/inspector.jsm
 +++ b/browser/devtools/highlighter/inspector.jsm
-@@ -239,17 +239,17 @@ InspectorUI.prototype = {
+@@ -277,17 +277,17 @@ InspectorUI.prototype = {
      } else {
        this.startInspecting();
      }
@@ -254,7 +257,7 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
      } else {
        this.treePanel.open();
        Services.prefs.setBoolPref("devtools.inspector.htmlPanelOpen", true);
-@@ -263,16 +263,54 @@ InspectorUI.prototype = {
+@@ -301,16 +301,54 @@ InspectorUI.prototype = {
     * @returns boolean
     */
    get isInspectorOpen()
@@ -309,7 +312,7 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
      return doc.documentElement ? doc.documentElement.lastElementChild : null;
    },
  
-@@ -418,16 +456,22 @@ InspectorUI.prototype = {
+@@ -459,16 +497,22 @@ InspectorUI.prototype = {
          Services.prefs.getBoolPref("devtools.inspector.htmlPanelOpen"));
  
        this.store.setValue(this.winID, "sidebarOpen",
@@ -332,7 +335,7 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
     * Browse nodes according to the breadcrumbs layout, only for some specific
     * elements of the UI.
     */
-@@ -715,16 +759,33 @@ InspectorUI.prototype = {
+@@ -755,16 +799,33 @@ InspectorUI.prototype = {
      if (this.store.getValue(this.winID, "htmlPanelOpen")) {
        this.treePanel.open();
      }
@@ -366,10 +369,51 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
     * Main callback handler for events.
     *
     * @param event
+@@ -853,30 +914,40 @@ InspectorUI.prototype = {
+           node = bc.nodeHierarchy[bc.currentIndex + 1].node;
+         if (node && this.highlighter.isNodeHighlightable(node)) {
+           this.highlighter.highlight(node);
+         }
+         event.preventDefault();
+         event.stopPropagation();
+         break;
+       case this.chromeWin.KeyEvent.DOM_VK_UP:
++        if (this.originalTarget.id == "inspector-menu-toolbarbutton") {
++          // We don't want to prevent the user to open the menu
++          // with the keyboard.
++          break;
++        }
+         if (this.selection) {
+           // Find a previous sibling that is highlightable.
+           node = this.selection.previousSibling;
+           while (node && !this.highlighter.isNodeHighlightable(node)) {
+             node = node.previousSibling;
+           }
+         }
+         if (node && this.highlighter.isNodeHighlightable(node)) {
+           this.highlighter.highlight(node, true);
+         }
+         event.preventDefault();
+         event.stopPropagation();
+         break;
+       case this.chromeWin.KeyEvent.DOM_VK_DOWN:
++        if (this.originalTarget.id == "inspector-menu-toolbarbutton") {
++          // We don't want to prevent the user to open the menu
++          // with the keyboard.
++          break;
++        }
+         if (this.selection) {
+           // Find a next sibling that is highlightable.
+           node = this.selection.nextSibling;
+           while (node && !this.highlighter.isNodeHighlightable(node)) {
+             node = node.nextSibling;
+           }
+         }
+         if (node && this.highlighter.isNodeHighlightable(node)) {
 diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/en-US/chrome/browser/browser.dtd
 --- a/browser/locales/en-US/chrome/browser/browser.dtd
 +++ b/browser/locales/en-US/chrome/browser/browser.dtd
-@@ -219,16 +219,25 @@ can reach it easily. -->
+@@ -219,16 +219,28 @@ can reach it easily. -->
  <!ENTITY inspectorHTMLCopyInner.accesskey   "I">
  
  <!ENTITY inspectorHTMLCopyOuter.label       "Copy Outer HTML">
@@ -378,13 +422,16 @@ diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/
  <!ENTITY inspectorHTMLDelete.label          "Delete Node">
  <!ENTITY inspectorHTMLDelete.accesskey      "D">
  
-+<!-- LOCALIZATION NOTE: The menu in the Inspector toolbar -->
++<!-- LOCALIZATION NOTE (inspectMenuButton.*): The menu in the Inspector
++  -  toolbar. The button doesn't have a label, so we use an aria-label
++  -  for accessibility -->
 +<!ENTITY inspectMenuButton.tooltiptext      "Inspector Options">
++<!ENTITY inspectMenuButton.arialabel        "Inspector Options">
 +
 +<!-- LOCALIZATION NOTE: These are for the menu in the Inspector Toolbar -->
-+<!ENTITY inspectorToggleVeil.label          "Dim the page">
++<!ENTITY inspectorToggleVeil.label          "Dim The Page">
 +<!ENTITY inspectorToggleVeil.accesskey      "D">
-+<!ENTITY inspectorToggleInfobar.label       "Show node details">
++<!ENTITY inspectorToggleInfobar.label       "Show Node Info">
 +<!ENTITY inspectorToggleInfobar.accesskey   "S">
 +
  <!-- LOCALIZATION NOTE (inspect3DViewButton.label): This button shows an
@@ -398,7 +445,7 @@ diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/
 diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
 --- a/browser/themes/gnomestripe/browser.css
 +++ b/browser/themes/gnomestripe/browser.css
-@@ -1992,16 +1992,28 @@ panel[dimmed="true"] {
+@@ -2010,16 +2010,28 @@ panel[dimmed="true"] {
    list-style-image: url("chrome://browser/skin/devtools/inspect-button.png");
    -moz-image-region: rect(0px 16px 16px 0px);
  }
@@ -427,6 +474,22 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
    -moz-appearance: none;
    border: 0;
    -moz-border-start: 1px solid #242b33;
+@@ -2346,8 +2358,15 @@ html|*#highlighter-nodeinfobar-pseudo-cl
+   -moz-appearance: none;
+   border-top: 1px solid black;
+   border-bottom-width: 0;
+   min-height: 3px;
+   height: 3px;
+   margin-bottom: -3px;
+   position: relative;
+ }
++
++/* Highlight toolbar - Option menu */
++
++#inspector-menu-toolbarbutton:focus {
++  outline: 1px dotted hsla(210,30%,85%,0.4);
++  outline-offset: -2px;
++}
 diff --git a/browser/themes/gnomestripe/devtools/inspector-menu-icon.png b/browser/themes/gnomestripe/devtools/inspector-menu-icon.png
 new file mode 100644
 index 0000000000000000000000000000000000000000..9fd78175dfd5449b43034602ed854907ea82d885
@@ -464,8 +527,7 @@ vP2hf8!*eW|JeLPg0h#F|!A4MHCujKww^Ko-W{nMk00000NkvXXu0mjfmjtI_
 diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
 --- a/browser/themes/gnomestripe/jar.mn
 +++ b/browser/themes/gnomestripe/jar.mn
-@@ -126,16 +126,17 @@ browser.jar:
-   skin/classic/browser/devtools/splitview.css         (devtools/splitview.css)
+@@ -127,16 +127,17 @@ browser.jar:
    skin/classic/browser/devtools/styleeditor.css       (devtools/styleeditor.css)
    skin/classic/browser/devtools/debugger.css          (devtools/debugger.css)
    skin/classic/browser/devtools/magnifying-glass.png  (devtools/magnifying-glass.png)
@@ -473,6 +535,7 @@ diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.
    skin/classic/browser/devtools/itemArrow-rtl.png     (devtools/itemArrow-rtl.png)
    skin/classic/browser/devtools/itemArrow-ltr.png     (devtools/itemArrow-ltr.png)
    skin/classic/browser/devtools/inspect-button.png    (devtools/inspect-button.png)
+   skin/classic/browser/devtools/dropmarker.png        (devtools/dropmarker.png)
 +  skin/classic/browser/devtools/inspector-menu-icon.png (devtools/inspector-menu-icon.png)
  #ifdef MOZ_SERVICES_SYNC
    skin/classic/browser/sync-16-throbber.png
@@ -485,7 +548,7 @@ diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.
 diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
 --- a/browser/themes/pinstripe/browser.css
 +++ b/browser/themes/pinstripe/browser.css
-@@ -2727,16 +2727,28 @@ panel[dimmed="true"] {
+@@ -2743,16 +2743,28 @@ panel[dimmed="true"] {
    list-style-image: url("chrome://browser/skin/devtools/inspect-button.png");
    -moz-image-region: rect(0px 16px 16px 0px);
  }
@@ -548,31 +611,10 @@ zSsN>4^Z)lPfR_s=PV<-<la%hiV5K)Zt^FF`?VA%*v$okgdrpTK!ARc%Xn@BHE_LU`
 zUOUd+Qx>F~)^n2$EjuIU#9cql5Bb3jV@CWKK{0x8YwZ9_fDZ@(8*BtH$C!~Cz^Pzc
 vP2hf8!*eW|JeLPg0h#F|!A4MHCujKww^Ko-W{nMk00000NkvXXu0mjfmjtI_
 
-diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
---- a/browser/themes/pinstripe/jar.mn
-+++ b/browser/themes/pinstripe/jar.mn
-@@ -167,16 +167,17 @@ browser.jar:
-   skin/classic/browser/devtools/styleeditor.css             (devtools/styleeditor.css)
-   skin/classic/browser/devtools/debugger.css                (devtools/debugger.css)
-   skin/classic/browser/devtools/magnifying-glass.png        (devtools/magnifying-glass.png)
-   skin/classic/browser/devtools/itemToggle.png              (devtools/itemToggle.png)
-   skin/classic/browser/devtools/itemArrow-rtl.png           (devtools/itemArrow-rtl.png)
-   skin/classic/browser/devtools/itemArrow-ltr.png           (devtools/itemArrow-ltr.png)
-   skin/classic/browser/devtools/background-noise-toolbar.png (devtools/background-noise-toolbar.png)
-   skin/classic/browser/devtools/inspect-button.png          (devtools/inspect-button.png)
-+  skin/classic/browser/devtools/inspector-menu-icon.png     (devtools/inspector-menu-icon.png)
- #ifdef MOZ_SERVICES_SYNC
-   skin/classic/browser/sync-throbber.png
-   skin/classic/browser/sync-16.png
-   skin/classic/browser/sync-32.png
-   skin/classic/browser/sync-bg.png
-   skin/classic/browser/sync-128.png
-   skin/classic/browser/sync-desktopIcon.png
-   skin/classic/browser/sync-mobileIcon.png
 diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/browser.css
 --- a/browser/themes/winstripe/browser.css
 +++ b/browser/themes/winstripe/browser.css
-@@ -2687,16 +2687,28 @@ panel[dimmed="true"] {
+@@ -2678,16 +2678,28 @@ panel[dimmed="true"] {
    list-style-image: url("chrome://browser/skin/devtools/inspect-button.png");
    -moz-image-region: rect(0px 16px 16px 0px);
  }
@@ -638,8 +680,7 @@ vP2hf8!*eW|JeLPg0h#F|!A4MHCujKww^Ko-W{nMk00000NkvXXu0mjfmjtI_
 diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
 --- a/browser/themes/winstripe/jar.mn
 +++ b/browser/themes/winstripe/jar.mn
-@@ -151,16 +151,17 @@ browser.jar:
-         skin/classic/browser/devtools/splitview.css                 (devtools/splitview.css)
+@@ -154,16 +154,17 @@ browser.jar:
          skin/classic/browser/devtools/styleeditor.css               (devtools/styleeditor.css)
          skin/classic/browser/devtools/debugger.css                  (devtools/debugger.css)
          skin/classic/browser/devtools/magnifying-glass.png          (devtools/magnifying-glass.png)
@@ -647,6 +688,7 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/browser/devtools/itemArrow-rtl.png             (devtools/itemArrow-rtl.png)
          skin/classic/browser/devtools/itemArrow-ltr.png             (devtools/itemArrow-ltr.png)
          skin/classic/browser/devtools/inspect-button.png            (devtools/inspect-button.png)
+         skin/classic/browser/devtools/dropmarker.png                (devtools/dropmarker.png)
 +        skin/classic/browser/devtools/inspector-menu-icon.png       (devtools/inspector-menu-icon.png)
  #ifdef MOZ_SERVICES_SYNC
          skin/classic/browser/sync-throbber.png
@@ -656,8 +698,7 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/browser/sync-bg.png
          skin/classic/browser/sync-desktopIcon.png
          skin/classic/browser/sync-mobileIcon.png
-@@ -322,16 +323,17 @@ browser.jar:
-         skin/classic/aero/browser/devtools/splitview.css             (devtools/splitview.css)
+@@ -328,16 +329,17 @@ browser.jar:
          skin/classic/aero/browser/devtools/styleeditor.css           (devtools/styleeditor.css)
          skin/classic/aero/browser/devtools/debugger.css              (devtools/debugger.css)
          skin/classic/aero/browser/devtools/magnifying-glass.png      (devtools/magnifying-glass.png)
@@ -665,6 +706,7 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/aero/browser/devtools/itemArrow-rtl.png         (devtools/itemArrow-rtl.png)
          skin/classic/aero/browser/devtools/itemArrow-ltr.png         (devtools/itemArrow-ltr.png)
          skin/classic/aero/browser/devtools/inspect-button.png        (devtools/inspect-button.png)
+         skin/classic/aero/browser/devtools/dropmarker.png            (devtools/dropmarker.png)
 +        skin/classic/aera/browser/devtools/inspector-menu-icon.png   (devtools/inspector-menu-icon.png)
  #ifdef MOZ_SERVICES_SYNC
          skin/classic/aero/browser/sync-throbber.png
