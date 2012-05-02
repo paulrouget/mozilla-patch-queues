@@ -1,0 +1,563 @@
+# HG changeset patch
+# Parent 9ed8fb7d379134583666439090a534355ba2cf33
+Bug 749628 - Implement a "Responsive Design" tool - try: -b do -p linux -u mochitests -t none
+
+diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browser-sets.inc
+--- a/browser/base/content/browser-sets.inc
++++ b/browser/base/content/browser-sets.inc
+@@ -128,16 +128,17 @@
+     <command id="Tools:Downloads" oncommand="BrowserDownloadsUI();"/>
+     <command id="Tools:DevToolbar" oncommand="DeveloperToolbar.toggle();" disabled="true"/>
+     <command id="Tools:WebConsole" oncommand="HUDConsoleUI.toggleHUD();"/>
+     <command id="Tools:Inspect" oncommand="InspectorUI.toggleInspectorUI();" disabled="true"/>
+     <command id="Tools:Debugger" oncommand="DebuggerUI.toggleDebugger();" disabled="true"/>
+     <command id="Tools:RemoteDebugger" oncommand="DebuggerUI.toggleRemoteDebugger();" disabled="true"/>
+     <command id="Tools:Scratchpad" oncommand="Scratchpad.openScratchpad();" disabled="true"/>
+     <command id="Tools:StyleEditor" oncommand="StyleEditor.openChrome();" disabled="true"/>
++    <command id="Tools:ResponsiveUI" oncommand="ResponsiveUI.start();"/>
+     <command id="Tools:Addons" oncommand="BrowserOpenAddonsMgr();"/>
+     <command id="Tools:Sanitize"
+      oncommand="Cc['@mozilla.org/browser/browserglue;1'].getService(Ci.nsIBrowserGlue).sanitize(window);"/>
+     <command id="Tools:PrivateBrowsing" oncommand="gPrivateBrowsingUI.toggleMode();"/>
+     <command id="History:UndoCloseTab" oncommand="undoCloseTab();"/>
+     <command id="History:UndoCloseWindow" oncommand="undoCloseWindow();"/>
+     <command id="Browser:ToggleAddonBar" oncommand="toggleAddonBar();"/>
+   </commandset>
+diff --git a/browser/base/content/browser.css b/browser/base/content/browser.css
+--- a/browser/base/content/browser.css
++++ b/browser/base/content/browser.css
+@@ -529,8 +529,18 @@ statuspanel[inactive][previoustype=overL
+ }
+ 
+ .panel-inner-arrowcontentfooter[footertype="promobox"] {
+   -moz-binding: url("chrome://browser/content/urlbarBindings.xml#promobox");
+ }
+ 
+ /* highlighter */
+ %include highlighter.css
++
++vbox[anonid=browserContainer][expose] {
++  overflow: auto;
++}
++
++/* Style the scrollbars */
++vbox[anonid=browserContainer][expose] html xul|scrollbar {
++  outline: 2px solid red;
++  /*display: none!important;*/
++}
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -9259,16 +9259,34 @@ var Scratchpad = {
+ };
+ 
+ XPCOMUtils.defineLazyGetter(Scratchpad, "ScratchpadManager", function() {
+   let tmp = {};
+   Cu.import("resource:///modules/devtools/scratchpad-manager.jsm", tmp);
+   return tmp.ScratchpadManager;
+ });
+ 
++var ResponsiveUI = {
++  start: function RUI_start() {
++    return new this.ResponsiveUI(window, gBrowser.selectedBrowser);
++  }
++};
++
++XPCOMUtils.defineLazyGetter(ResponsiveUI, "ResponsiveUI", function() {
++  let tmp = {};
++  Cu.import("resource:///modules/devtools/responsivedesign.jsm", tmp);
++  return tmp.ResponsiveUI;
++});
++
++XPCOMUtils.defineLazyGetter(Scratchpad, "ScratchpadManager", function() {
++  let tmp = {};
++  Cu.import("resource:///modules/devtools/scratchpad-manager.jsm", tmp);
++  return tmp.ScratchpadManager;
++});
++
+ var StyleEditor = {
+   prefEnabledName: "devtools.styleeditor.enabled",
+   /**
+    * Opens the style editor. If the UI is already open, it will be focused.
+    *
+    * @param {CSSStyleSheet} [aSelectedStyleSheet] default Stylesheet.
+    * @param {Number} [aLine] Line to which the caret should be moved (one-indexed).
+    * @param {Number} [aCol] Column to which the caret should be moved (one-indexed).
+diff --git a/browser/devtools/Makefile.in b/browser/devtools/Makefile.in
+--- a/browser/devtools/Makefile.in
++++ b/browser/devtools/Makefile.in
+@@ -52,11 +52,12 @@ DIRS = \
+   sourceeditor \
+   styleeditor \
+   styleinspector \
+   tilt \
+   scratchpad \
+   debugger \
+   layoutview \
+   shared \
++  responsivedesign \
+   $(NULL)
+ 
+ include $(topsrcdir)/config/rules.mk
+diff --git a/browser/devtools/responsivedesign/Makefile.in b/browser/devtools/responsivedesign/Makefile.in
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/responsivedesign/Makefile.in
+@@ -0,0 +1,13 @@
++DEPTH		= ../../..
++topsrcdir	= @top_srcdir@
++srcdir		= @srcdir@
++VPATH		= @srcdir@
++
++include $(DEPTH)/config/autoconf.mk
++
++#TEST_DIRS += test
++
++include $(topsrcdir)/config/rules.mk
++
++libs::
++	$(NSINSTALL) $(srcdir)/*.jsm $(FINAL_TARGET)/modules/devtools
+diff --git a/browser/devtools/responsivedesign/responsivedesign.jsm b/browser/devtools/responsivedesign/responsivedesign.jsm
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/responsivedesign/responsivedesign.jsm
+@@ -0,0 +1,299 @@
++/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
++/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * The Original Code is the Mozilla Inspector Module.
++ *
++ * The Initial Developer of the Original Code is
++ * The Mozilla Foundation.
++ * Portions created by the Initial Developer are Copyright (C) 2010
++ * the Initial Developer. All Rights Reserved.
++ *
++ * Contributor(s):
++ *   Paul Rouget <paul@mozilla.com> (original author)
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++
++const Cc = Components.classes;
++const Cu = Components.utils;
++const Ci = Components.interfaces;
++const Cr = Components.results;
++
++var EXPORTED_SYMBOLS = ["ResponsiveUI"];
++
++const MIN_WIDTH = 150;
++const MIN_HEIGHT = 150;
++
++let presets = [
++  {description: "custom", custom: true},
++  {description: "low res phones", width: 240, height: 320},
++  {description: "feature phones", width: 240, height: 400},
++  {description: "iPhone < 4", width: 320, height: 480},
++  {description: "Blackberries", width: 360, height: 480},
++  {description: "Nokia N8, N97,…", width: 360, height: 640},
++  {description: "Blackberries", width: 480, height: 640},
++  {description: "Samsung Galaxy I, II, S, Nexus S,…", width: 480, height: 800},
++  {description: "Nokia N9, Sony Xperia,…", width: 480, height: 854},
++  {description: "HTCs", width: 480, height: 854},
++  {description: "iPhone >= 4", width: 640, height: 960},
++  {description: "Samsung Galaxy Tab, Kindle Fire,…", width: 600, height: 1024},
++  {description: "Apple iPad 1&2", width: 768, height: 1024},
++  {description: "Galaxy Nexus, Sony Xperia S, notebooks", width: 720, height: 1280},
++  {description: "Galaxy Tab 10.1", width: 768, height: 1366},
++  {description: "11.6\" Apple Macbook Air, Small 16:9 screen", width: 1366, height: 768},
++  {description: "Motorola Xoom, Galaxy Tabs, Galaxy Note,…", width: 800, height: 1280},
++  {description: "13\" Apple Macbook Air, medium 16:10 screen", width: 1440, height: 900},
++  {description: "HD+: Apple Macbook Air 13\", medium screen", width: 1600, height: 900},
++  {description: "", width: 1280, height: 1024},
++  {description: "", width: 1600, height: 1200},
++  {description: "iPad 3", width: 2048, height: 1536},
++  {description: "", width: 1920, height: 1600},
++  {description: "", width: 2880, height: 1800},
++]
++
++function ResponsiveUI(aWindow, aBrowser)
++{
++  this.mainWindow = aWindow;
++  this.browser = aBrowser;
++
++  this.container = aWindow.gBrowser.getBrowserContainer(aBrowser);
++  this.stack = this.container.querySelector("[anonid=browserStack]");
++
++  // Default size
++  let bbox = this.stack.getBoundingClientRect();
++  presets[0].width = bbox.width - 40; // padding
++  presets[0].height = bbox.height - 80; // padding + toolbar
++
++  this.container.setAttribute("expose", "true");
++  this.stack.setAttribute("expose", "true");
++
++  this.currentPreset = 0; // Custom
++
++  this.chromeDoc = aWindow.document;
++
++  let contentViewer = aBrowser.docShell.contentViewer.QueryInterface(Ci.nsIMarkupDocumentViewer);
++  contentViewer.fullZoom = 1;
++
++  this.presetSelected = this.presetSelected.bind(this);
++  this.toggleScrollbars = this.toggleScrollbars.bind(this);
++  this.rotate = this.rotate.bind(this);
++  this.startResizing = this.startResizing.bind(this);
++  this.stopResizing = this.stopResizing.bind(this);
++  this.onDrag = this.onDrag.bind(this);
++  this.close = this.close.bind(this);
++
++  this.buildUI();
++}
++
++ResponsiveUI.prototype = {
++  close: function RUI_unload() {
++    let style = (<r><![CDATA[
++        width: auto;
++        max-width: none;
++        min-width: 0;
++        height: auto;
++        max-height: none;
++        min-height: 0;
++    ]]></r>) + "";
++    this.stack.setAttribute("style", style);
++
++    this.container.removeAttribute("expose");
++    this.stack.removeAttribute("expose");
++    this.menulist.removeEventListener("select", this.presetSelected, true);
++    this.container.removeChild(this.toolbar);
++    this.stack.removeChild(this.resizer);
++  },
++
++  buildUI: function RUI_buildUI() {
++
++    // Toolbar
++
++    this.toolbar = this.chromeDoc.createElement("toolbar");
++    this.toolbar.className = "responsiveui-toolbar";
++    this.container.insertBefore(this.toolbar, this.stack);
++
++    this.menulist = this.chromeDoc.createElement("menulist");
++    this.menulist.className = "devtools-menulist";
++
++    this.menulist.addEventListener("select", this.presetSelected, true);
++
++    let menupopup = this.chromeDoc.createElement("menupopup");
++    this.registerPresets(menupopup);
++    this.menulist.appendChild(menupopup);
++
++    let rotateButton = this.chromeDoc.createElement("toolbarbutton");
++    rotateButton.className = "devtools-toolbarbutton";
++    rotateButton.setAttribute("label", "rotate"); //FIXME: i10n
++    rotateButton.onclick = this.rotate;
++
++    let scrollbarsButton = this.chromeDoc.createElement("toolbarbutton");
++    scrollbarsButton.className = "devtools-toolbarbutton";
++    scrollbarsButton.setAttribute("label", "hide scrollbars"); //FIXME: i10n
++    scrollbarsButton.onclick = this.toggleScrollbars;
++
++    let closeButton = this.chromeDoc.createElement("toolbarbutton");
++    closeButton.className = "devtools-closebutton";
++    closeButton.onclick = this.close;
++
++    this.toolbar.appendChild(this.menulist);
++    this.toolbar.appendChild(rotateButton);
++    this.toolbar.appendChild(scrollbarsButton);
++    this.toolbar.appendChild(closeButton);
++
++    // Resize
++
++    this.resizer = this.chromeDoc.createElement("box");
++    this.resizer.className = "devtools-se-resizer";
++    this.resizer.setAttribute("right", "0");
++    this.resizer.setAttribute("bottom", "0");
++    this.stack.appendChild(this.resizer);
++    this.resizer.onmousedown = this.startResizing;
++
++  },
++
++  registerPresets: function RUI_registerPresets(aParent) {
++    let fragment = this.chromeDoc.createDocumentFragment();
++    let i = 0;
++    let doc = this.chromeDoc;
++    let self = this;
++    presets.forEach(function(preset) {
++        let menuitem = doc.createElement("menuitem");
++        self.setMenuLabel(menuitem, preset);
++        menuitem.setAttribute("value", i++);
++        fragment.appendChild(menuitem);
++    });
++    aParent.appendChild(fragment);
++  },
++
++  setMenuLabel: function RUI_setMenuLabel(menuitem, preset) {
++    let description = preset.description?' (' + preset.description + ')':'';
++    menuitem.setAttribute("label", ~~preset.width + "x" + ~~preset.height + description);
++  },
++
++  presetSelected: function RUI_presetSelected() {
++    this.currentPreset = this.menulist.selectedIndex;
++    let preset = presets[this.currentPreset];
++    this.loadPreset(preset);
++  },
++
++  loadPreset: function RUI_loadPreset(p) {
++    this.setSize(p.width, p.height);
++  },
++
++  rotate: function RUI_rotate() {
++    this.setSize(this.currentHeight, this.currentWidth);
++  },
++
++  toggleScrollbars: function RUI_toggleScrollbars() {
++    this.browser.contentWindow.document.documentElement.overflow = "visible";
++  },
++
++  setSize: function RUI_setSize(width, height) {
++    this.currentWidth = width;
++    this.currentHeight = height;
++
++    let style = (<r><![CDATA[
++        width: %width;
++        max-width: %width;
++        min-width: %width;
++        height: %height;
++        max-height: %height;
++        min-height: %height;
++    ]]></r>) + "";
++
++    style = style.replace(/%width/g, width + "px");
++    style = style.replace(/%height/g, height + "px");
++
++    this.stack.setAttribute("style", style);
++
++    if (presets[this.currentPreset].custom) {
++      let preset = presets[this.currentPreset];
++      preset.width = this.currentWidth;
++      preset.height = this.currentHeight;
++
++      let menuitem = this.menulist.firstChild.childNodes[this.currentPreset];
++      this.setMenuLabel(menuitem, preset);
++    }
++  },
++
++  getCustomMenuItem: function RUI_getCustomMenuItem() {
++      return this.menulist.firstChild.childNodes[0];
++  },
++
++  /* Resize */
++
++  startResizing: function RUI_startResizing(e) {
++    let preset = presets[this.currentPreset];
++    if (!preset.custom) {
++      this.currentPreset = 0;
++      preset = presets[0];
++      preset.width = this.currentWidth;
++      preset.height = this.currentHeight;
++      let menuitem = this.getCustomMenuItem();
++      this.setMenuLabel(menuitem, preset);
++      this.menulist.selectedIndex = 0;
++    }
++    this.mainWindow.addEventListener("mouseup", this.stopResizing, true);
++    this.mainWindow.addEventListener("mousemove", this.onDrag, true);
++    this.container.style.pointerEvents = "none";
++
++    this.stack.setAttribute("notransition", "true");
++
++    this.lastClientX = e.clientX;
++    this.lastClientY = e.clientY;
++  },
++
++  onDrag: function RUI_onDrag(e) {
++    let deltaX = e.clientX - this.lastClientX;
++    let deltaY = e.clientY - this.lastClientY;
++
++    let width = this.currentWidth + deltaX;
++    let height = this.currentHeight + deltaY;
++
++    if (width < MIN_WIDTH) {
++        width = this.currentWidth;
++    } else {
++        this.lastClientX = e.clientX;
++    }
++
++    if (height < MIN_HEIGHT) {
++        height = this.currentHeight;
++    } else {
++        this.lastClientY = e.clientY;
++    }
++
++    this.setSize(width, height);
++  },
++
++  stopResizing: function RUI_stopResizing() {
++    this.container.style.pointerEvents = "auto";
++
++    this.mainWindow.removeEventListener("mouseup", this.stopResizing, true);
++    this.mainWindow.removeEventListener("mousemove", this.onDrag, true);
++
++    this.stack.removeAttribute("notransition");
++  },
++}
+diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
+--- a/browser/themes/gnomestripe/browser.css
++++ b/browser/themes/gnomestripe/browser.css
+@@ -2395,16 +2395,47 @@ html|*#highlighter-nodeinfobar-pseudo-cl
+   border-top: 1px solid black;
+   border-bottom-width: 0;
+   min-height: 3px;
+   height: 3px;
+   margin-bottom: -3px;
+   position: relative;
+ }
+ 
++vbox[anonid=browserContainer][expose] {
++  background: #222 url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFgAAABYBAMAAACDuy0HAAAAG1BMVEX+/v4BAQH///8KCgoDAwN/f3/19fWAgID8/PzhDwT2AAAACXRSTlMFBQUFBQUFBQWHDtP9AAALwklEQVR4Xg3KOWOyWhAA0Bn2ci57eXEvQY1JCZp8sQTjVoJLTAkaE0swbj/7ve4UB37FLW4q86Lwwlh86J/ASAkpWaj+Krbb31HzH0Kjc2tIl7SADaWbpZBPE5dds6jJNyNdjAyKWqdroIixWRQIY6E/kOY7hIciL/ZfrAO3XP/06AuUJ3mSd/z95OB9vIal0DPlaZWHP7RE6DIXjmKqKkuGr+xNZylOnj1GSlUKvnxZDBOIzTfMe0fJgJ7c/GIIOdUuKxYyBFUOzvY6AC5AXx8R+o5O4S0j0wqBND3ErIYm/XHFbQjtH1MXD5dUbp19OFdjkDlys+HSwrBgHRvL9wVN/pi8ViOIwcv/D1GRW6UuDvJLLQA5lCI17iUdsKYpOuYfMATGnpn/Zs3W6gov51G+/Vs9Ay//we5kh8uwvEPum6o5HkDMDb3ZWunwtq+UzENU8NphDdbvNtKM3knx5gi6UMSQl+eGs+27mraDtxeWdH+T62Us/GylEtr7Ct8jlbeXKvAf5onx8D2uVt1J/GblV+XQyKUInOUG44fqjcszK266yHWAAYG9ekhvy4l4Maa44jYVyV2RFEuS54e2HcswtmNdqR/+V4P0O9e4XnpWgxVSQkNXpYMCxJ4Vel0lmi56jnYIIJAQMndF+zTEiyuj92r3ijJT1O0alPQnLWJvJLR7Xx7Xg9fm9QOqFu8o29m3QQqFwZN4bki/RoprNtMKKtEET9iMsJyKpkiguAorn2yzkv0wG3M1EEVDJP5VN7muLjYCglzdGQ7boYGgRmorzhRDq83gglgylC+hBLEyy6ZQWNwCmmqt6PvExAqGEA9V2XIT4/fS+I2cx1n5td85kOCjHfPWTg72FJ/+vKOyggt+rytFbEDJWL+mPwpgw6HtFLIHmq4o2m1nZ9saKwiKEOTVZtWlnqHODPu949VfKD+zzpfynd/ZZU5IWZ0dgnqRHC4uOBpBsT8N7YbFJzADiW2eo/T979OKFxY8zk/+HR/NNEkzgSBsmA35Sayz1m/ubxgmYQOmffyRh9gdx42mUVX512oqWkfxAzyuSCxx1cywx3jIXuXJEEbssymo0xMy7SskJW9C5IPYroPwQunt7f5FEPPXJLWRbGHcL4Q3sx3TLAN6W672r/I5CKkL6zSwwk0AI8+iBCSv1Y7QQP5RSoLE227uy8vn22Y6dhLBgEsRh18cTGjIv3y+60Kmt3YAZQX8qf3bJDUc/5pdjti+KwAZ9GzzQzd23d1JBAnSvWkWB8YfsIGlspHitNiMPYPFfR+OecRuPyxgfoP9/HkR3cR27IohiaDXCk/3VNP6lIxP9TBnsMeAAUZloq6P8KURLBsNFuiA3LsN/d9qpCeKKIBgSzsN5k+rdh3uh0VbvMuOIomJD1fBOiCqIsvklS5bOQhMaahJC+Rc+6lz+Uvxmq05Py+LoGIQlLKvlcaHsFG9Ui66H/qdHz67sPRGho+ruC92QgN5JEMmLsZREEiJu78FJbyzT8FsdK90XoEcezn2R5iLUzZhczJmf1yNY3gJNJUQvbpTznTAbnV5J8iL4q2OWuhJEndWVTyEr8M5VGTWtvOmUo1DsnOsqXE5ZzKE8K4/8cl8+c1XArp1RUKz+iKP96j2FcUmA+v0HnEr0iUdSrRK5duAj1FQamvpiaXR2JddD6g8n4SyFx/fjT4LkC+ghJckj1e1wP+DrHrpIiMaPH5F1rcaRvwZWfEn6fx+/C7PdXABGLNKjr1USZ5XyHjsafXMEoXtguAfjykMioMMHISXVAc9yQY5o5Qg8MM0nhWCA2HoiEgBc1EH+warLjxH3Ln68M/ciFqI1bG0mBOxiNreOuShEf/9pIzhm1Bh2cbYVxn2IYQ7eljYpab/5EdPF2PSmcy+62j6e2HBPNbe+8JVMuRQBrWdL9uBh4bYbQaQJ07FyfcpCuvSuxUyYjP6avvw9gTcAj0uTVohSwOHDDaHTs8nyachMBcWoVDWp3/lWgqeCLMneAUhSuhD2RJpufLOSi7emxOVhYsOGomV2JCEKjWu7kuqwueyFEmDgVhR0l4oHn8W87UZuxb8id54SxHWiSnPKnMyAhzdhi2wN/AoH3OYwLajuybB8h/QeJJiX1gIt+dfij+gr0CJRXQ2Y04Q6q8xHzfWm9FIgchiW0+X86tIotIGzRG1gENaKokQkLn+FXZ2x3KUcp7d/NUsmOmFCG/i03YB8pi0eiNS4LUIfA06AKvfQmP/VAXS1AP2kzJ+9LAaTafvFyO7bz8U9OCpld2q1eHGts+ZFrt04AmIlubOPP7Xayfi/r0tiX2aaPT9Dz4+TVPBoXsjHDzWfrmawOsZfmBT/k2+c6sz/hvD5wjrjT7XgRlnEzPuZermi1jqfUrE3q7VdFfJu5oT9Ad+VUh1fIwIFhBy8TmMuhIeX2XpmogmvS1C3ZuwiyR87ZSrj0Jv1DpEAYkbcL3RpjZXmZpPV4mXH8z8Nh8CS+R+PpcTnkhyr5UJaSiz0wjK22Ewl+zS+pTug0PQ0CSnJQ5LfdR77vVZufgjkQ/ydf4V5zpEaNq+JZmrQK6WdZBacmMHL9RmLnPUs0/MYwYFzoyrXYQMTHGAUJOfumR5r79MZO28DIEXQVT5wGw99TY1T0GOCC/BzWv8READwICd0LjUNKnE6ORVa0lOnqhoO0v33lwWcwF0ynTgTpFxy+0OKdphNDWJlH8ubKoG6WJXtKxAwbsilpBJB+GBwimvTsCrv1R7LSX9ExkAw44ZEcxU3L50OHnKAyKZNe1fih+hVqItRGCDf7shuvme+lTWteX5oYuc58NrCaqjYIrIV0PFyQeh2ZzZEqNS60LuhnP5wweMkkaU93pDA/RWPNeGpPCBgiUeDvV0L1NfdRP/Hn5i7rUK7kftlIWeIUIYbtzzFl9nlIeaNfoX+x/qyWzIABLTZDbeq/hDZpxg2gkh+ICfSU8OUpJ8yWY17uQ5EGa+GGWFmnrBd9vX3KOteYkJaMpPwJ4TjzDjbhkOMKmWKClzVJ2g81YGFl/c0xPIKncgJGdUKvZoUUJu0gYaIAh6E0xNeQ15qpJXzNITgf4W+w/oUaKOM54EMUi1j5yvOCsEe8JYpwVGj53lNiPMY9Rltgd4icp82fvN69zkSBUI40nJSRTeHz7h1IX42Cr0klWjxjO05MSX1IaTeDmTRGEeKvAvtaaBaLQnjftGJz+4cjFyy6/iCjLGF2/gW+jQhEUxbEBPyQzXi+Bb4kc9wK4jIwNLWbwQAOtYKRLaipDH+X4TPPOG8DCNY4IC9yBk1qcibjhUgRnDcf35pl9d5otbvQjOIXlEu5dVtm5LRaK5KWcD/PX6LaGd25CuNHG/vgeIB1kcpCme+J8idlcjfBALAJSggznsGHGOAJgdGduMnZg+bAaeGASGV9bh/X2wPsVTmBLxmTTQsBGFkEOkZJTsGAm+HrtMDbWwvTXOutX1u7BxIq9Xib6DkFMbUitNdrYsULkahsAhBEh9FjdzL9BNARxTSr7T3u1rE+IWUmCIpwTZHZCu5l9THCuCcOhZqfekuQxjQ7EoyGUJAwCv/q1JOuJeCc/3lknb76zAquO/DAQhK/62cP8X2s3+IBLIhvL8RHopoHpIArJysYTTmMMeubPXh8W760AvMVH67jqgg06+/ne5MZ631z6yROhloh3dPQirZoEpr80wgt/cEbhbAQTmRLtGh8lxCwDBBb5OeJ4aEq25XBNMT2rzWedW2zIzj+CCDKlnlyJBzT81qBWp69h7vlb3TmEV+DNm2rqj1iT7BQuwVVsuPkwq1e5P8tgNjVbIlMzwXeM11kZqjx3KKFOJzc3CAyFVhi8fxVZ5FvhdAM5mM6kS6OgKu16MFglq3/b/QVIwdw7HUCyeW04JPjC5dO+GC9OfqfB4VX+wwuift+ths2Ss3i6nkOE+JFyD+wKFL+WMX6nwwDva0S1/O8Mlnida69Ph96fuFvCoRMvXnCfsLPPmC/hA5RnMNE4fDK0pVOQ4BHLaErzv/wD99ABmjNZk0AAAAABJRU5ErkJggg==);
++  box-shadow: 0 0 7px black inset;
++  padding: 0 20px 20px 20px;
++}
++
++stack[anonid=browserStack][expose] {
++  box-shadow: 0 0 7px black;
++  -moz-transition: 300ms; /* FIXME: define properties*/
++}
++
++stack[anonid=browserStack][expose][notransition] {
++  -moz-transition: none;
++}
++
++
++vbox[anonid=browserContainer] > toolbar {
++  -moz-appearance: none;
++  background: transparent;
++  margin: 10px 0;
++}
++
++vbox[anonid=browserContainer] > toolbar > menulist {
++  -moz-margin-start: 0;
++}
++
++vbox[anonid=browserContainer] > toolbar > menulist,
++vbox[anonid=browserContainer] > toolbar > toolbarbutton {
++  border-radius: 0;
++}
++
+ .gcli-panel-inner-arrowcontent {
+   padding: 0;
+ }
+ 
+ .gclitoolbar-input-node,
+ .gclitoolbar-complete-node,
+ .gclitoolbar-prompt {
+   font-family: monospace;
+diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gnomestripe/devtools/common.css
+--- a/browser/themes/gnomestripe/devtools/common.css
++++ b/browser/themes/gnomestripe/devtools/common.css
+@@ -142,8 +142,15 @@
+   margin-bottom: 0;
+ }
+ 
+ .devtools-closebutton > .toolbarbutton-icon {
+   /* XXX Buttons have padding in widget/ that we don't want here but can't override with good CSS, so we must
+      use evil CSS to give the impression of smaller content */
+   margin: -4px;
+ }
++
++.devtools-se-resizer {
++  width:14px;
++  height:14px;
++  background: -moz-linear-gradient(bottom right, #339FFF 1px, black 3px, #339FFF 5px, black 7px, #339FFF 9px, transparent 9px);
++  cursor: se-resize;
++}
+diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
+--- a/browser/themes/pinstripe/browser.css
++++ b/browser/themes/pinstripe/browser.css
+@@ -3121,16 +3121,47 @@ html|*#highlighter-nodeinfobar-pseudo-cl
+   border-top: 1px solid black;
+   border-bottom-width: 0;
+   min-height: 3px;
+   height: 3px;
+   margin-bottom: -3px;
+   position: relative;
+ }
+ 
++vbox[anonid=browserContainer][expose] {
++  background: #222 url(data:image/png;base64,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);
++  box-shadow: 0 0 7px black inset;
++  padding: 0 20px 20px 20px;
++}
++
++stack[anonid=browserStack][expose] {
++  box-shadow: 0 0 7px black;
++  -moz-transition: 300ms; /* FIXME: define properties*/
++}
++
++stack[anonid=browserStack][expose][notransition] {
++  -moz-transition: none;
++}
++
++
++vbox[anonid=browserContainer] > toolbar {
++  -moz-appearance: none;
++  background: transparent;
++  margin: 10px 0;
++}
++
++vbox[anonid=browserContainer] > toolbar > menulist {
++  -moz-margin-start: 0;
++}
++
++vbox[anonid=browserContainer] > toolbar > menulist,
++vbox[anonid=browserContainer] > toolbar > toolbarbutton {
++  border-radius: 0;
++}
++
+ .gcli-panel-inner-arrowcontent {
+   padding: 0;
+ }
+ 
+ .gclitoolbar-input-node,
+ .gclitoolbar-complete-node,
+ .gclitoolbar-prompt {
+   font-family: Menlo, Monaco, monospace;
+diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinstripe/devtools/common.css
+--- a/browser/themes/pinstripe/devtools/common.css
++++ b/browser/themes/pinstripe/devtools/common.css
+@@ -162,8 +162,15 @@
+ 
+ .devtools-closebutton:hover {
+   -moz-image-region: rect(0, 32px, 16px, 16px);
+ }
+ 
+ .devtools-closebutton:active {
+   -moz-image-region: rect(0, 48px, 16px, 32px);
+ }
++
++.devtools-se-resizer {
++  width:14px;
++  height:14px;
++  background: -moz-linear-gradient(bottom right, #339FFF 1px, black 3px, #339FFF 5px, black 7px, #339FFF 9px, transparent 9px);
++  cursor: se-resize;
++}

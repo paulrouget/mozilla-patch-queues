@@ -1,0 +1,92 @@
+# HG changeset patch
+# Parent 0f8ea3826bf79f3b6c09b4da14abdd76200004ff
+
+diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
+--- a/browser/themes/gnomestripe/browser.css
++++ b/browser/themes/gnomestripe/browser.css
+@@ -591,31 +591,85 @@ toolbar[mode="full"] .toolbarbutton-1 > 
+ .toolbarbutton-1 > .toolbarbutton-menubutton-button {
+   padding: 5px;
+ }
+ 
+ .toolbarbutton-1[checked="true"] {
+   padding: 5px !important;
+ }
+ 
++#unified-back-forward-button {
++  -moz-box-align: center;
++}
++
+ /* 24px primary toolbar buttons */
++
++/* Icons and Text: default GTK icons */
+ #back-button {
+   list-style-image: url("moz-icon://stock/gtk-go-back-ltr?size=toolbar");
+ }
+ #back-button[disabled="true"] {
+   list-style-image: url("moz-icon://stock/gtk-go-back-ltr?size=toolbar&state=disabled");
+ }
+ 
+ #back-button:-moz-locale-dir(rtl) {
+   list-style-image: url("moz-icon://stock/gtk-go-back-rtl?size=toolbar");
+ }
+ #back-button[disabled="true"]:-moz-locale-dir(rtl) {
+   list-style-image: url("moz-icon://stock/gtk-go-back-rtl?size=toolbar&state=disabled");
+ }
+ 
++/* Icons: keyhole */
++#navigator-toolbox[iconsize="large"][mode="icons"] > #nav-bar #back-button {
++  -moz-appearance: none;
++  list-style-image: url("http://people.mozilla.com/~shorlander/files/australis-designSpecs/images-linux/toolbarButton-back.svg");
++  border: 1px solid ThreeDShadow;
++  border-radius: 50%;
++  margin: 2px;
++  width: 30px;
++  height: 30px;
++  background-image: -moz-linear-gradient(hsla(0,0%,100%,.7), hsla(0,0%,100%,.2));
++  background-clip: padding-box;
++  box-shadow: 0 1px 0 hsla(0,0%,100%,.3) inset, 0 0 0 1px hsla(0,0%,100%,.3) inset, 0 1px 0 hsla(0,0%,0%,.03);
++  -moz-transition-property: background-color, border-color, box-shadow;
++  -moz-transition-duration: 150ms;
++  -moz-transition-timing-function: ease;
++}
++
++#navigator-toolbox[iconsize="large"][mode="icons"] > #nav-bar #back-button {
++}
++
++#navigator-toolbox[iconsize="large"][mode="icons"] > #nav-bar #back-button:hover {
++  background-image: -moz-linear-gradient(hsla(0,0%,100%,.9), hsla(0,0%,100%,.4));
++  border-color: hsla(0,0%,10%,.3) hsla(0,0%,10%,.35) hsla(0,0%,10%,.4);
++  box-shadow: 0 1px 0 hsla(0,0%,100%,.3) inset, 0 0 0 1px hsla(0,0%,100%,.3) inset, 0 1px 0 hsla(0,0%,10%,.03), 0 0 2px hsla(0,0%,10%,.2);
++}
++
++#navigator-toolbox[iconsize="large"][mode="icons"] > #nav-bar #back-button[open],
++#navigator-toolbox[iconsize="large"][mode="icons"] > #nav-bar #back-button:hover:active {
++  background-color: ButtonShadow;
++  background-image: -moz-linear-gradient(hsla(0,0%,100%,.7), hsla(0,0%,100%,.4));
++  box-shadow: 0 1px 1px hsla(0,0%,0%,.1) inset, 0 0 1px hsla(0,0%,0%,.3) inset;
++  -moz-transition-duration: 10ms;
++  -moz-transition-timing-function: linear;
++}
++
++#navigator-toolbox[iconsize="large"][mode="icons"] > #nav-bar #back-button[disabled="true"] > image {
++  /* PAUL:FIXME */
++  opacity: 0.5;
++}
++
++#navigator-toolbox[iconsize="large"][mode="icons"] > #nav-bar #back-button[disabled="true"]:-moz-locale-dir(rtl) > image {
++  -moz-transform: scaleX(-1);
++}
++
++/* PAUL:FIXME #back-button[disabled="true"]:-moz-locale-dir(rtl) {
++  list-style-image: url("moz-icon://stock/gtk-go-back-rtl?size=toolbar&state=disabled");
++} */
++
+ #forward-button,
+ @conditionalForwardWithUrlbar@ > #forward-button {
+   list-style-image: url("moz-icon://stock/gtk-go-forward-ltr?size=toolbar");
+ }
+ #forward-button:-moz-locale-dir(rtl),
+ @conditionalForwardWithUrlbar@ > #forward-button:-moz-locale-dir(rtl) {
+   list-style-image: url("moz-icon://stock/gtk-go-forward-rtl?size=toolbar");
+ }

@@ -1,0 +1,110 @@
+# vim: se ft=diff :
+# HG changeset patch
+# User OHZEKI Tetsuharu <saneyuki.s.snyk@gmail.com>
+# Date 2012-04-25 18:59
+Bug 747603 - InspectorUI.prototype.buildButtonsTooltip handle the error by returning in case key is null. r=?
+
+# HG changeset patch
+# Parent d470016df45dfa3141e2585f21d2ed09b9ace7f6
+# User OHZEKI Tetsuharu <saneyuki.s.snyk@gmail.com>
+Bug 747603 - InspectorUI.prototype.buildButtonsTooltip handle the error by returning in case key is null. r=?
+
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -291,43 +291,48 @@ InspectorUI.prototype = {
+    * The tooltips include the related keyboard shortcut.
+    */
+   buildButtonsTooltip: function IUI_buildButtonsTooltip()
+   {
+     let keysbundle = Services.strings.createBundle("chrome://global-platform/locale/platformKeys.properties");
+ 
+     // Inspect Button - the shortcut string is built from the <key> element
+ 
++    let tooltip;
+     let key = this.chromeDoc.getElementById("key_inspect");
++    if (key) {
++      let modifiersAttr = key.getAttribute("modifiers");
+ 
+-    let modifiersAttr = key.getAttribute("modifiers");
++      let combo = [];
+ 
+-    let combo = [];
++      if (modifiersAttr.match("accel"))
++#ifdef XP_MACOSX
++        combo.push(keysbundle.GetStringFromName("VK_META"));
++#else
++        combo.push(keysbundle.GetStringFromName("VK_CONTROL"));
++#endif
++      if (modifiersAttr.match("shift"))
++        combo.push(keysbundle.GetStringFromName("VK_SHIFT"));
++      if (modifiersAttr.match("alt"))
++        combo.push(keysbundle.GetStringFromName("VK_ALT"));
++      if (modifiersAttr.match("ctrl"))
++        combo.push(keysbundle.GetStringFromName("VK_CONTROL"));
++      if (modifiersAttr.match("meta"))
++        combo.push(keysbundle.GetStringFromName("VK_META"));
+ 
+-    if (modifiersAttr.match("accel"))
+-#ifdef XP_MACOSX
+-      combo.push(keysbundle.GetStringFromName("VK_META"));
+-#else
+-      combo.push(keysbundle.GetStringFromName("VK_CONTROL"));
+-#endif
+-    if (modifiersAttr.match("shift"))
+-      combo.push(keysbundle.GetStringFromName("VK_SHIFT"));
+-    if (modifiersAttr.match("alt"))
+-      combo.push(keysbundle.GetStringFromName("VK_ALT"));
+-    if (modifiersAttr.match("ctrl"))
+-      combo.push(keysbundle.GetStringFromName("VK_CONTROL"));
+-    if (modifiersAttr.match("meta"))
+-      combo.push(keysbundle.GetStringFromName("VK_META"));
++      combo.push(key.getAttribute("key"));
+ 
+-    combo.push(key.getAttribute("key"));
++      let separator = keysbundle.GetStringFromName("MODIFIER_SEPARATOR");
++      tooltip = this.strings.formatStringFromName("inspectButton.tooltipWithAccesskey",
++        [combo.join(separator)], 1);
++    }
++    else {
++      tooltip = this.strings.GetStringFromName("inspectButton.tooltip");
++    }
+ 
+-    let separator = keysbundle.GetStringFromName("MODIFIER_SEPARATOR");
+-
+-    let tooltip = this.strings.formatStringFromName("inspectButton.tooltiptext",
+-      [combo.join(separator)], 1);
+     let button = this.chromeDoc.getElementById("inspector-inspect-toolbutton");
+     button.setAttribute("tooltiptext", tooltip);
+ 
+     // Markup Button - the shortcut string is built from the accesskey attribute
+ 
+     button = this.chromeDoc.getElementById("inspector-treepanel-toolbutton");
+ #ifdef XP_MACOSX
+     // On Mac, no accesskey
+diff --git a/browser/locales/en-US/chrome/browser/devtools/inspector.properties b/browser/locales/en-US/chrome/browser/devtools/inspector.properties
+--- a/browser/locales/en-US/chrome/browser/devtools/inspector.properties
++++ b/browser/locales/en-US/chrome/browser/devtools/inspector.properties
+@@ -19,17 +19,20 @@ confirmNavigationAway.buttonStayAccesske
+ breadcrumbs.siblings=Siblings
+ # LOCALIZATION NOTE (htmlPanel): Used in the Inspector tool's openInspectorUI
+ # method when registering the HTML panel.
+ 
+ # LOCALIZATION NOTE (inspectButton.tooltiptext):
+ # This button appears in the Inspector Toolbar. inspectButton is stateful,
+ # if it's pressed users can select an element with the mouse.
+ # %S is the keyboard shortcut.
+-inspectButton.tooltiptext=Select element with mouse (%S)
++# When the key of inspect is overridden by other addons,
++# We use inspectButton.tooltip.
++inspectButton.tooltip=Select element with mouse
++inspectButton.tooltipWithAccesskey=Select element with mouse (%S)
+ 
+ # LOCALIZATION NOTE (markupButton.*):
+ # This button is the button located at the beginning of the breadcrumbs
+ # in the inspector toolbar. Its tooltip is built dynamically.
+ # markupButton.tooltip is used on Mac.
+ # On Windows and Linux, we use markupButton.tooltipWithAccesskey, where we append
+ # the keyboard shortcut.
+ markupButton.tooltip=Markup Panel
+

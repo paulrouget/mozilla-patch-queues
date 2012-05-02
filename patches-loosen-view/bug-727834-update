@@ -1,0 +1,103 @@
+# HG changeset patch
+# Parent 0cc38395dd60ac92e913230973ebaeb234313d2e
+
+diff --git a/layout/inspector/public/inIDOMUtils.idl b/layout/inspector/public/inIDOMUtils.idl
+--- a/layout/inspector/public/inIDOMUtils.idl
++++ b/layout/inspector/public/inIDOMUtils.idl
+@@ -89,10 +89,10 @@ interface inIDOMUtils : nsISupports
+ 
+   /**
+    * Parse CSS and update the style sheet inplace.
+    *
+    * @param DOMCSSStyleSheet aSheet
+    * @param DOMString aInput
+    *        The new source string for the style sheet.
+    */
+-  void parseStyleSheet(in nsIDOMCSSStyleSheet aSheet, in DOMString aInput);
++  void parseStyleSheet(in nsIDOMCSSStyleSheet aSheet, in DOMString aInput, in boolean aAllowUnsafeRules);
+ };
+diff --git a/layout/inspector/src/inDOMUtils.cpp b/layout/inspector/src/inDOMUtils.cpp
+--- a/layout/inspector/src/inDOMUtils.cpp
++++ b/layout/inspector/src/inDOMUtils.cpp
+@@ -457,15 +457,16 @@ inDOMUtils::ClearPseudoClassLocks(nsIDOM
+   nsCOMPtr<mozilla::dom::Element> element = do_QueryInterface(aElement);
+   element->ClearStyleStateLocks();
+ 
+   return NS_OK;
+ }
+ 
+ NS_IMETHODIMP
+ inDOMUtils::ParseStyleSheet(nsIDOMCSSStyleSheet *aSheet,
+-                            const nsAString& aInput)
++                            const nsAString& aInput,
++                            bool aAllowUnsafeRules)
+ {
+   NS_ENSURE_ARG_POINTER(aSheet);
+ 
+   nsRefPtr<nsCSSStyleSheet> sheet = do_QueryObject(aSheet);
+-  return sheet->ParseSheet(aInput);
++  return sheet->ParseSheet(aInput, aAllowUnsafeRules);
+ }
+diff --git a/layout/style/nsCSSStyleSheet.cpp b/layout/style/nsCSSStyleSheet.cpp
+--- a/layout/style/nsCSSStyleSheet.cpp
++++ b/layout/style/nsCSSStyleSheet.cpp
+@@ -2107,17 +2107,17 @@ nsCSSStyleSheet::StyleSheetLoaded(nsCSSS
+     // they do)!
+     mDocument->StyleRuleAdded(this, aSheet->GetOwnerRule());
+   }
+ 
+   return NS_OK;
+ }
+ 
+ nsresult
+-nsCSSStyleSheet::ParseSheet(const nsAString& aInput)
++nsCSSStyleSheet::ParseSheet(const nsAString& aInput, bool aAllowUnsafeRules = false)
+ {
+   // Not doing this if the sheet is not complete!
+   if (!mInner->mComplete) {
+     return NS_ERROR_DOM_INVALID_ACCESS_ERR;
+   }
+ 
+   // Hold strong ref to the CSSLoader in case the document update
+   // kills the document
+@@ -2152,17 +2152,17 @@ nsCSSStyleSheet::ParseSheet(const nsAStr
+ 
+   // allow unsafe rules if the style sheet's principal is the system principal
+   bool allowUnsafeRules = false;
+   nsIScriptSecurityManager *securityManager = nsContentUtils::GetSecurityManager();
+   rv = securityManager->IsSystemPrincipal(mInner->mPrincipal, &allowUnsafeRules);
+   NS_ENSURE_SUCCESS(rv, rv);
+ 
+   rv = parser.ParseSheet(aInput, mInner->mSheetURI, mInner->mBaseURI,
+-                         mInner->mPrincipal, 1, allowUnsafeRules);
++                         mInner->mPrincipal, 1, aAllowUnsafeRules);
+ 
+   DidDirty();
+   if (mDocument) {
+     for (PRInt32 index = 0; index < mInner->mOrderedRules.Count(); ++index) {
+       nsRefPtr<css::Rule> rule = mInner->mOrderedRules.ObjectAt(index);
+       if (rule->GetType() == css::Rule::IMPORT_RULE) {
+         if (!IsChildSheetLoaded(rule)) {
+           continue; // notify when loaded (see StyleSheetLoaded)
+diff --git a/layout/style/nsCSSStyleSheet.h b/layout/style/nsCSSStyleSheet.h
+--- a/layout/style/nsCSSStyleSheet.h
++++ b/layout/style/nsCSSStyleSheet.h
+@@ -253,17 +253,17 @@ public:
+ 
+   // Append all of this sheet's child sheets to aArray.  Return true
+   // on success and false on allocation failure.
+   bool AppendAllChildSheets(nsTArray<nsCSSStyleSheet*>& aArray);
+ 
+   bool UseForPresentation(nsPresContext* aPresContext,
+                             nsMediaQueryResultCacheKey& aKey) const;
+ 
+-  nsresult ParseSheet(const nsAString& aInput);
++  nsresult ParseSheet(const nsAString& aInput, bool aAllowUnsafeRules);
+ 
+   // nsIDOMStyleSheet interface
+   NS_DECL_NSIDOMSTYLESHEET
+ 
+   // nsIDOMCSSStyleSheet interface
+   NS_DECL_NSIDOMCSSSTYLESHEET
+ 
+   // Function used as a callback to rebuild our inner's child sheet

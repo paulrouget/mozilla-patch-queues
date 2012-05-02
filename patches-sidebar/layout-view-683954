@@ -1,14 +1,14 @@
 # vim: se ft=diff :
 # HG changeset patch
-# Parent c95282a997af8014a5bfd8a9b7b1205db688943c
+# Parent ac3ea3b31fe01e9aa8a94d7937a3eaa158052cf7
 # User Paul Rouget <paul@mozilla.com>
 # Date 1331559596 -3600
-Bug 683954 - [Layout] Implement an abstract view of the layout of the selected node
+Bug 683954 - [Layout] Implement an abstract view of the layout of the selected node  - try: -b do -p linux,macosx64,win32 -u mochitests -t none
 
 diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
 --- a/browser/app/profile/firefox.js
 +++ b/browser/app/profile/firefox.js
-@@ -1038,16 +1038,20 @@ pref("devtools.errorconsole.enabled", fa
+@@ -1044,16 +1044,20 @@ pref("devtools.errorconsole.enabled", fa
  
  // Enable the Inspector
  pref("devtools.inspector.enabled", true);
@@ -91,7 +91,7 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
    // screen.
    OPENED: "inspector-opened",
  
-@@ -1411,16 +1412,22 @@ function InspectorStyleSidebar(aOptions)
+@@ -1400,16 +1401,22 @@ function InspectorStyleSidebar(aOptions)
  
  InspectorStyleSidebar.prototype = {
  
@@ -114,14 +114,14 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
    },
  
    /**
-@@ -1520,20 +1527,29 @@ InspectorStyleSidebar.prototype = {
+@@ -1509,20 +1516,29 @@ InspectorStyleSidebar.prototype = {
      this._box.removeAttribute("hidden");
      this._splitter.removeAttribute("hidden");
      this._toggleButton.checked = true;
  
      this._showDefault();
  
-     this._inspector._setStoreValue("sidebarOpen", true);
+     this._inspector._sidebarOpen = true;
      Services.prefs.setBoolPref("devtools.inspector.sidebarOpen", true);
 +
 +    // Instantiate the Layout View if needed.
@@ -141,14 +141,14 @@ diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highl
    hide: function ISS_hide()
    {
      this._teardown();
-     this._inspector._setStoreValue("sidebarOpen", false);
+     this._inspector._sidebarOpen = false;
      Services.prefs.setBoolPref("devtools.inspector.sidebarOpen", false);
    },
  
 diff --git a/browser/devtools/jar.mn b/browser/devtools/jar.mn
 --- a/browser/devtools/jar.mn
 +++ b/browser/devtools/jar.mn
-@@ -4,14 +4,15 @@ browser.jar:
+@@ -4,14 +4,16 @@ browser.jar:
  *   content/browser/scratchpad.xul                (scratchpad/scratchpad.xul)
      content/browser/scratchpad.js                 (scratchpad/scratchpad.js)
      content/browser/splitview.css                 (shared/splitview.css)
@@ -158,6 +158,7 @@ diff --git a/browser/devtools/jar.mn b/browser/devtools/jar.mn
      content/browser/devtools/cssruleview.xul      (styleinspector/cssruleview.xul)
      content/browser/devtools/styleinspector.css   (styleinspector/styleinspector.css)
 +*   content/browser/devtools/layoutview/view.xhtml  (layoutview/view.xhtml)
++    content/browser/devtools/layoutview/view.css  (layoutview/view.css)
      content/browser/orion.js                      (sourceeditor/orion/orion.js)
  *   content/browser/source-editor-overlay.xul     (sourceeditor/source-editor-overlay.xul)
  *   content/browser/debugger.xul                  (debugger/debugger.xul)
@@ -168,7 +169,7 @@ diff --git a/browser/devtools/layoutview/LayoutView.jsm b/browser/devtools/layou
 new file mode 100644
 --- /dev/null
 +++ b/browser/devtools/layoutview/LayoutView.jsm
-@@ -0,0 +1,319 @@
+@@ -0,0 +1,317 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 +/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 +/* ***** BEGIN LICENSE BLOCK *****
@@ -236,11 +237,9 @@ new file mode 100644
 +    this.documentReady = false;
 +
 +    // Is the layout view was open before?
-+    // If there's nothing in the store, then it's the first time
-+    // it is open, we fallback to the preference.
-+    if (this.inspector._getStoreValue("layoutview-is-open") == null) {
-+      this.inspector._setStoreValue("layoutview-is-open",
-+        Services.prefs.getBoolPref("devtools.layoutview.open"));
++    if (!("_layoutViewIsOpen" in this.inspector)) {
++      this.inspector._layoutViewIsOpen =
++        Services.prefs.getBoolPref("devtools.layoutview.open");
 +    }
 +
 +    // We update the values when:
@@ -364,7 +363,7 @@ new file mode 100644
 +    else
 +      this.onUnlock();
 +
-+    if (this.inspector._getStoreValue("layoutview-is-open")) {
++    if (this.inspector._layoutViewIsOpen) {
 +      this.open();
 +    } else {
 +      this.close();
@@ -399,7 +398,7 @@ new file mode 100644
 +    if (this.documentReady)
 +      this.doc.body.classList.add("open");
 +    if (aUserAction) {
-+      this.inspector._setStoreValue("layoutview-is-open", true);
++      this.inspector._layoutViewIsOpen = true;
 +      Services.prefs.setBoolPref("devtools.layoutview.open", true);
 +    }
 +    this.iframe.setAttribute("open", "true");
@@ -417,7 +416,7 @@ new file mode 100644
 +    if (this.documentReady)
 +      this.doc.body.classList.remove("open");
 +    if (aUserAction) {
-+      this.inspector._setStoreValue("layoutview-is-open", false);
++      this.inspector._layoutViewIsOpen = false;
 +      Services.prefs.setBoolPref("devtools.layoutview.open", false);
 +    }
 +    this.iframe.removeAttribute("open");
@@ -743,11 +742,192 @@ new file mode 100644
 +    finish();
 +  }
 +}
+diff --git a/browser/devtools/layoutview/view.css b/browser/devtools/layoutview/view.css
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/layoutview/view.css
+@@ -0,0 +1,176 @@
++body, html {
++  height: 100%;
++  width: 100%;
++  overflow: hidden;
++}
++
++body {
++  margin: 0;
++  padding: 0;
++}
++
++#header {
++  -moz-box-sizing: border-box;
++  font: 12px/14px monospace;
++  width: 100%;
++  padding: 3px 4px;
++  display: -moz-box;
++}
++
++body[dir=rtl] > #header {
++  -moz-box-direction: reverse;
++}
++
++#header > span {
++  display: -moz-box;
++}
++
++#element-size {
++  -moz-box-flex: 1;
++}
++
++body[dir=rtl] > #header > #element-size {
++  -moz-box-pack: end;
++}
++
++#header:focus {
++  outline: none;
++}
++
++#main {
++  margin: 10px;
++  -moz-box-sizing: border-box;
++  width: -moz-calc(100% - 2 * 10px);
++  position: absolute;
++  border-width: 1px;
++  font: 10px/12px monospace;
++}
++
++#margins {
++  padding: 28px;
++}
++
++#content {
++  height: 20px;
++  border-width: 1px;
++}
++
++#padding {
++  border-width: 25px;
++}
++
++#borders {
++  border-width: 2px;
++  box-shadow: 0 0 16px black;
++}
++
++#main > p {
++  position: absolute;
++  pointer-events: none;
++}
++
++#main > p {
++  margin: 0;
++  text-align: center;
++}
++
++#main > p > span {
++  vertical-align: middle;
++  pointer-events: auto;
++  cursor: default;
++}
++
++.border.top {
++  left: 0; top: 23px;
++  width: 98px;
++}
++
++.border.bottom {
++  right: 0; bottom: 22px;
++  width: 98px;
++  top: auto;
++}
++
++.border.left {
++  top: 42px; left: 0;
++  width: 56px;
++}
++
++.border.right{
++  bottom: 42px; right: 0;
++  width: 56px;
++  top: auto;
++}
++
++.top, .bottom {
++  width: -moz-calc(100% - 2px);
++  text-align: center;
++}
++
++.margin.top {
++  top: 8px;
++}
++
++.margin.bottom {
++  bottom: 6px;
++}
++
++.padding.top {
++  top: 35px;
++}
++
++.padding.bottom {
++  bottom: 35px;
++}
++
++.size,
++.margin.left,
++.margin.right,
++.padding.left,
++.padding.right {
++  top: 0;
++  line-height: 132px;
++}
++
++.size {
++  width: -moz-calc(100% - 2px);
++}
++
++.margin.right,
++.margin.left {
++  width: 28px;
++}
++
++.padding.right,
++.padding.left {
++  width: 25px;
++}
++
++.margin.right {
++  right: 0;
++}
++
++.margin.left {
++  left: 0;
++}
++
++.padding.left {
++  left: 30px;
++}
++
++.padding.right {
++  right: 30px;
++}
++
++.tooltip {
++  position: absolute;
++  bottom: 0;
++  right: 2px;
++  pointer-events: none;
++}
++
++body.dim > #main,
++body.dim > #header > #element-size {
++  visibility: hidden;
++}
++
 diff --git a/browser/devtools/layoutview/view.xhtml b/browser/devtools/layoutview/view.xhtml
 new file mode 100644
 --- /dev/null
 +++ b/browser/devtools/layoutview/view.xhtml
-@@ -0,0 +1,326 @@
+@@ -0,0 +1,149 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +#ifdef 0
 +<!-- ***** BEGIN LICENSE BLOCK *****
@@ -850,184 +1030,7 @@ new file mode 100644
 +    </script>
 +
 +    <link rel="stylesheet" href="chrome://browser/skin/devtools/layoutview.css" type="text/css"/>
-+
-+    <style>
-+      body, html {
-+        height: 100%;
-+        width: 100%;
-+        overflow: hidden;
-+      }
-+
-+      body {
-+        margin: 0;
-+        padding: 0;
-+      }
-+
-+      #header {
-+        -moz-box-sizing: border-box;
-+        font: 12px/14px monospace;
-+        width: 100%;
-+        padding: 3px 4px;
-+        display: -moz-box;
-+      }
-+
-+      body[dir=rtl] > #header {
-+        -moz-box-direction: reverse;
-+      }
-+
-+      #header > span {
-+        display: -moz-box;
-+      }
-+
-+      #element-size {
-+        -moz-box-flex: 1;
-+      }
-+
-+      body[dir=rtl] > #header > #element-size {
-+        -moz-box-pack: end;
-+      }
-+
-+      #header:focus {
-+        outline: none;
-+      }
-+
-+      #main {
-+        margin: 10px;
-+        -moz-box-sizing: border-box;
-+        width: -moz-calc(100% - 2 * 10px);
-+        position: absolute;
-+        border-width: 1px;
-+        font: 10px/12px monospace;
-+      }
-+
-+      #margins {
-+        padding: 28px;
-+      }
-+
-+      #content {
-+        height: 20px;
-+        border-width: 1px;
-+      }
-+
-+      #padding {
-+        border-width: 25px;
-+      }
-+
-+      #borders {
-+        border-width: 2px;
-+        box-shadow: 0 0 16px black;
-+      }
-+
-+      #main > p {
-+        position: absolute;
-+        pointer-events: none;
-+      }
-+
-+      #main > p {
-+        margin: 0;
-+        text-align: center;
-+      }
-+
-+      #main > p > span {
-+        vertical-align: middle;
-+        pointer-events: auto;
-+        cursor: default;
-+      }
-+
-+      .border.top {
-+        left: 0; top: 23px;
-+        width: 98px;
-+      }
-+
-+      .border.bottom {
-+        right: 0; bottom: 22px;
-+        width: 98px;
-+        top: auto;
-+      }
-+
-+      .border.left {
-+        top: 42px; left: 0;
-+        width: 56px;
-+      }
-+
-+      .border.right{
-+        bottom: 42px; right: 0;
-+        width: 56px;
-+        top: auto;
-+      }
-+
-+      .top, .bottom {
-+        width: -moz-calc(100% - 2px);
-+        text-align: center;
-+      }
-+
-+      .margin.top {
-+        top: 8px;
-+      }
-+
-+      .margin.bottom {
-+        bottom: 6px;
-+      }
-+
-+      .padding.top {
-+        top: 35px;
-+      }
-+
-+      .padding.bottom {
-+        bottom: 35px;
-+      }
-+
-+      .size,
-+      .margin.left,
-+      .margin.right,
-+      .padding.left,
-+      .padding.right {
-+        top: 0;
-+        line-height: 132px;
-+      }
-+
-+      .size {
-+        width: -moz-calc(100% - 2px);
-+      }
-+
-+      .margin.right,
-+      .margin.left {
-+        width: 28px;
-+      }
-+
-+      .padding.right,
-+      .padding.left {
-+        width: 25px;
-+      }
-+
-+      .margin.right {
-+        right: 0;
-+      }
-+
-+      .margin.left {
-+        left: 0;
-+      }
-+
-+      .padding.left {
-+        left: 30px;
-+      }
-+
-+      .padding.right {
-+        right: 30px;
-+      }
-+
-+      .tooltip {
-+        position: absolute;
-+        bottom: 0;
-+        right: 2px;
-+        pointer-events: none;
-+      }
-+
-+      body.dim > #main,
-+      body.dim > #header > #element-size {
-+        visibility: hidden;
-+      }
-+    </style>
++    <link rel="stylesheet" href="view.css" type="text/css"/>
 +
 +  </head>
 +  <body>
@@ -1313,8 +1316,7 @@ new file mode 100644
 diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
 --- a/browser/themes/gnomestripe/jar.mn
 +++ b/browser/themes/gnomestripe/jar.mn
-@@ -127,16 +127,19 @@ browser.jar:
-   skin/classic/browser/devtools/styleeditor.css       (devtools/styleeditor.css)
+@@ -133,16 +133,19 @@ browser.jar:
    skin/classic/browser/devtools/debugger.css          (devtools/debugger.css)
    skin/classic/browser/devtools/magnifying-glass.png  (devtools/magnifying-glass.png)
    skin/classic/browser/devtools/itemToggle.png        (devtools/itemToggle.png)
@@ -1322,6 +1324,7 @@ diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.
    skin/classic/browser/devtools/itemArrow-ltr.png     (devtools/itemArrow-ltr.png)
    skin/classic/browser/devtools/inspect-button.png    (devtools/inspect-button.png)
    skin/classic/browser/devtools/dropmarker.png        (devtools/dropmarker.png)
+   skin/classic/browser/devtools/treepanel-button.png  (devtools/treepanel-button.png)
 +  skin/classic/browser/devtools/layout-background.png (devtools/layout-background.png)
 +  skin/classic/browser/devtools/layoutview.css        (devtools/layoutview.css)
 +  skin/classic/browser/devtools/layout-buttons.png    (devtools/layout-buttons.png)
@@ -1526,8 +1529,7 @@ new file mode 100644
 diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
 --- a/browser/themes/pinstripe/jar.mn
 +++ b/browser/themes/pinstripe/jar.mn
-@@ -168,16 +168,19 @@ browser.jar:
-   skin/classic/browser/devtools/debugger.css                (devtools/debugger.css)
+@@ -174,16 +174,19 @@ browser.jar:
    skin/classic/browser/devtools/magnifying-glass.png        (devtools/magnifying-glass.png)
    skin/classic/browser/devtools/itemToggle.png              (devtools/itemToggle.png)
    skin/classic/browser/devtools/itemArrow-rtl.png           (devtools/itemArrow-rtl.png)
@@ -1535,6 +1537,7 @@ diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
    skin/classic/browser/devtools/background-noise-toolbar.png (devtools/background-noise-toolbar.png)
    skin/classic/browser/devtools/inspect-button.png          (devtools/inspect-button.png)
    skin/classic/browser/devtools/dropmarker.png              (devtools/dropmarker.png)
+   skin/classic/browser/devtools/treepanel-button.png        (devtools/treepanel-button.png)
 +  skin/classic/browser/devtools/layout-background.png       (devtools/layout-background.png)
 +  skin/classic/browser/devtools/layoutview.css              (devtools/layoutview.css)
 +  skin/classic/browser/devtools/layout-buttons.png          (devtools/layout-buttons.png)
@@ -1739,8 +1742,7 @@ new file mode 100644
 diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
 --- a/browser/themes/winstripe/jar.mn
 +++ b/browser/themes/winstripe/jar.mn
-@@ -154,16 +154,19 @@ browser.jar:
-         skin/classic/browser/devtools/styleeditor.css               (devtools/styleeditor.css)
+@@ -160,16 +160,19 @@ browser.jar:
          skin/classic/browser/devtools/debugger.css                  (devtools/debugger.css)
          skin/classic/browser/devtools/magnifying-glass.png          (devtools/magnifying-glass.png)
          skin/classic/browser/devtools/itemToggle.png                (devtools/itemToggle.png)
@@ -1748,6 +1750,7 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/browser/devtools/itemArrow-ltr.png             (devtools/itemArrow-ltr.png)
          skin/classic/browser/devtools/inspect-button.png            (devtools/inspect-button.png)
          skin/classic/browser/devtools/dropmarker.png                (devtools/dropmarker.png)
+         skin/classic/browser/devtools/treepanel-button.png          (devtools/treepanel-button.png)
 +        skin/classic/browser/devtools/layout-background.png         (devtools/layout-background.png)
 +        skin/classic/browser/devtools/layoutview.css                (devtools/layoutview.css)
 +        skin/classic/browser/devtools/layout-buttons.png            (devtools/layout-buttons.png)
@@ -1759,8 +1762,7 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/browser/sync-bg.png
          skin/classic/browser/sync-desktopIcon.png
          skin/classic/browser/sync-mobileIcon.png
-@@ -328,16 +331,19 @@ browser.jar:
-         skin/classic/aero/browser/devtools/styleeditor.css           (devtools/styleeditor.css)
+@@ -340,16 +343,19 @@ browser.jar:
          skin/classic/aero/browser/devtools/debugger.css              (devtools/debugger.css)
          skin/classic/aero/browser/devtools/magnifying-glass.png      (devtools/magnifying-glass.png)
          skin/classic/aero/browser/devtools/itemToggle.png            (devtools/itemToggle.png)
@@ -1768,6 +1770,7 @@ diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
          skin/classic/aero/browser/devtools/itemArrow-ltr.png         (devtools/itemArrow-ltr.png)
          skin/classic/aero/browser/devtools/inspect-button.png        (devtools/inspect-button.png)
          skin/classic/aero/browser/devtools/dropmarker.png            (devtools/dropmarker.png)
+         skin/classic/aero/browser/devtools/treepanel-button.png      (devtools/treepanel-button.png)
 +        skin/classic/aero/browser/devtools/layout-background.png     (devtools/layout-background.png)
 +        skin/classic/aero/browser/devtools/layoutview.css            (devtools/layoutview.css)
 +        skin/classic/aero/browser/devtools/layout-buttons.png        (devtools/layout-buttons.png)

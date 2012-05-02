@@ -1,0 +1,403 @@
+# vim: se ft=diff :
+# HG changeset patch
+# User Cedric Vivier <cedricv@neonux.com>
+# Date 2012-02-23 11:07
+Bug 727834 - Add an API to (re)parse a style sheet inplace. r=bz
+---
+ layout/inspector/public/inIDOMUtils.idl          |   12 +++-
+ layout/inspector/src/inDOMUtils.cpp              |   11 +++
+ layout/inspector/tests/chrome/Makefile.in        |    2 +
+ layout/inspector/tests/chrome/test_bug727834.css |    7 ++
+ layout/inspector/tests/chrome/test_bug727834.xul |   88 ++++++++++++++++++++++
+ layout/style/nsCSSStyleSheet.cpp                 |   81 ++++++++++++++++++--
+ layout/style/nsCSSStyleSheet.h                   |    2 +
+ 7 files changed, 195 insertions(+), 8 deletions(-)
+ create mode 100644 layout/inspector/tests/chrome/test_bug727834.css
+ create mode 100644 layout/inspector/tests/chrome/test_bug727834.xul
+
+---
+ layout/inspector/public/inIDOMUtils.idl          |   12 +++-
+ layout/inspector/src/inDOMUtils.cpp              |   11 +++
+ layout/inspector/tests/chrome/Makefile.in        |    2 +
+ layout/inspector/tests/chrome/test_bug727834.css |    7 ++
+ layout/inspector/tests/chrome/test_bug727834.xul |   88 ++++++++++++++++++++++
+ layout/style/nsCSSStyleSheet.cpp                 |   81 ++++++++++++++++++--
+ layout/style/nsCSSStyleSheet.h                   |    2 +
+ 7 files changed, 195 insertions(+), 8 deletions(-)
+ create mode 100644 layout/inspector/tests/chrome/test_bug727834.css
+ create mode 100644 layout/inspector/tests/chrome/test_bug727834.xul
+
+diff --git a/layout/inspector/public/inIDOMUtils.idl b/layout/inspector/public/inIDOMUtils.idl
+index edc523a..7e80314 100644
+--- a/layout/inspector/public/inIDOMUtils.idl
++++ b/layout/inspector/public/inIDOMUtils.idl
+@@ -43,18 +43,19 @@ interface nsISupportsArray;
+ interface nsIDOMCharacterData;
+ interface nsIDOMElement;
+ interface nsIDOMDocument;
+ interface nsIDOMCSSStyleRule;
+ interface nsIDOMNode;
+ interface nsIDOMNodeList;
+ interface nsIDOMFontFaceList;
+ interface nsIDOMRange;
++interface nsIDOMCSSStyleSheet;
+ 
+-[scriptable, uuid(983475e4-6bdf-4741-a733-76e9a8d119b9)]
++[scriptable, uuid(f7a37305-a963-4a2a-b951-2c97a6b27fb4)]
+ interface inIDOMUtils : nsISupports
+ {
+   // CSS utilities
+   nsISupportsArray getCSSStyleRules(in nsIDOMElement aElement, [optional] in DOMString aPseudo);
+   unsigned long getRuleLine(in nsIDOMCSSStyleRule aRule);
+ 
+   // Returns true if the string names a property that is inherited by default.
+   bool isInheritedProperty(in AString aPropertyName);
+@@ -80,9 +81,18 @@ interface inIDOMUtils : nsISupports
+ 
+   // pseudo-class style locking methods. aPseudoClass must be a valid pseudo-class
+   // selector string, e.g. ":hover". ":-moz-any-link" and non-event-state
+   // pseudo-classes are ignored.
+   void addPseudoClassLock(in nsIDOMElement aElement, in DOMString aPseudoClass);
+   void removePseudoClassLock(in nsIDOMElement aElement, in DOMString aPseudoClass);
+   bool hasPseudoClassLock(in nsIDOMElement aElement, in DOMString aPseudoClass);
+   void clearPseudoClassLocks(in nsIDOMElement aElement);
++
++  /**
++   * Parse CSS and update the style sheet inplace.
++   *
++   * @param DOMCSSStyleSheet aSheet
++   * @param DOMString aInput
++   *        The new source string for the style sheet.
++   */
++  void parseStyleSheet(in nsIDOMCSSStyleSheet aSheet, in DOMString aInput);
+ };
+diff --git a/layout/inspector/src/inDOMUtils.cpp b/layout/inspector/src/inDOMUtils.cpp
+index 74e1c89..68c6d56 100644
+--- a/layout/inspector/src/inDOMUtils.cpp
++++ b/layout/inspector/src/inDOMUtils.cpp
+@@ -55,16 +55,17 @@
+ #include "nsXBLPrototypeBinding.h"
+ #include "nsIMutableArray.h"
+ #include "nsBindingManager.h"
+ #include "nsComputedDOMStyle.h"
+ #include "nsEventStateManager.h"
+ #include "nsIAtom.h"
+ #include "nsRange.h"
+ #include "mozilla/dom/Element.h"
++#include "nsCSSStyleSheet.h"
+ 
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ 
+ inDOMUtils::inDOMUtils()
+ {
+ }
+ 
+@@ -452,8 +453,18 @@ inDOMUtils::ClearPseudoClassLocks(nsIDOMElement *aElement)
+ {
+   NS_ENSURE_ARG_POINTER(aElement);
+ 
+   nsCOMPtr<mozilla::dom::Element> element = do_QueryInterface(aElement);
+   element->ClearStyleStateLocks();
+ 
+   return NS_OK;
+ }
++
++NS_IMETHODIMP
++inDOMUtils::ParseStyleSheet(nsIDOMCSSStyleSheet *aSheet,
++                            const nsAString& aInput)
++{
++  NS_ENSURE_ARG_POINTER(aSheet);
++
++  nsRefPtr<nsCSSStyleSheet> sheet = do_QueryObject(aSheet);
++  return sheet->ParseSheet(aInput);
++}
+diff --git a/layout/inspector/tests/chrome/Makefile.in b/layout/inspector/tests/chrome/Makefile.in
+index 2fb745d..fa7f5a1 100644
+--- a/layout/inspector/tests/chrome/Makefile.in
++++ b/layout/inspector/tests/chrome/Makefile.in
+@@ -47,12 +47,14 @@ include $(topsrcdir)/config/rules.mk
+ _CHROME_FILES =\
+ 		test_bug467669.xul \
+ 		test_bug467669.css \
+ 		test_bug695639.xul \
+ 		test_bug695639.css \
+ 		GentiumPlus-R.woff \
+ 		test_bug708874.xul \
+ 		test_bug708874.css \
++		test_bug727834.xul \
++		test_bug727834.css \
+ 		$(NULL)
+ 
+ libs:: $(_CHROME_FILES)
+ 	$(INSTALL) $^ $(DEPTH)/_tests/testing/mochitest/chrome/$(relativesrcdir)
+diff --git a/layout/inspector/tests/chrome/test_bug727834.css b/layout/inspector/tests/chrome/test_bug727834.css
+new file mode 100644
+index 0000000..f21f7a5
+--- /dev/null
++++ b/layout/inspector/tests/chrome/test_bug727834.css
+@@ -0,0 +1,7 @@
++/* vim: set ts=2 et sw=2 tw=80: */
++/* Any copyright is dedicated to the Public Domain.
++   http://creativecommons.org/publicdomain/zero/1.0/ */
++
++body {
++  padding-top: 100px;
++}
+diff --git a/layout/inspector/tests/chrome/test_bug727834.xul b/layout/inspector/tests/chrome/test_bug727834.xul
+new file mode 100644
+index 0000000..a929259
+--- /dev/null
++++ b/layout/inspector/tests/chrome/test_bug727834.xul
+@@ -0,0 +1,88 @@
++<?xml version="1.0"?>
++<!--
++vim: set ts=2 et sw=2 tw=80:
++Any copyright is dedicated to the Public Domain.
++http://creativecommons.org/publicdomain/zero/1.0/
++-->
++<?xml-stylesheet type="text/css" href="chrome://global/skin"?>
++<?xml-stylesheet type="text/css" href="chrome://mochikit/content/tests/SimpleTest/test.css"?>
++<?xml-stylesheet type="text/css" href="test_bug727834.css"?>
++<window title="Mozilla Bug 727834"
++        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
++        onload="RunTests();">
++  <script type="application/javascript" src="chrome://mochikit/content/tests/SimpleTest/SimpleTest.js"/>
++  <script type="application/javascript"><![CDATA[
++/** Test for Bug 727834 - Add an API to (re)parse a style sheet inplace **/
++
++function RunTests() {
++  SimpleTest.waitForExplicitFinish();
++
++  let DOMUtils = Components.classes["@mozilla.org/inspector/dom-utils;1"]
++                   .getService(Components.interfaces.inIDOMUtils);
++  let body = document.querySelector("body");
++  let testSheet = document.styleSheets[2];
++  let rule = document.styleSheets[2].cssRules[0];
++
++  is(testSheet.cssRules.length, 1,
++     "style sheet has 1 rule");
++  is(rule.style.paddingTop, "100px",
++     "original first rule has padding-top 100px");
++  is(window.getComputedStyle(body).paddingTop, "100px",
++     "original first rule applies");
++
++  DOMUtils.parseStyleSheet(testSheet,
++    "@import url(test_bug727834.css); body{background: red;}");
++
++  is(testSheet.cssRules.length, 2,
++     "style sheet now has 2 rules");
++  is(window.getComputedStyle(body).backgroundColor, "rgb(255, 0, 0)",
++     "background is now red");
++
++  let exceptionName;
++  try {
++    rule.style.paddingLeft = "100px";
++  } catch (ex) {
++    exceptionName = ex.name;
++  } finally {
++    is(exceptionName, "NS_ERROR_NOT_AVAILABLE",
++       "original rule is not available for modification anymore");
++  }
++  is(window.getComputedStyle(body).paddingLeft, "0px",
++     "original rule does not apply to document");
++
++  rule = testSheet.cssRules[0];
++
++  is(rule.parentStyleSheet, testSheet,
++     "child sheet's parent is not null");
++
++  DOMUtils.parseStyleSheet(testSheet,
++    "body{background: lime;}");
++
++  is(testSheet.cssRules.length, 1,
++     "style sheet now has 1 rule");
++  is(window.getComputedStyle(body).backgroundColor, "rgb(0, 255, 0)",
++     "background is now lime");
++  is(rule.parentStyleSheet, null,
++     "detached child sheet's parent is null");
++
++  SimpleTest.executeSoon(function () {
++    DOMUtils.parseStyleSheet(testSheet,
++      "@import url(test_bug727834.css); body{background: blue;}");
++
++    is(testSheet.cssRules.length, 2,
++       "style sheet now has 2 rules");
++    is(window.getComputedStyle(body).backgroundColor, "rgb(0, 0, 255)",
++       "background is now blue");
++    is(testSheet.cssRules[0].parentStyleSheet, testSheet,
++       "parent style sheet is the test sheet");
++
++    SimpleTest.finish();
++  });
++}
++  ]]></script>
++  <body xmlns="http://www.w3.org/1999/xhtml">
++    <a href="https://bugzilla.mozilla.org/show_bug.cgi?id=727834">
++      Mozilla Bug 727834 - Add an API to (re)parse a style sheet inplace
++    </a>
++  </body>
++</window>
+diff --git a/layout/style/nsCSSStyleSheet.cpp b/layout/style/nsCSSStyleSheet.cpp
+index 029dd75..2306765 100644
+--- a/layout/style/nsCSSStyleSheet.cpp
++++ b/layout/style/nsCSSStyleSheet.cpp
+@@ -1781,16 +1781,26 @@ nsCSSStyleSheet::InsertRule(const nsAString& aRule,
+   //-- Security check: Only scripts whose principal subsumes that of the
+   //   style sheet can modify rule collections.
+   nsresult rv = SubjectSubsumesInnerPrincipal();
+   NS_ENSURE_SUCCESS(rv, rv);
+ 
+   return InsertRuleInternal(aRule, aIndex, aReturn);
+ }
+ 
++static bool
++IsChildSheetLoaded(css::Rule *cssRule)
++{
++  nsCOMPtr<nsIDOMCSSImportRule> importRule(do_QueryInterface(cssRule));
++  NS_ASSERTION(importRule, "Rule which has type IMPORT_RULE and does not implement nsIDOMCSSImportRule!");
++  nsCOMPtr<nsIDOMCSSStyleSheet> childSheet;
++  importRule->GetStyleSheet(getter_AddRefs(childSheet));
++  return childSheet != nsnull;
++}
++
+ nsresult
+ nsCSSStyleSheet::InsertRuleInternal(const nsAString& aRule, 
+                                     PRUint32 aIndex, 
+                                     PRUint32* aReturn)
+ {
+   // No doing this if the sheet is not complete!
+   if (!mInner->mComplete) {
+     return NS_ERROR_DOM_INVALID_ACCESS_ERR;
+@@ -1905,23 +1915,17 @@ nsCSSStyleSheet::InsertRuleInternal(const nsAString& aRule,
+       result = RegisterNamespaceRule(cssRule);
+       NS_ENSURE_SUCCESS(result, result);
+     }
+ 
+     // We don't notify immediately for @import rules, but rather when
+     // the sheet the rule is importing is loaded
+     bool notify = true;
+     if (type == css::Rule::IMPORT_RULE) {
+-      nsCOMPtr<nsIDOMCSSImportRule> importRule(do_QueryInterface(cssRule));
+-      NS_ASSERTION(importRule, "Rule which has type IMPORT_RULE and does not implement nsIDOMCSSImportRule!");
+-      nsCOMPtr<nsIDOMCSSStyleSheet> childSheet;
+-      importRule->GetStyleSheet(getter_AddRefs(childSheet));
+-      if (!childSheet) {
+-        notify = false;
+-      }
++      notify = !IsChildSheetLoaded(cssRule);
+     }
+     if (mDocument && notify) {
+       mDocument->StyleRuleAdded(this, cssRule);
+     }
+   }
+   
+   *aReturn = aIndex;
+   return NS_OK;
+@@ -2102,16 +2106,79 @@ nsCSSStyleSheet::StyleSheetLoaded(nsCSSStyleSheet* aSheet,
+     // XXXldb @import rules shouldn't even implement nsIStyleRule (but
+     // they do)!
+     mDocument->StyleRuleAdded(this, aSheet->GetOwnerRule());
+   }
+ 
+   return NS_OK;
+ }
+ 
++nsresult
++nsCSSStyleSheet::ParseSheet(const nsAString& aInput)
++{
++  // Not doing this if the sheet is not complete!
++  if (!mInner->mComplete) {
++    return NS_ERROR_DOM_INVALID_ACCESS_ERR;
++  }
++
++  // Hold strong ref to the CSSLoader in case the document update
++  // kills the document
++  nsRefPtr<css::Loader> loader;
++  if (mDocument) {
++    loader = mDocument->CSSLoader();
++    NS_ASSERTION(loader, "Document with no CSS loader!");
++  } else {
++    loader = new css::Loader();
++  }
++
++  nsCSSParser parser(loader, this);
++
++  mozAutoDocUpdate updateBatch(mDocument, UPDATE_STYLE, true);
++
++  nsresult rv = WillDirty();
++  NS_ENSURE_SUCCESS(rv, rv);
++
++  // detach existing rules (including child sheets via import rules)
++  while (mInner->mOrderedRules.Count() != 0) {
++    nsRefPtr<css::Rule> rule = mInner->mOrderedRules.ObjectAt(0);
++    mInner->mOrderedRules.RemoveObjectAt(0);
++    rule->SetStyleSheet(nsnull);
++    if (mDocument) {
++      mDocument->StyleRuleRemoved(this, rule);
++    }
++  }
++
++  // nuke child sheets list and current namespace map
++  mInner->mFirstChild = nsnull;
++  mInner->mNameSpaceMap = nsnull;
++
++  // allow unsafe rules if the style sheet's principal is the system principal
++  bool allowUnsafeRules = false;
++  nsIScriptSecurityManager *securityManager = nsContentUtils::GetSecurityManager();
++  rv = securityManager->IsSystemPrincipal(mInner->mPrincipal, &allowUnsafeRules);
++  NS_ENSURE_SUCCESS(rv, rv);
++
++  rv = parser.ParseSheet(aInput, mInner->mSheetURI, mInner->mBaseURI,
++                         mInner->mPrincipal, 1, allowUnsafeRules);
++
++  DidDirty();
++  if (mDocument) {
++    for (PRInt32 index = 0; index < mInner->mOrderedRules.Count(); ++index) {
++      nsRefPtr<css::Rule> rule = mInner->mOrderedRules.ObjectAt(index);
++      if (rule->GetType() == css::Rule::IMPORT_RULE) {
++        if (!IsChildSheetLoaded(rule)) {
++          continue; // notify when loaded (see StyleSheetLoaded)
++        }
++      }
++      mDocument->StyleRuleAdded(this, mInner->mOrderedRules.ObjectAt(index));
++    }
++  }
++  return rv;
++}
++
+ /* virtual */ nsIURI*
+ nsCSSStyleSheet::GetOriginalURI() const
+ {
+   return mInner->mOriginalSheetURI;
+ }
+ 
+ nsresult
+ NS_NewCSSStyleSheet(nsCSSStyleSheet** aInstancePtrResult)
+diff --git a/layout/style/nsCSSStyleSheet.h b/layout/style/nsCSSStyleSheet.h
+index fa602a9..b8bd098 100644
+--- a/layout/style/nsCSSStyleSheet.h
++++ b/layout/style/nsCSSStyleSheet.h
+@@ -253,16 +253,18 @@ public:
+ 
+   // Append all of this sheet's child sheets to aArray.  Return true
+   // on success and false on allocation failure.
+   bool AppendAllChildSheets(nsTArray<nsCSSStyleSheet*>& aArray);
+ 
+   bool UseForPresentation(nsPresContext* aPresContext,
+                             nsMediaQueryResultCacheKey& aKey) const;
+ 
++  nsresult ParseSheet(const nsAString& aInput);
++
+   // nsIDOMStyleSheet interface
+   NS_DECL_NSIDOMSTYLESHEET
+ 
+   // nsIDOMCSSStyleSheet interface
+   NS_DECL_NSIDOMCSSSTYLESHEET
+ 
+   // Function used as a callback to rebuild our inner's child sheet
+   // list after we clone a unique inner for ourselves.
+-- 
+1.7.6.5
+
+
