@@ -1,5 +1,5 @@
 # HG changeset patch
-# Parent 038fa59a22840755fb144af114e26ce8722116b0
+# Parent e0738afc41ad8d1123f1a7e96df3073f69dca2c8
 Bug 749628 - Implement a Responsive Design tool
 
 diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
@@ -189,7 +189,7 @@ diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
 +#ifdef MENUBAR_CAN_AUTOHIDE
 +    document.getElementById("appmenu_responsiveUI").hidden = false;
 +#endif
-+    document.getElementById("developer-toolbar-responsiveui").hidden = false;
++    /* FIXME: reenable this once toolbar is back: document.getElementById("developer-toolbar-responsiveui").hidden = false; */
 +  }
 +
 +
@@ -312,7 +312,7 @@ diff --git a/browser/devtools/responsivedesign/responsivedesign.jsm b/browser/de
 new file mode 100644
 --- /dev/null
 +++ b/browser/devtools/responsivedesign/responsivedesign.jsm
-@@ -0,0 +1,413 @@
+@@ -0,0 +1,417 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 +/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 +/* ***** BEGIN LICENSE BLOCK *****
@@ -353,6 +353,9 @@ new file mode 100644
 + * ***** END LICENSE BLOCK ***** */
 +
 +const Ci = Components.interfaces;
++const Cu = Components.utils;
++
++Cu.import("resource://gre/modules/Services.jsm");
 +
 +var EXPORTED_SYMBOLS = ["ResponsiveUIManager"];
 +
@@ -385,7 +388,7 @@ new file mode 100644
 +let ResponsiveUIManager = {
 +  toggle: function(aWindow, aBrowser) {
 +    if (aBrowser.responsiveUI) {
-+      this.close();
++      this.close(aWindow, aBrowser);
 +    } else {
 +      this.open(aWindow, aBrowser);
 +    }
@@ -393,7 +396,7 @@ new file mode 100644
 +  open: function(aWindow, aBrowser) {
 +    aBrowser.responsiveUI = new ResponsiveUI(aWindow, aBrowser);
 +  },
-+  close: function() {
++  close: function(aWindow, aBrowser) {
 +    aBrowser.responsiveUI.close();
 +  }
 +}
@@ -402,6 +405,8 @@ new file mode 100644
 +{
 +  this.mainWindow = aWindow;
 +  this.browser = aBrowser;
++
++  this.strings = Services.strings.createBundle("chrome://browser/locale/devtools/responsiveUI.properties");
 +
 +  this.container = aWindow.gBrowser.getBrowserContainer(aBrowser);
 +  this.stack = this.container.querySelector("[anonid=browserStack]");
@@ -478,6 +483,7 @@ new file mode 100644
 +    this.contentViewer = null;
 +
 +    delete this.browser.responsiveUI;
++    delete this.strings;
 +  },
 +
 +  buildUI: function RUI_buildUI() {
@@ -500,7 +506,7 @@ new file mode 100644
 +
 +    let rotateButton = this.chromeDoc.createElement("toolbarbutton");
 +    rotateButton.className = "devtools-toolbarbutton";
-+    rotateButton.setAttribute("label", "rotate"); //FIXME: i10n
++    rotateButton.setAttribute("label", this.strings.GetStringFromName("responsiveUI.rotate"));
 +    rotateButton.onclick = this.rotate;
 +
 +    // Zoom buttons
@@ -519,7 +525,7 @@ new file mode 100644
 +
 +    let zoomrestore = this.chromeDoc.createElement("toolbarbutton");
 +    zoomrestore.className = "devtools-toolbarbutton";
-+    zoomrestore.setAttribute("label", "1:1");
++    zoomrestore.setAttribute("label", this.strings.GetStringFromName("responsiveUI.resetZoom"));
 +    zoomrestore.onclick = this.zoomRestore;
 +
 +    this.zoomLabel = this.chromeDoc.createElement("label");
@@ -534,18 +540,11 @@ new file mode 100644
 +    zoombox.appendChild(zoomout);
 +    zoombox.appendChild(zoomrestore);
 +
-+    // Close button
-+    let closeButton = this.chromeDoc.createElement("toolbarbutton");
-+    closeButton.className = "devtools-closebutton";
-+    closeButton.onclick = this.close;
-+
-+    // Build toolbar
 +    this.toolbar.appendChild(this.menulist);
 +    this.toolbar.appendChild(rotateButton);
 +    this.toolbar.appendChild(zoombox);
-+    // FIXME: do we need a close button? this.toolbar.appendChild(closeButton);
 +
-+    // Resize
++    // Resizers
 +
 +    this.resizer = this.chromeDoc.createElement("box");
 +    this.resizer.className = "devtools-responsiveui-resizehandle";
@@ -578,9 +577,13 @@ new file mode 100644
 +  },
 +
 +  setMenuLabel: function RUI_setMenuLabel(menuitem, preset) {
-+    let description = "";
-+    if (preset.custom) description = " (custom)";
-+    menuitem.setAttribute("label", Math.round(preset.width) + "x" + Math.round(preset.height) + description);
++    let size = Math.round(preset.width) + "x" + Math.round(preset.height);
++    if (preset.custom) {
++      let str = this.strings.formatStringFromName("responsiveUI.customResolution", [size], 1);
++      menuitem.setAttribute("label", str);
++    } else {
++      menuitem.setAttribute("label", size);
++    }
 +  },
 +
 +  presetSelected: function RUI_presetSelected() {
@@ -633,7 +636,8 @@ new file mode 100644
 +  },
 +
 +  updateZoomLabel: function RUI_updateZoomLabel() {
-+    this.zoomLabel.setAttribute("value", "zoom: " + Math.round(100 * this.currentZoomValue) + "%");
++    let str = this.strings.formatStringFromName("responsiveUI.zoom", [Math.round(100 * this.currentZoomValue) + "%"], 1);
++    this.zoomLabel.setAttribute("value", str);
 +  },
 +
 +  setSize: function RUI_setSize(width, height) {
@@ -894,7 +898,9 @@ new file mode 100644
 +      let [width, height] = extractSizeFromString(instance.menulist.firstChild.firstChild.getAttribute("label"));
 +      is(width, initialHeight, "Label updated (width).");
 +      is(height, initialWidth, "Label updated (height).");
-+      finishUp();
++
++       EventUtils.synthesizeKey("VK_ESCAPE", {});
++      executeSoon(finishUp);
 +    }, 500);
 +  }
 +
@@ -906,8 +912,6 @@ new file mode 100644
 +      isnot(document.getElementById("menu_responsiveUI").getAttribute("checked"), "true", "app menu unchecked");
 +    if (document.getElementById("developer-toolbar-responsiveui"))
 +      isnot(document.getElementById("developer-toolbar-responsiveui").getAttribute("checked"), "true", "toolbar button unchecked");
-+
-+
 +
 +    delete instance;
 +    gBrowser.removeCurrentTab();
@@ -952,7 +956,7 @@ diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/
  <!ENTITY inspectContextMenu.label     "Inspect Element">
  <!ENTITY inspectContextMenu.accesskey "Q">
  
-+<!ENTITY responsiveUI.label            "Responsive Design">
++<!ENTITY responsiveUI.label            "Responsive Mode">
 +<!ENTITY responsiveUI.accesskey        "R">
 +<!ENTITY responsiveUI.commandkey       "D">
 +
@@ -965,6 +969,58 @@ diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/
    -
    -  It's quite possible that you won't have a good analogue for the word
    -  "Scratchpad" in your locale. You should feel free to find a close
+diff --git a/browser/locales/en-US/chrome/browser/devtools/responsiveUI.properties b/browser/locales/en-US/chrome/browser/devtools/responsiveUI.properties
+new file mode 100644
+--- /dev/null
++++ b/browser/locales/en-US/chrome/browser/devtools/responsiveUI.properties
+@@ -0,0 +1,26 @@
++# LOCALIZATION NOTE These strings are used inside the Responsive Mode
++# which is available from the Web Developer sub-menu -> 'Responsive Mode'.
++#
++# The correct localization of this file might be to keep it in
++# English, or another language commonly spoken among web developers.
++# You want to make that choice consistent across the developer tools.
++# A good criteria is the language in which you'd find the best
++# documentation on web development on the web.
++
++
++# LOCALIZATION NOTE  (responsiveUI.rotate): label of the rotate button.
++responsiveUI.rotate=rotate
++
++# LOCALIZATION NOTE  (responsiveUI.customResolution): label of the first item
++# in the menulist at the beginning of the toolbar. For %S is replace with the
++# current size of the page. For example: "400x600".
++responsiveUI.customResolution=%S (custom)
++
++# LOCALIZATION NOTE  (responsiveUI.zoom): label of introducing the zoom box in
++# the toolbar. It shows the current zoom level. %S is replaced by a percentage
++# value. For example: 80%.
++responsiveUI.zoom=zoom: %S
++
++# LOCALIZATION NOTE  (responsiveUI.resetZoom): label of the very last button in
++# toolbar, that lets the user reset the zoom level of the page.
++responsiveUI.resetZoom=1:1
+diff --git a/browser/locales/jar.mn b/browser/locales/jar.mn
+--- a/browser/locales/jar.mn
++++ b/browser/locales/jar.mn
+@@ -27,16 +27,17 @@
+     locale/browser/devtools/styleeditor.properties    (%chrome/browser/devtools/styleeditor.properties)
+     locale/browser/devtools/styleeditor.dtd           (%chrome/browser/devtools/styleeditor.dtd)
+     locale/browser/devtools/styleinspector.properties (%chrome/browser/devtools/styleinspector.properties)
+     locale/browser/devtools/styleinspector.dtd        (%chrome/browser/devtools/styleinspector.dtd)
+     locale/browser/devtools/webConsole.dtd            (%chrome/browser/devtools/webConsole.dtd)
+     locale/browser/devtools/sourceeditor.properties   (%chrome/browser/devtools/sourceeditor.properties)
+     locale/browser/devtools/sourceeditor.dtd          (%chrome/browser/devtools/sourceeditor.dtd)
+     locale/browser/devtools/layoutview.dtd            (%chrome/browser/devtools/layoutview.dtd)
++    locale/browser/devtools/responsiveUI.properties   (%chrome/browser/devtools/responsiveUI.properties)
+     locale/browser/newTab.dtd                      (%chrome/browser/newTab.dtd)
+     locale/browser/newTab.properties               (%chrome/browser/newTab.properties)
+     locale/browser/openLocation.dtd                (%chrome/browser/openLocation.dtd)
+     locale/browser/openLocation.properties         (%chrome/browser/openLocation.properties)
+ *   locale/browser/pageInfo.dtd                    (%chrome/browser/pageInfo.dtd)
+     locale/browser/pageInfo.properties             (%chrome/browser/pageInfo.properties)
+     locale/browser/quitDialog.properties           (%chrome/browser/quitDialog.properties)
+ *   locale/browser/safeMode.dtd                    (%chrome/browser/safeMode.dtd)
 diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
 --- a/browser/themes/gnomestripe/browser.css
 +++ b/browser/themes/gnomestripe/browser.css
@@ -1068,7 +1124,7 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
 diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinstripe/devtools/common.css
 --- a/browser/themes/pinstripe/devtools/common.css
 +++ b/browser/themes/pinstripe/devtools/common.css
-@@ -162,8 +162,15 @@
+@@ -148,8 +148,15 @@
  
  .devtools-closebutton:hover {
    -moz-image-region: rect(0, 32px, 16px, 16px);
