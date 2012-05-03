@@ -1,5 +1,5 @@
 # HG changeset patch
-# Parent e0738afc41ad8d1123f1a7e96df3073f69dca2c8
+# Parent 5007ba2b40ce95ee86abce014a04f61464f74503
 Bug 749628 - Implement a Responsive Design tool
 
 diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
@@ -19,12 +19,12 @@ diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
 +
  // Enable the Debugger
  pref("devtools.debugger.enabled", false);
+ pref("devtools.debugger.remote-enabled", false);
+ pref("devtools.debugger.remote-host", "localhost");
+ pref("devtools.debugger.remote-port", 6000);
  
  // The default Debugger UI height
  pref("devtools.debugger.ui.height", 250);
- 
- // Enable the style inspector
- pref("devtools.styleinspector.enabled", true);
 diff --git a/browser/base/content/browser-appmenu.inc b/browser/base/content/browser-appmenu.inc
 --- a/browser/base/content/browser-appmenu.inc
 +++ b/browser/base/content/browser-appmenu.inc
@@ -48,9 +48,9 @@ diff --git a/browser/base/content/browser-appmenu.inc b/browser/base/content/bro
                      label="&debuggerMenu.label;"
                      key="key_debugger"
                      command="Tools:Debugger"/>
-           <menuitem id="appmenu_scratchpad"
+           <menuitem id="appmenu_remoteDebugger"
                      hidden="true"
-                     label="&scratchpad.label;"
+                     label="&remoteDebuggerMenu.label;"
 diff --git a/browser/base/content/browser-menubar.inc b/browser/base/content/browser-menubar.inc
 --- a/browser/base/content/browser-menubar.inc
 +++ b/browser/base/content/browser-menubar.inc
@@ -75,19 +75,19 @@ diff --git a/browser/base/content/browser-menubar.inc b/browser/base/content/bro
                              label="&debuggerMenu.label;"
                              key="key_debugger"
                              command="Tools:Debugger"/>
-                   <menuitem id="menu_scratchpad"
+                   <menuitem id="menu_remoteDebugger"
                              hidden="true"
-                             label="&scratchpad.label;"
+                             label="&remoteDebuggerMenu.label;"
 diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browser-sets.inc
 --- a/browser/base/content/browser-sets.inc
 +++ b/browser/base/content/browser-sets.inc
-@@ -126,16 +126,17 @@
- 
-     <command id="Tools:Search" oncommand="BrowserSearch.webSearch();"/>
+@@ -128,16 +128,17 @@
      <command id="Tools:Downloads" oncommand="BrowserDownloadsUI();"/>
      <command id="Tools:WebConsole" oncommand="HUDConsoleUI.toggleHUD();"/>
      <command id="Tools:Inspect" oncommand="InspectorUI.toggleInspectorUI();" disabled="true"/>
      <command id="Tools:Debugger" oncommand="DebuggerUI.toggleDebugger();" disabled="true"/>
+     <command id="Tools:RemoteDebugger" oncommand="DebuggerUI.toggleRemoteDebugger();" disabled="true"/>
+     <command id="Tools:ChromeDebugger" oncommand="DebuggerUI.toggleChromeDebugger();" disabled="true"/>
      <command id="Tools:Scratchpad" oncommand="Scratchpad.openScratchpad();" disabled="true"/>
      <command id="Tools:StyleEditor" oncommand="StyleEditor.openChrome();" disabled="true"/>
 +    <command id="Tools:ResponsiveUI" oncommand="ResponsiveUI.toggle();" disabled="true"/>
@@ -99,7 +99,7 @@ diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browse
      <command id="History:UndoCloseWindow" oncommand="undoCloseWindow();"/>
      <command id="Browser:ToggleAddonBar" oncommand="toggleAddonBar();"/>
    </commandset>
-@@ -271,16 +272,23 @@
+@@ -273,16 +274,23 @@
      />
      <key id="key_inspect" key="&inspectMenu.commandkey;" command="Inspector:Inspect"
  #ifdef XP_MACOSX
@@ -172,7 +172,7 @@ diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
  # of those above. If you wish to allow use of your version of this file only
  # under the terms of either the GPL or the LGPL, and not to allow others to
  # use your version of this file under the terms of the MPL, indicate your
-@@ -1751,16 +1752,28 @@ function delayedStartup(isLoadingBlank, 
+@@ -1771,16 +1772,28 @@ function delayedStartup(isLoadingBlank, 
    // If the user (or the locale) hasn't enabled the top-level "Character
    // Encoding" menu via the "browser.menu.showCharacterEncoding" preference,
    // hide it.
@@ -201,7 +201,7 @@ diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
        if (event.button == 0)
          appMenuOpening = new Date();
      }, false);
-@@ -4948,17 +4961,18 @@ var XULBrowserWindow = {
+@@ -4968,17 +4981,18 @@ var XULBrowserWindow = {
        // e.g. about:blank. The _state for these pages means we won't need these
        // properties anyways, though.
      }
@@ -221,7 +221,7 @@ diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
      // loading (STATE_START) or done (STATE_STOP) mode
      this.onStateChange(
        gBrowser.webProgress,
-@@ -9231,16 +9245,28 @@ var Scratchpad = {
+@@ -9251,16 +9265,28 @@ var Scratchpad = {
  };
  
  XPCOMUtils.defineLazyGetter(Scratchpad, "ScratchpadManager", function() {
