@@ -1,5 +1,5 @@
 # HG changeset patch
-# Parent 3b7072da140cc459547a464938fe2f545d0e2c3b
+# Parent dc3bd5eab128eed2e3286e52b40f693cf5c5aec4
 Bug 749626 - Theme update: make the close button code generic and implement the dark theme for menulists
 
 diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
@@ -218,7 +218,7 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
 diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinstripe/devtools/common.css
 --- a/browser/themes/pinstripe/devtools/common.css
 +++ b/browser/themes/pinstripe/devtools/common.css
-@@ -39,28 +39,30 @@
+@@ -39,28 +39,34 @@
  
  /* Toolbar and Toolbar items */
  
@@ -242,6 +242,10 @@ diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinst
    background: -moz-linear-gradient(hsla(212,7%,57%,.35), hsla(212,7%,57%,.1)) padding-box;
    box-shadow: 0 1px 0 hsla(210,16%,76%,.15) inset, 0 0 0 1px hsla(210,16%,76%,.15) inset, 0 1px 0 hsla(210,16%,76%,.15);
 +  color: inherit;
++}
++
++.devtools-menulist {
++  margin: 0 2px;
  }
  
  .devtools-toolbarbutton:-moz-focusring {
@@ -250,7 +254,7 @@ diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinst
  }
  
  .devtools-toolbarbutton > .toolbarbutton-text {
-@@ -72,38 +74,47 @@
+@@ -72,38 +78,52 @@
  }
  
  .devtools-toolbarbutton:not([checked]):hover:active {
@@ -277,6 +281,11 @@ diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinst
 +
 +.devtools-menulist > .menulist-dropmarker {
 +  -moz-appearance: none;
++  background-color: transparent;
++  display: -moz-box;
++  list-style-image: url("chrome://browser/skin/devtools/dropmarker.png");
++  border-width: 0;
++  min-width: 18px;
 +}
 +
  /* Search input */
@@ -299,7 +308,7 @@ diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinst
                0 0 0 1px hsla(210,16%,76%,.1) inset,
                0 1px 0 hsla(210,16%,76%,.15);
    color: hsl(210,30%,85%);
-@@ -115,8 +126,30 @@
+@@ -115,8 +135,30 @@
  
  .devtools-searchinput > .textbox-input-box > .textbox-search-icons {
    display: none;
