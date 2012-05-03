@@ -1,20 +1,96 @@
 # HG changeset patch
-# Parent 9ed8fb7d379134583666439090a534355ba2cf33
-Bug 749628 - Implement a "Responsive Design" tool - try: -b do -p linux -u mochitests -t none
+# Parent 038fa59a22840755fb144af114e26ce8722116b0
+Bug 749628 - Implement a Responsive Design tool
 
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -1051,16 +1051,19 @@ pref("devtools.inspector.htmlHeight", 11
+ pref("devtools.inspector.htmlPanelOpen", false);
+ pref("devtools.inspector.sidebarOpen", false);
+ pref("devtools.inspector.activeSidebar", "ruleview");
+ 
+ // Enable the Layout View
+ pref("devtools.layoutview.enabled", false);
+ pref("devtools.layoutview.open", false);
+ 
++// Enable the Responsive UI tool
++pref("devtools.responsiveUI.enabled", false);
++
+ // Enable the Debugger
+ pref("devtools.debugger.enabled", false);
+ 
+ // The default Debugger UI height
+ pref("devtools.debugger.ui.height", 250);
+ 
+ // Enable the style inspector
+ pref("devtools.styleinspector.enabled", true);
+diff --git a/browser/base/content/browser-appmenu.inc b/browser/base/content/browser-appmenu.inc
+--- a/browser/base/content/browser-appmenu.inc
++++ b/browser/base/content/browser-appmenu.inc
+@@ -184,16 +184,22 @@
+                     command="Tools:WebConsole"
+                     key="key_webConsole"/>
+           <menuitem id="appmenu_pageInspect"
+                     hidden="true"
+                     label="&inspectMenu.label;"
+                     type="checkbox"
+                     command="Tools:Inspect"
+                     key="key_inspect"/>
++          <menuitem id="appmenu_responsiveUI"
++                    hidden="true"
++                    label="&responsiveUI.label;"
++                    type="checkbox"
++                    command="Tools:ResponsiveUI"
++                    key="key_responsiveUI"/>
+           <menuitem id="appmenu_debugger"
+                     hidden="true"
+                     label="&debuggerMenu.label;"
+                     key="key_debugger"
+                     command="Tools:Debugger"/>
+           <menuitem id="appmenu_scratchpad"
+                     hidden="true"
+                     label="&scratchpad.label;"
+diff --git a/browser/base/content/browser-menubar.inc b/browser/base/content/browser-menubar.inc
+--- a/browser/base/content/browser-menubar.inc
++++ b/browser/base/content/browser-menubar.inc
+@@ -541,16 +541,23 @@
+                             command="Tools:WebConsole"/>
+                   <menuitem id="menu_pageinspect"
+                             type="checkbox"
+                             hidden="true"
+                             label="&inspectMenu.label;"
+                             accesskey="&inspectMenu.accesskey;"
+                             key="key_inspect"
+                             command="Tools:Inspect"/>
++                  <menuitem id="menu_responsiveUI"
++                            type="checkbox"
++                            hidden="true"
++                            label="&responsiveUI.label;"
++                            accesskey="&responsiveUI.accesskey;"
++                            key="key_responsiveUI"
++                            command="Tools:ResponsiveUI"/>
+                   <menuitem id="menu_debugger"
+                             hidden="true"
+                             label="&debuggerMenu.label;"
+                             key="key_debugger"
+                             command="Tools:Debugger"/>
+                   <menuitem id="menu_scratchpad"
+                             hidden="true"
+                             label="&scratchpad.label;"
 diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browser-sets.inc
 --- a/browser/base/content/browser-sets.inc
 +++ b/browser/base/content/browser-sets.inc
-@@ -128,16 +128,17 @@
+@@ -126,16 +126,17 @@
+ 
+     <command id="Tools:Search" oncommand="BrowserSearch.webSearch();"/>
      <command id="Tools:Downloads" oncommand="BrowserDownloadsUI();"/>
-     <command id="Tools:DevToolbar" oncommand="DeveloperToolbar.toggle();" disabled="true"/>
      <command id="Tools:WebConsole" oncommand="HUDConsoleUI.toggleHUD();"/>
      <command id="Tools:Inspect" oncommand="InspectorUI.toggleInspectorUI();" disabled="true"/>
      <command id="Tools:Debugger" oncommand="DebuggerUI.toggleDebugger();" disabled="true"/>
-     <command id="Tools:RemoteDebugger" oncommand="DebuggerUI.toggleRemoteDebugger();" disabled="true"/>
      <command id="Tools:Scratchpad" oncommand="Scratchpad.openScratchpad();" disabled="true"/>
      <command id="Tools:StyleEditor" oncommand="StyleEditor.openChrome();" disabled="true"/>
-+    <command id="Tools:ResponsiveUI" oncommand="ResponsiveUI.start();"/>
++    <command id="Tools:ResponsiveUI" oncommand="ResponsiveUI.toggle();" disabled="true"/>
      <command id="Tools:Addons" oncommand="BrowserOpenAddonsMgr();"/>
      <command id="Tools:Sanitize"
       oncommand="Cc['@mozilla.org/browser/browserglue;1'].getService(Ci.nsIBrowserGlue).sanitize(window);"/>
@@ -23,10 +99,34 @@ diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browse
      <command id="History:UndoCloseWindow" oncommand="undoCloseWindow();"/>
      <command id="Browser:ToggleAddonBar" oncommand="toggleAddonBar();"/>
    </commandset>
+@@ -271,16 +272,23 @@
+     />
+     <key id="key_inspect" key="&inspectMenu.commandkey;" command="Inspector:Inspect"
+ #ifdef XP_MACOSX
+         modifiers="accel,alt"
+ #else
+         modifiers="accel,shift"
+ #endif
+     />
++    <key id="key_responsiveUI" key="&responsiveUI.commandkey;" command="Tools:ResponsiveUI"
++#ifdef XP_MACOSX
++        modifiers="accel,alt"
++#else
++        modifiers="accel,shift"
++#endif
++    />
+     <key id="key_scratchpad" keycode="&scratchpad.keycode;" modifiers="shift"
+          keytext="&scratchpad.keytext;" command="Tools:Scratchpad"/>
+     <key id="key_styleeditor" keycode="&styleeditor.keycode;" modifiers="shift"
+          keytext="&styleeditor.keytext;" command="Tools:StyleEditor"/>
+     <key id="openFileKb" key="&openFileCmd.commandkey;" command="Browser:OpenFile"  modifiers="accel"/>
+     <key id="key_savePage" key="&savePageCmd.commandkey;" command="Browser:SavePage" modifiers="accel"/>
+     <key id="printKb" key="&printCmd.commandkey;" command="cmd_print"  modifiers="accel"/>
+     <key id="key_close" key="&closeCmd.key;" command="cmd_close" modifiers="accel"/>
 diff --git a/browser/base/content/browser.css b/browser/base/content/browser.css
 --- a/browser/base/content/browser.css
 +++ b/browser/base/content/browser.css
-@@ -529,8 +529,18 @@ statuspanel[inactive][previoustype=overL
+@@ -529,8 +529,24 @@ statuspanel[inactive][previoustype=overL
  }
  
  .panel-inner-arrowcontentfooter[footertype="promobox"] {
@@ -40,15 +140,88 @@ diff --git a/browser/base/content/browser.css b/browser/base/content/browser.css
 +  overflow: auto;
 +}
 +
-+/* Style the scrollbars */
-+vbox[anonid=browserContainer][expose] html xul|scrollbar {
-+  outline: 2px solid red;
-+  /*display: none!important;*/
++.devtools-responsiveui-toolbar:-moz-locale-dir(rtl) {
++  -moz-box-pack: end;
++}
++
++stack[anonid=browserStack][expose] {
++  -moz-transition: 300ms;
++}
++
++stack[anonid=browserStack][expose][notransition] {
++  -moz-transition: none;
 +}
 diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
 --- a/browser/base/content/browser.js
 +++ b/browser/base/content/browser.js
-@@ -9259,16 +9259,34 @@ var Scratchpad = {
+@@ -52,16 +52,17 @@
+ #   Gavin Sharp <gavin@gavinsharp.com>
+ #   Justin Dolske <dolske@mozilla.com>
+ #   Rob Campbell <rcampbell@mozilla.com>
+ #   David Dahl <ddahl@mozilla.com>
+ #   Patrick Walton <pcwalton@mozilla.com>
+ #   Mihai Sucan <mihai.sucan@gmail.com>
+ #   Victor Porof <vporof@mozilla.com>
+ #   Frank Yan <fyan@mozilla.com>
++#   Paul Rouget <paul@mozilla.com>
+ #
+ # Alternatively, the contents of this file may be used under the terms of
+ # either the GNU General Public License Version 2 or later (the "GPL"), or
+ # the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ # in which case the provisions of the GPL or the LGPL are applicable instead
+ # of those above. If you wish to allow use of your version of this file only
+ # under the terms of either the GPL or the LGPL, and not to allow others to
+ # use your version of this file under the terms of the MPL, indicate your
+@@ -1751,16 +1752,28 @@ function delayedStartup(isLoadingBlank, 
+   // If the user (or the locale) hasn't enabled the top-level "Character
+   // Encoding" menu via the "browser.menu.showCharacterEncoding" preference,
+   // hide it.
+   if ("true" != gPrefService.getComplexValue("browser.menu.showCharacterEncoding",
+                                              Ci.nsIPrefLocalizedString).data)
+     document.getElementById("appmenu_charsetMenu").hidden = true;
+ #endif
+ 
++  // Enable Responsive UI?
++  let responsiveUIEnabled = gPrefService.getBoolPref("devtools.responsiveUI.enabled");
++  if (responsiveUIEnabled) {
++    document.getElementById("menu_responsiveUI").hidden = false;
++    document.getElementById("Tools:ResponsiveUI").removeAttribute("disabled");
++#ifdef MENUBAR_CAN_AUTOHIDE
++    document.getElementById("appmenu_responsiveUI").hidden = false;
++#endif
++    document.getElementById("developer-toolbar-responsiveui").hidden = false;
++  }
++
++
+   let appMenuButton = document.getElementById("appmenu-button");
+   let appMenuPopup = document.getElementById("appmenu-popup");
+   if (appMenuButton && appMenuPopup) {
+     let appMenuOpening = null;
+     appMenuButton.addEventListener("mousedown", function(event) {
+       if (event.button == 0)
+         appMenuOpening = new Date();
+     }, false);
+@@ -4948,17 +4961,18 @@ var XULBrowserWindow = {
+       // e.g. about:blank. The _state for these pages means we won't need these
+       // properties anyways, though.
+     }
+     gIdentityHandler.checkIdentity(this._state, locationObj);
+   },
+ 
+   // simulate all change notifications after switching tabs
+   onUpdateCurrentBrowser: function XWB_onUpdateCurrentBrowser(aStateFlags, aStatus, aMessage, aTotalProgress) {
+-    if (FullZoom.updateBackgroundTabs)
++    // If the browser is in ResponsiveUI mode, we don't update its zoom value.
++    if (FullZoom.updateBackgroundTabs && !gBrowser.selectedBrowser.responsiveUI)
+       FullZoom.onLocationChange(gBrowser.currentURI, true);
+     var nsIWebProgressListener = Components.interfaces.nsIWebProgressListener;
+     var loadingDone = aStateFlags & nsIWebProgressListener.STATE_STOP;
+     // use a pseudo-object instead of a (potentially nonexistent) channel for getting
+     // a correct error message - and make sure that the UI is always either in
+     // loading (STATE_START) or done (STATE_STOP) mode
+     this.onStateChange(
+       gBrowser.webProgress,
+@@ -9231,16 +9245,28 @@ var Scratchpad = {
  };
  
  XPCOMUtils.defineLazyGetter(Scratchpad, "ScratchpadManager", function() {
@@ -58,21 +231,15 @@ diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
  });
  
 +var ResponsiveUI = {
-+  start: function RUI_start() {
-+    return new this.ResponsiveUI(window, gBrowser.selectedBrowser);
++  toggle: function RUI_toggle() {
++    this.ResponsiveUIManager.toggle(window, gBrowser.selectedBrowser);
 +  }
 +};
 +
-+XPCOMUtils.defineLazyGetter(ResponsiveUI, "ResponsiveUI", function() {
++XPCOMUtils.defineLazyGetter(ResponsiveUI, "ResponsiveUIManager", function() {
 +  let tmp = {};
 +  Cu.import("resource:///modules/devtools/responsivedesign.jsm", tmp);
-+  return tmp.ResponsiveUI;
-+});
-+
-+XPCOMUtils.defineLazyGetter(Scratchpad, "ScratchpadManager", function() {
-+  let tmp = {};
-+  Cu.import("resource:///modules/devtools/scratchpad-manager.jsm", tmp);
-+  return tmp.ScratchpadManager;
++  return tmp.ResponsiveUIManager;
 +});
 +
  var StyleEditor = {
@@ -83,6 +250,28 @@ diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
     * @param {CSSStyleSheet} [aSelectedStyleSheet] default Stylesheet.
     * @param {Number} [aLine] Line to which the caret should be moved (one-indexed).
     * @param {Number} [aCol] Column to which the caret should be moved (one-indexed).
+diff --git a/browser/base/content/test/browser_bug462673.js b/browser/base/content/test/browser_bug462673.js
+--- a/browser/base/content/test/browser_bug462673.js
++++ b/browser/base/content/test/browser_bug462673.js
+@@ -10,17 +10,17 @@ var runs = [
+     var newBrowser = newTab.linkedBrowser;
+     tabbrowser.removeTab(tab);
+     ok(!win.closed, "Window stays open");
+     if (!win.closed) {
+       is(tabbrowser.tabContainer.childElementCount, 1, "Window has one tab");
+       is(tabbrowser.browsers.length, 1, "Window has one browser");
+       is(tabbrowser.selectedTab, newTab, "Remaining tab is selected");
+       is(tabbrowser.selectedBrowser, newBrowser, "Browser for remaining tab is selected");
+-      is(tabbrowser.mTabBox.selectedPanel, newBrowser.parentNode.parentNode, "Panel for remaining tab is selected");
++      is(tabbrowser.mTabBox.selectedPanel, newBrowser.parentNode.parentNode.parentNode, "Panel for remaining tab is selected");
+     }
+   }
+ ];
+ 
+ function test() {
+   waitForExplicitFinish();
+   runOneTest();
+ }
 diff --git a/browser/devtools/Makefile.in b/browser/devtools/Makefile.in
 --- a/browser/devtools/Makefile.in
 +++ b/browser/devtools/Makefile.in
@@ -103,7 +292,7 @@ diff --git a/browser/devtools/responsivedesign/Makefile.in b/browser/devtools/re
 new file mode 100644
 --- /dev/null
 +++ b/browser/devtools/responsivedesign/Makefile.in
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,15 @@
 +DEPTH		= ../../..
 +topsrcdir	= @top_srcdir@
 +srcdir		= @srcdir@
@@ -111,7 +300,9 @@ new file mode 100644
 +
 +include $(DEPTH)/config/autoconf.mk
 +
-+#TEST_DIRS += test
++ifdef ENABLE_TESTS
++	DIRS += test
++endif
 +
 +include $(topsrcdir)/config/rules.mk
 +
@@ -121,7 +312,7 @@ diff --git a/browser/devtools/responsivedesign/responsivedesign.jsm b/browser/de
 new file mode 100644
 --- /dev/null
 +++ b/browser/devtools/responsivedesign/responsivedesign.jsm
-@@ -0,0 +1,299 @@
+@@ -0,0 +1,413 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 +/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 +/* ***** BEGIN LICENSE BLOCK *****
@@ -137,11 +328,11 @@ new file mode 100644
 + * for the specific language governing rights and limitations under the
 + * License.
 + *
-+ * The Original Code is the Mozilla Inspector Module.
++ * The Original Code is the Mozilla Responsive UI Module.
 + *
 + * The Initial Developer of the Original Code is
 + * The Mozilla Foundation.
-+ * Portions created by the Initial Developer are Copyright (C) 2010
++ * Portions created by the Initial Developer are Copyright (C) 2012
 + * the Initial Developer. All Rights Reserved.
 + *
 + * Contributor(s):
@@ -161,42 +352,51 @@ new file mode 100644
 + *
 + * ***** END LICENSE BLOCK ***** */
 +
-+const Cc = Components.classes;
-+const Cu = Components.utils;
 +const Ci = Components.interfaces;
-+const Cr = Components.results;
 +
-+var EXPORTED_SYMBOLS = ["ResponsiveUI"];
++var EXPORTED_SYMBOLS = ["ResponsiveUIManager"];
 +
 +const MIN_WIDTH = 150;
 +const MIN_HEIGHT = 150;
 +
++const MIN_ZOOM = 0.5;
++const MAX_ZOOM = 3.0;
++
 +let presets = [
-+  {description: "custom", custom: true},
-+  {description: "low res phones", width: 240, height: 320},
-+  {description: "feature phones", width: 240, height: 400},
-+  {description: "iPhone < 4", width: 320, height: 480},
-+  {description: "Blackberries", width: 360, height: 480},
-+  {description: "Nokia N8, N97,…", width: 360, height: 640},
-+  {description: "Blackberries", width: 480, height: 640},
-+  {description: "Samsung Galaxy I, II, S, Nexus S,…", width: 480, height: 800},
-+  {description: "Nokia N9, Sony Xperia,…", width: 480, height: 854},
-+  {description: "HTCs", width: 480, height: 854},
-+  {description: "iPhone >= 4", width: 640, height: 960},
-+  {description: "Samsung Galaxy Tab, Kindle Fire,…", width: 600, height: 1024},
-+  {description: "Apple iPad 1&2", width: 768, height: 1024},
-+  {description: "Galaxy Nexus, Sony Xperia S, notebooks", width: 720, height: 1280},
-+  {description: "Galaxy Tab 10.1", width: 768, height: 1366},
-+  {description: "11.6\" Apple Macbook Air, Small 16:9 screen", width: 1366, height: 768},
-+  {description: "Motorola Xoom, Galaxy Tabs, Galaxy Note,…", width: 800, height: 1280},
-+  {description: "13\" Apple Macbook Air, medium 16:10 screen", width: 1440, height: 900},
-+  {description: "HD+: Apple Macbook Air 13\", medium screen", width: 1600, height: 900},
-+  {description: "", width: 1280, height: 1024},
-+  {description: "", width: 1600, height: 1200},
-+  {description: "iPad 3", width: 2048, height: 1536},
-+  {description: "", width: 1920, height: 1600},
-+  {description: "", width: 2880, height: 1800},
-+]
++  {custom: true}, // custom
++  {width: 240, height: 400},    // feature phones
++  {width: 320, height: 480},    // iPhone < 4 and some Blackberries
++  {width: 360, height: 640},    // Nokia N8, N97,…
++  {width: 480, height: 800},    // Samsung Galaxy I, II, S, Nexus S,… Same width but different height: Blackberries, Nokia N9, Sony Xperia, and some HTCs
++  {width: 600, height: 1024},   // Samsung Galaxy Tab, Kindle Fire,…
++  {width: 640, height: 960},    // iPhone >= 4
++  {width: 720, height: 1280},   // Galaxy Nexus, Sony Xperia S, notebooks
++  {width: 768, height: 1024},   // Apple iPad 1&2. Same width but different height: Galaxy Tab 10.1
++  {width: 800, height: 1280},   // Motorola Xoom, Galaxy Tabs, Galaxy Note,…
++  {width: 1280, height: 1024},
++  {width: 1366, height: 768},   // 11.6" Apple Macbook Air, Small 16:9 screen
++  {width: 1440, height: 900},   // 13" Apple Macbook Air, medium 16:10 screen
++  {width: 1600, height: 900},   // HD+: Apple Macbook Air 13\", medium screen
++  {width: 1920, height: 1600},
++  {width: 2048, height: 1536},  // iPad 3
++  {width: 2880, height: 1800},
++];
++
++let ResponsiveUIManager = {
++  toggle: function(aWindow, aBrowser) {
++    if (aBrowser.responsiveUI) {
++      this.close();
++    } else {
++      this.open(aWindow, aBrowser);
++    }
++  },
++  open: function(aWindow, aBrowser) {
++    aBrowser.responsiveUI = new ResponsiveUI(aWindow, aBrowser);
++  },
++  close: function() {
++    aBrowser.responsiveUI.close();
++  }
++}
 +
 +function ResponsiveUI(aWindow, aBrowser)
 +{
@@ -205,6 +405,11 @@ new file mode 100644
 +
 +  this.container = aWindow.gBrowser.getBrowserContainer(aBrowser);
 +  this.stack = this.container.querySelector("[anonid=browserStack]");
++
++  this.contentViewer = aBrowser.docShell.contentViewer.QueryInterface(Ci.nsIMarkupDocumentViewer);
++  this.currentZoomValue = 1;
++  this.initialZoom = this.contentViewer.fullZoom;
++  this.contentViewer.fullZoom = 1;
 +
 +  // Default size
 +  let bbox = this.stack.getBoundingClientRect();
@@ -218,16 +423,25 @@ new file mode 100644
 +
 +  this.chromeDoc = aWindow.document;
 +
-+  let contentViewer = aBrowser.docShell.contentViewer.QueryInterface(Ci.nsIMarkupDocumentViewer);
-+  contentViewer.fullZoom = 1;
-+
 +  this.presetSelected = this.presetSelected.bind(this);
-+  this.toggleScrollbars = this.toggleScrollbars.bind(this);
 +  this.rotate = this.rotate.bind(this);
++  this.zoomIn = this.zoomIn.bind(this);
++  this.zoomOut = this.zoomOut.bind(this);
++  this.zoomRestore = this.zoomRestore.bind(this);
 +  this.startResizing = this.startResizing.bind(this);
 +  this.stopResizing = this.stopResizing.bind(this);
++  this.onResize = this.onResize.bind(this);
 +  this.onDrag = this.onDrag.bind(this);
++  this.onKeypress = this.onKeypress.bind(this);
 +  this.close = this.close.bind(this);
++
++  this.stack.addEventListener("resize", this.onResize);
++  this.mainWindow.addEventListener("keypress", this.onKeypress, true);
++
++  this.chromeDoc.getElementById("menu_responsiveUI").setAttribute("checked", "true");
++  let appmenuitem = this.chromeDoc.getElementById("appmenu_responsiveUI");
++  if (appmenuitem) appmenuitem.setAttribute("checked", "true");
++  /* FIXME: reenable once the toolbar is back: this.chromeDoc.getElementById("developer-toolbar-responsiveui").setAttribute("checked", "true"); */
 +
 +  this.buildUI();
 +}
@@ -244,11 +458,26 @@ new file mode 100644
 +    ]]></r>) + "";
 +    this.stack.setAttribute("style", style);
 +
++    this.chromeDoc.getElementById("menu_responsiveUI").removeAttribute("checked");
++    let appmenuitem = this.chromeDoc.getElementById("appmenu_responsiveUI");
++    if (appmenuitem) appmenuitem.removeAttribute("checked");
++    /* FIXME: reenable once the toolbar is back: this.chromeDoc.getElementById("developer-toolbar-responsiveui").removeAttribute("checked"); */
++
++    this.zoomLabel = null;
++
 +    this.container.removeAttribute("expose");
 +    this.stack.removeAttribute("expose");
++    this.mainWindow.removeEventListener("keypress", this.onKeypress, true);
 +    this.menulist.removeEventListener("select", this.presetSelected, true);
 +    this.container.removeChild(this.toolbar);
 +    this.stack.removeChild(this.resizer);
++    this.stack.removeChild(this.resizeBar);
++    this.stack.removeEventListener("resize", this.onResize);
++
++    this.contentViewer.fullZoom = this.initialZoom;
++    this.contentViewer = null;
++
++    delete this.browser.responsiveUI;
 +  },
 +
 +  buildUI: function RUI_buildUI() {
@@ -256,7 +485,8 @@ new file mode 100644
 +    // Toolbar
 +
 +    this.toolbar = this.chromeDoc.createElement("toolbar");
-+    this.toolbar.className = "responsiveui-toolbar";
++    this.toolbar.className = "devtools-toolbar devtools-responsiveui-toolbar";
++    this.toolbar.setAttribute("align", "center");
 +    this.container.insertBefore(this.toolbar, this.stack);
 +
 +    this.menulist = this.chromeDoc.createElement("menulist");
@@ -273,29 +503,64 @@ new file mode 100644
 +    rotateButton.setAttribute("label", "rotate"); //FIXME: i10n
 +    rotateButton.onclick = this.rotate;
 +
-+    let scrollbarsButton = this.chromeDoc.createElement("toolbarbutton");
-+    scrollbarsButton.className = "devtools-toolbarbutton";
-+    scrollbarsButton.setAttribute("label", "hide scrollbars"); //FIXME: i10n
-+    scrollbarsButton.onclick = this.toggleScrollbars;
++    // Zoom buttons
++    let zoombox = this.chromeDoc.createElement("hbox");
++    zoombox.className = "devtools-responsiveui-zoombox";
 +
++    let zoomin = this.chromeDoc.createElement("toolbarbutton");
++    zoomin.className = "devtools-toolbarbutton";
++    zoomin.setAttribute("label", "+");
++    zoomin.onclick = this.zoomIn;
++
++    let zoomout = this.chromeDoc.createElement("toolbarbutton");
++    zoomout.className = "devtools-toolbarbutton";
++    zoomout.setAttribute("label", "-");
++    zoomout.onclick = this.zoomOut;
++
++    let zoomrestore = this.chromeDoc.createElement("toolbarbutton");
++    zoomrestore.className = "devtools-toolbarbutton";
++    zoomrestore.setAttribute("label", "1:1");
++    zoomrestore.onclick = this.zoomRestore;
++
++    this.zoomLabel = this.chromeDoc.createElement("label");
++    this.updateZoomLabel();
++
++    let zoomLabelContainer = this.chromeDoc.createElement("vbox");
++    zoomLabelContainer.setAttribute("pack", "center");
++    zoomLabelContainer.appendChild(this.zoomLabel);
++
++    zoombox.appendChild(zoomLabelContainer);
++    zoombox.appendChild(zoomin);
++    zoombox.appendChild(zoomout);
++    zoombox.appendChild(zoomrestore);
++
++    // Close button
 +    let closeButton = this.chromeDoc.createElement("toolbarbutton");
 +    closeButton.className = "devtools-closebutton";
 +    closeButton.onclick = this.close;
 +
++    // Build toolbar
 +    this.toolbar.appendChild(this.menulist);
 +    this.toolbar.appendChild(rotateButton);
-+    this.toolbar.appendChild(scrollbarsButton);
-+    this.toolbar.appendChild(closeButton);
++    this.toolbar.appendChild(zoombox);
++    // FIXME: do we need a close button? this.toolbar.appendChild(closeButton);
 +
 +    // Resize
 +
 +    this.resizer = this.chromeDoc.createElement("box");
-+    this.resizer.className = "devtools-se-resizer";
++    this.resizer.className = "devtools-responsiveui-resizehandle";
 +    this.resizer.setAttribute("right", "0");
 +    this.resizer.setAttribute("bottom", "0");
-+    this.stack.appendChild(this.resizer);
 +    this.resizer.onmousedown = this.startResizing;
 +
++    this.resizeBar =  this.chromeDoc.createElement("box");
++    this.resizeBar.className = "devtools-responsiveui-resizebar";
++    this.resizeBar.setAttribute("top", "0");
++    this.resizeBar.setAttribute("right", "0");
++    this.resizeBar.onmousedown = this.startResizing;
++
++    this.stack.appendChild(this.resizer);
++    this.stack.appendChild(this.resizeBar);
 +  },
 +
 +  registerPresets: function RUI_registerPresets(aParent) {
@@ -313,8 +578,9 @@ new file mode 100644
 +  },
 +
 +  setMenuLabel: function RUI_setMenuLabel(menuitem, preset) {
-+    let description = preset.description?' (' + preset.description + ')':'';
-+    menuitem.setAttribute("label", ~~preset.width + "x" + ~~preset.height + description);
++    let description = "";
++    if (preset.custom) description = " (custom)";
++    menuitem.setAttribute("label", Math.round(preset.width) + "x" + Math.round(preset.height) + description);
 +  },
 +
 +  presetSelected: function RUI_presetSelected() {
@@ -324,15 +590,50 @@ new file mode 100644
 +  },
 +
 +  loadPreset: function RUI_loadPreset(p) {
-+    this.setSize(p.width, p.height);
++    this.setSize(p.width * this.currentZoomValue, p.height * this.currentZoomValue);
 +  },
 +
 +  rotate: function RUI_rotate() {
 +    this.setSize(this.currentHeight, this.currentWidth);
 +  },
 +
-+  toggleScrollbars: function RUI_toggleScrollbars() {
-+    this.browser.contentWindow.document.documentElement.overflow = "visible";
++  zoomIn: function RUI_zoomIn() {
++    if (this.contentViewer.fullZoom >= MAX_ZOOM) return;
++    this.contentViewer.fullZoom += 0.1;
++  },
++
++  zoomOut: function RUI_zoomOut() {
++    if (this.contentViewer.fullZoom <= MIN_ZOOM) return;
++    this.contentViewer.fullZoom -= 0.1;
++  },
++
++  zoomRestore: function RUI_zoomRestore() {
++    this.contentViewer.fullZoom = 1;
++  },
++
++  onResize: function RUI_onResize() {
++    let newZoomValue = this.contentViewer.fullZoom;
++    if (newZoomValue == this.currentZoomValue) return;
++
++    let lastZoomValue = this.currentZoomValue;
++    this.currentZoomValue = newZoomValue;
++
++    this.updateZoomLabel();
++
++    this.setSize((this.currentWidth / lastZoomValue) * this.currentZoomValue, (this.currentHeight / lastZoomValue) * this.currentZoomValue);
++  },
++
++  onKeypress: function RUI_onKeypress(e) {
++    if (e.keyCode == this.mainWindow.KeyEvent.DOM_VK_ESCAPE &&
++        this.mainWindow.gBrowser.selectedBrowser == this.browser) {
++      e.preventDefault();
++      e.stopPropagation();
++      this.close();
++    }
++  },
++
++  updateZoomLabel: function RUI_updateZoomLabel() {
++    this.zoomLabel.setAttribute("value", "zoom: " + Math.round(100 * this.currentZoomValue) + "%");
 +  },
 +
 +  setSize: function RUI_setSize(width, height) {
@@ -355,8 +656,8 @@ new file mode 100644
 +
 +    if (presets[this.currentPreset].custom) {
 +      let preset = presets[this.currentPreset];
-+      preset.width = this.currentWidth;
-+      preset.height = this.currentHeight;
++      preset.width = this.currentWidth / this.currentZoomValue;
++      preset.height = this.currentHeight / this.currentZoomValue;
 +
 +      let menuitem = this.menulist.firstChild.childNodes[this.currentPreset];
 +      this.setMenuLabel(menuitem, preset);
@@ -374,8 +675,8 @@ new file mode 100644
 +    if (!preset.custom) {
 +      this.currentPreset = 0;
 +      preset = presets[0];
-+      preset.width = this.currentWidth;
-+      preset.height = this.currentHeight;
++      preset.width = this.currentWidth / this.currentZoomValue;
++      preset.height = this.currentHeight / this.currentZoomValue;
 +      let menuitem = this.getCustomMenuItem();
 +      this.setMenuLabel(menuitem, preset);
 +      this.menulist.selectedIndex = 0;
@@ -388,11 +689,15 @@ new file mode 100644
 +
 +    this.lastClientX = e.clientX;
 +    this.lastClientY = e.clientY;
++
++    this.ignoreY = (e.target === this.resizeBar);
 +  },
 +
 +  onDrag: function RUI_onDrag(e) {
 +    let deltaX = e.clientX - this.lastClientX;
 +    let deltaY = e.clientY - this.lastClientY;
++
++    if (this.ignoreY) deltaY = 0;
 +
 +    let width = this.currentWidth + deltaX;
 +    let height = this.currentHeight + deltaY;
@@ -421,10 +726,250 @@ new file mode 100644
 +    this.stack.removeAttribute("notransition");
 +  },
 +}
+diff --git a/browser/devtools/responsivedesign/test/Makefile.in b/browser/devtools/responsivedesign/test/Makefile.in
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/responsivedesign/test/Makefile.in
+@@ -0,0 +1,53 @@
++# ***** BEGIN LICENSE BLOCK *****
++# Version: MPL 1.1/GPL 2.0/LGPL 2.1
++#
++# The contents of this file are subject to the Mozilla Public License Version
++# 1.1 (the "License"); you may not use this file except in compliance with
++# the License. You may obtain a copy of the License at
++# http://www.mozilla.org/MPL/
++#
++# Software distributed under the License is distributed on an "AS IS" basis,
++# WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++# for the specific language governing rights and limitations under the
++# License.
++#
++# The Original Code is mozilla.org code.
++#
++# The Initial Developer of the Original Code is
++# Mozilla Foundation.
++# Portions created by the Initial Developer are Copyright (C) 2012
++# the Initial Developer. All Rights Reserved.
++#
++# Contributor(s):
++#   Paul Rouget <paul@mozilla.com>
++#
++# Alternatively, the contents of this file may be used under the terms of
++# either of the GNU General Public License Version 2 or later (the "GPL"),
++# or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++# in which case the provisions of the GPL or the LGPL are applicable instead
++# of those above. If you wish to allow use of your version of this file only
++# under the terms of either the GPL or the LGPL, and not to allow others to
++# use your version of this file under the terms of the MPL, indicate your
++# decision by deleting the provisions above and replace them with the notice
++# and other provisions required by the GPL or the LGPL. If you do not delete
++# the provisions above, a recipient may use your version of this file under
++# the terms of any one of the MPL, the GPL or the LGPL.
++#
++# ***** END LICENSE BLOCK *****
++
++DEPTH     = ../../../..
++topsrcdir	= @top_srcdir@
++srcdir		= @srcdir@
++VPATH		= @srcdir@
++relativesrcdir  = browser/devtools/responsivedesign/test
++
++include $(DEPTH)/config/autoconf.mk
++include $(topsrcdir)/config/rules.mk
++
++_BROWSER_FILES = \
++		browser_responsiveui.js \
++		$(NULL)
++
++
++libs::	$(_BROWSER_FILES)
++	$(INSTALL) $(foreach f,$^,"$f") $(DEPTH)/_tests/testing/mochitest/browser/$(relativesrcdir)
+diff --git a/browser/devtools/responsivedesign/test/browser_responsiveui.js b/browser/devtools/responsivedesign/test/browser_responsiveui.js
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/responsivedesign/test/browser_responsiveui.js
+@@ -0,0 +1,151 @@
++/* Any copyright is dedicated to the Public Domain.
++   http://creativecommons.org/publicdomain/zero/1.0/ */
++
++function test() {
++  let instance;
++
++  waitForExplicitFinish();
++
++  gBrowser.selectedTab = gBrowser.addTab();
++  gBrowser.selectedBrowser.addEventListener("load", function onload() {
++    gBrowser.selectedBrowser.removeEventListener("load", onload, true);
++    waitForFocus(startTest, content);
++  }, true);
++
++  content.location = "data:text/html,mop";
++
++  function startTest() {
++    document.getElementById("Tools:ResponsiveUI").removeAttribute("disabled");
++    synthesizeKeyFromKeyTag("key_responsiveUI");
++    executeSoon(onUIOpen);
++  }
++
++  function onUIOpen() {
++    // Is it open?
++    let container = gBrowser.getBrowserContainer();
++    is(container.getAttribute("expose"), "true", "Expose mode open.");
++
++    // Menus are correctly updated?
++    is(document.getElementById("menu_responsiveUI").getAttribute("checked"), "true", "menu checked");
++    if (document.getElementById("appmenu_responsiveUI"))
++      is(document.getElementById("menu_responsiveUI").getAttribute("checked"), "true", "app menu checked");
++    if (document.getElementById("developer-toolbar-responsiveui"))
++      is(document.getElementById("developer-toolbar-responsiveui").getAttribute("checked"), "true", "toolbar button checked");
++
++    instance = gBrowser.selectedBrowser.responsiveUI;
++    ok(instance, "instance of the module is attached to the browser.");
++
++    testPresets();
++  }
++
++  function testPresets() {
++    function testOnePreset(c) {
++      if (c == 0) {
++        executeSoon(testCustom);
++        return;
++      }
++      instance.menulist.selectedIndex = c;
++      window.setTimeout(function() {
++        let item = instance.menulist.firstChild.childNodes[c];
++        let [width, height] = extractSizeFromString(item.getAttribute("label"));
++        is(content.innerWidth, width, "preset " + c + ": dimension valid (width)");
++        is(content.innerHeight, height, "preset " + c + ": dimension valid (height)");
++        testOnePreset(c - 1);
++      }, 500);
++    }
++    testOnePreset(instance.menulist.firstChild.childNodes.length - 1);
++  }
++
++  function extractSizeFromString(str) {
++    let numbers = str.match(/(\d+)[^\d]*(\d+)/);
++    if (numbers) {
++      return [numbers[1], numbers[2]];
++    } else {
++      return [null, null];
++    }
++  }
++
++  function testCustom() {
++    let initialWidth = content.innerWidth;
++    let initialHeight = content.innerHeight;
++
++    let x = 2, y = 2;
++    EventUtils.synthesizeMouse(instance.resizer, x, y, {type: "mousedown"}, window);
++    x += 20; y += 10;
++    EventUtils.synthesizeMouse(instance.resizer, x, y, {type: "mousemove"}, window);
++    EventUtils.synthesizeMouse(instance.resizer, x, y, {type: "mouseup"}, window);
++
++    window.setTimeout(function() {
++      let expectedWidth = initialWidth + 20;
++      let expectedHeight = initialHeight + 10;
++      info("initial width: " + initialWidth);
++      info("initial height: " + initialHeight);
++      is(content.innerWidth, expectedWidth, "Size correcty updated (width).");
++      is(content.innerHeight, expectedHeight, "Size correcty updated (height).");
++      is(instance.menulist.selectedIndex, 0, "Custom menuitem selected");
++      let [width, height] = extractSizeFromString(instance.menulist.firstChild.firstChild.getAttribute("label"));
++      is(width, expectedWidth, "Label updated (width).");
++      is(height, expectedHeight, "Label updated (height).");
++      rotate();
++    }, 500);
++  }
++
++  function rotate() {
++    let initialWidth = content.innerWidth;
++    let initialHeight = content.innerHeight;
++
++    info("rotate");
++    instance.rotate();
++
++    window.setTimeout(function() {
++      is(content.innerWidth, initialHeight, "The width is now the height.");
++      is(content.innerHeight, initialWidth, "The height is now the width.");
++      let [width, height] = extractSizeFromString(instance.menulist.firstChild.firstChild.getAttribute("label"));
++      is(width, initialHeight, "Label updated (width).");
++      is(height, initialWidth, "Label updated (height).");
++      finishUp();
++    }, 500);
++  }
++
++  function finishUp() {
++
++    // Menus are correctly updated?
++    isnot(document.getElementById("menu_responsiveUI").getAttribute("checked"), "true", "menu unchecked");
++    if (document.getElementById("appmenu_responsiveUI"))
++      isnot(document.getElementById("menu_responsiveUI").getAttribute("checked"), "true", "app menu unchecked");
++    if (document.getElementById("developer-toolbar-responsiveui"))
++      isnot(document.getElementById("developer-toolbar-responsiveui").getAttribute("checked"), "true", "toolbar button unchecked");
++
++
++
++    delete instance;
++    gBrowser.removeCurrentTab();
++    finish();
++  }
++
++  function synthesizeKeyFromKeyTag(aKeyId) {
++    let key = document.getElementById(aKeyId);
++    isnot(key, null, "Successfully retrieved the <key> node");
++
++    let modifiersAttr = key.getAttribute("modifiers");
++
++    let name = null;
++
++    if (key.getAttribute("keycode"))
++      name = key.getAttribute("keycode");
++    else if (key.getAttribute("key"))
++      name = key.getAttribute("key");
++
++    isnot(name, null, "Successfully retrieved keycode/key");
++
++    let modifiers = {
++      shiftKey: modifiersAttr.match("shift"),
++      ctrlKey: modifiersAttr.match("ctrl"),
++      altKey: modifiersAttr.match("alt"),
++      metaKey: modifiersAttr.match("meta"),
++      accelKey: modifiersAttr.match("accel")
++    }
++
++    EventUtils.synthesizeKey(name, modifiers);
++  }
++}
+diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/en-US/chrome/browser/browser.dtd
+--- a/browser/locales/en-US/chrome/browser/browser.dtd
++++ b/browser/locales/en-US/chrome/browser/browser.dtd
+@@ -193,16 +193,21 @@ can reach it easily. -->
+ 
+ <!ENTITY inspectMenu.label            "Inspect">
+ <!ENTITY inspectMenu.accesskey        "T">
+ <!ENTITY inspectMenu.commandkey       "I">
+ 
+ <!ENTITY inspectContextMenu.label     "Inspect Element">
+ <!ENTITY inspectContextMenu.accesskey "Q">
+ 
++<!ENTITY responsiveUI.label            "Responsive Design">
++<!ENTITY responsiveUI.accesskey        "R">
++<!ENTITY responsiveUI.commandkey       "D">
++
++
+ <!-- LOCALIZATION NOTE (scratchpad.label): This menu item label appears
+   -  in the Tools menu. See bug 653093.
+   -  The Scratchpad is intended to provide a simple text editor for creating
+   -  and evaluating bits of JavaScript code for the purposes of function
+   -  prototyping, experimentation and convenient scripting.
+   -
+   -  It's quite possible that you won't have a good analogue for the word
+   -  "Scratchpad" in your locale. You should feel free to find a close
 diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
 --- a/browser/themes/gnomestripe/browser.css
 +++ b/browser/themes/gnomestripe/browser.css
-@@ -2395,16 +2395,47 @@ html|*#highlighter-nodeinfobar-pseudo-cl
+@@ -2394,8 +2394,75 @@ html|*#highlighter-nodeinfobar-pseudo-cl
+   -moz-appearance: none;
    border-top: 1px solid black;
    border-bottom-width: 0;
    min-height: 3px;
@@ -432,116 +977,94 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
    margin-bottom: -3px;
    position: relative;
  }
- 
++
 +vbox[anonid=browserContainer][expose] {
-+  background: #222 url(data:image/png;base64,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);
++  background: #2a3643 url(data:image/png;base64,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);
 +  box-shadow: 0 0 7px black inset;
 +  padding: 0 20px 20px 20px;
 +}
 +
 +stack[anonid=browserStack][expose] {
 +  box-shadow: 0 0 7px black;
-+  -moz-transition: 300ms; /* FIXME: define properties*/
 +}
 +
-+stack[anonid=browserStack][expose][notransition] {
-+  -moz-transition: none;
-+}
-+
-+
-+vbox[anonid=browserContainer] > toolbar {
-+  -moz-appearance: none;
++.devtools-responsiveui-toolbar {
 +  background: transparent;
 +  margin: 10px 0;
++  padding: 0;
++  box-shadow: none;
 +}
 +
-+vbox[anonid=browserContainer] > toolbar > menulist {
++.devtools-responsiveui-toolbar > menulist {
 +  -moz-margin-start: 0;
 +}
 +
-+vbox[anonid=browserContainer] > toolbar > menulist,
-+vbox[anonid=browserContainer] > toolbar > toolbarbutton {
++.devtools-responsiveui-toolbar > menulist,
++.devtools-responsiveui-toolbar > toolbarbutton,
++.devtools-responsiveui-zoombox > toolbarbutton {
 +  border-radius: 0;
 +}
 +
- .gcli-panel-inner-arrowcontent {
-   padding: 0;
- }
- 
- .gclitoolbar-input-node,
- .gclitoolbar-complete-node,
- .gclitoolbar-prompt {
-   font-family: monospace;
++.devtools-responsiveui-zoombox {
++  margin: 0 3px;
++}
++.devtools-responsiveui-zoombox > toolbarbutton {
++  margin: 0;
++  min-width: 22px;
++  border-width: 1px;
++  -moz-padding-start: 1px;
++  -moz-border-start-width: 0;
++}
++.devtools-responsiveui-zoombox > vbox {
++  min-width: 92px;
++  padding: 0 6px;
++  border: 1px solid hsla(210,8%,5%,.6);
++  background: -moz-linear-gradient(hsla(220,6%,10%,.6), hsla(210,11%,18%,.45) 75%, hsla(210,11%,30%,.4));
++  box-shadow: 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
++}
++
++.devtools-responsiveui-resizebar {
++  width: 6px;
++  height: 35px;
++  border: 1px solid hsla(210,8%,5%,.6);
++  background: -moz-linear-gradient(hsla(220,6%,10%,.6), hsla(210,11%,18%,.45) 75%, hsla(210,11%,30%,.4));
++  box-shadow: 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
++  -moz-transform: translate(12px, 3px);
++  border-radius: 3px;
++  cursor: ew-resize;
++}
++
++.devtools-responsiveui-resizehandle {
++  width: 6px;
++  height: 6px;
++  border: 1px solid hsla(210,8%,5%,.6);
++  background: -moz-linear-gradient(hsla(220,6%,10%,.6), hsla(210,11%,18%,.45) 75%, hsla(210,11%,30%,.4));
++  box-shadow: 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
++  -moz-transform: translate(12px, 12px);
++  border-radius: 3px;
++  cursor: se-resize;
++}
 diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gnomestripe/devtools/common.css
 --- a/browser/themes/gnomestripe/devtools/common.css
 +++ b/browser/themes/gnomestripe/devtools/common.css
-@@ -142,8 +142,15 @@
-   margin-bottom: 0;
+@@ -44,16 +44,17 @@
+   background: -moz-linear-gradient(top, hsl(210,11%,36%), hsl(210,11%,18%));
+   color: hsl(210,30%,85%);
  }
  
- .devtools-closebutton > .toolbarbutton-icon {
-   /* XXX Buttons have padding in widget/ that we don't want here but can't override with good CSS, so we must
-      use evil CSS to give the impression of smaller content */
-   margin: -4px;
- }
-+
-+.devtools-se-resizer {
-+  width:14px;
-+  height:14px;
-+  background: -moz-linear-gradient(bottom right, #339FFF 1px, black 3px, #339FFF 5px, black 7px, #339FFF 9px, transparent 9px);
-+  cursor: se-resize;
-+}
-diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
---- a/browser/themes/pinstripe/browser.css
-+++ b/browser/themes/pinstripe/browser.css
-@@ -3121,16 +3121,47 @@ html|*#highlighter-nodeinfobar-pseudo-cl
-   border-top: 1px solid black;
-   border-bottom-width: 0;
-   min-height: 3px;
-   height: 3px;
-   margin-bottom: -3px;
-   position: relative;
- }
- 
-+vbox[anonid=browserContainer][expose] {
-+  background: #222 url(data:image/png;base64,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);
-+  box-shadow: 0 0 7px black inset;
-+  padding: 0 20px 20px 20px;
-+}
-+
-+stack[anonid=browserStack][expose] {
-+  box-shadow: 0 0 7px black;
-+  -moz-transition: 300ms; /* FIXME: define properties*/
-+}
-+
-+stack[anonid=browserStack][expose][notransition] {
-+  -moz-transition: none;
-+}
-+
-+
-+vbox[anonid=browserContainer] > toolbar {
-+  -moz-appearance: none;
-+  background: transparent;
-+  margin: 10px 0;
-+}
-+
-+vbox[anonid=browserContainer] > toolbar > menulist {
-+  -moz-margin-start: 0;
-+}
-+
-+vbox[anonid=browserContainer] > toolbar > menulist,
-+vbox[anonid=browserContainer] > toolbar > toolbarbutton {
-+  border-radius: 0;
-+}
-+
- .gcli-panel-inner-arrowcontent {
-   padding: 0;
- }
- 
- .gclitoolbar-input-node,
- .gclitoolbar-complete-node,
- .gclitoolbar-prompt {
-   font-family: Menlo, Monaco, monospace;
+ .devtools-menulist,
+ .devtools-toolbarbutton {
+   -moz-appearance: none;
+   min-width: 78px;
++  max-width: 162px;
+   min-height: 22px;
+   text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
+   border: 1px solid hsla(210,8%,5%,.45);
+   border-radius: 3px;
+   background: -moz-linear-gradient(hsla(212,7%,57%,.35), hsla(212,7%,57%,.1)) padding-box;
+   box-shadow: 0 1px 0 hsla(210,16%,76%,.15) inset, 0 0 0 1px hsla(210,16%,76%,.15) inset, 0 1px 0 hsla(210,16%,76%,.15);
+   margin: 0 3px;
+   color: inherit;
 diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinstripe/devtools/common.css
 --- a/browser/themes/pinstripe/devtools/common.css
 +++ b/browser/themes/pinstripe/devtools/common.css
