@@ -1,5 +1,5 @@
 # HG changeset patch
-# Parent 63e8ebb539cdbde515e27af801c7959b76ec54b0
+# Parent 536bab06d90f6f2996a0d41c7460aef01e00f9bc
 Bug 749628 - Implement a Responsive Design tool
 
 diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
@@ -126,7 +126,7 @@ diff --git a/browser/base/content/browser-sets.inc b/browser/base/content/browse
 diff --git a/browser/base/content/browser.css b/browser/base/content/browser.css
 --- a/browser/base/content/browser.css
 +++ b/browser/base/content/browser.css
-@@ -529,8 +529,24 @@ statuspanel[inactive][previoustype=overL
+@@ -529,8 +529,35 @@ statuspanel[inactive][previoustype=overL
  }
  
  .panel-inner-arrowcontentfooter[footertype="promobox"] {
@@ -136,7 +136,7 @@ diff --git a/browser/base/content/browser.css b/browser/base/content/browser.css
  /* highlighter */
  %include highlighter.css
 +
-+vbox[anonid=browserContainer][expose] {
++vbox[anonid=browserContainer][responsivemode] {
 +  overflow: auto;
 +}
 +
@@ -144,11 +144,22 @@ diff --git a/browser/base/content/browser.css b/browser/base/content/browser.css
 +  -moz-box-pack: end;
 +}
 +
-+stack[anonid=browserStack][expose] {
++stack[anonid=browserStack][responsivemode] {
 +  -moz-transition: 300ms;
++  -moz-transition-timing-function: linear;
 +}
 +
-+stack[anonid=browserStack][expose][notransition] {
++stack[anonid=browserStack][responsivemode] > browser {
++  -moz-transform-origin: bottom right;
++  -moz-transition: 300ms;
++  -moz-transition-timing-function: linear;
++}
++
++stack[anonid=browserStack][responsivemode][notransition] {
++  -moz-transition: none;
++}
++
++stack[anonid=browserStack][responsivemode][notransition] > browser {
 +  -moz-transition: none;
 +}
 diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
@@ -250,28 +261,6 @@ diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
     * @param {CSSStyleSheet} [aSelectedStyleSheet] default Stylesheet.
     * @param {Number} [aLine] Line to which the caret should be moved (one-indexed).
     * @param {Number} [aCol] Column to which the caret should be moved (one-indexed).
-diff --git a/browser/base/content/test/browser_bug462673.js b/browser/base/content/test/browser_bug462673.js
---- a/browser/base/content/test/browser_bug462673.js
-+++ b/browser/base/content/test/browser_bug462673.js
-@@ -10,17 +10,17 @@ var runs = [
-     var newBrowser = newTab.linkedBrowser;
-     tabbrowser.removeTab(tab);
-     ok(!win.closed, "Window stays open");
-     if (!win.closed) {
-       is(tabbrowser.tabContainer.childElementCount, 1, "Window has one tab");
-       is(tabbrowser.browsers.length, 1, "Window has one browser");
-       is(tabbrowser.selectedTab, newTab, "Remaining tab is selected");
-       is(tabbrowser.selectedBrowser, newBrowser, "Browser for remaining tab is selected");
--      is(tabbrowser.mTabBox.selectedPanel, newBrowser.parentNode.parentNode, "Panel for remaining tab is selected");
-+      is(tabbrowser.mTabBox.selectedPanel, newBrowser.parentNode.parentNode.parentNode, "Panel for remaining tab is selected");
-     }
-   }
- ];
- 
- function test() {
-   waitForExplicitFinish();
-   runOneTest();
- }
 diff --git a/browser/devtools/Makefile.in b/browser/devtools/Makefile.in
 --- a/browser/devtools/Makefile.in
 +++ b/browser/devtools/Makefile.in
@@ -312,7 +301,7 @@ diff --git a/browser/devtools/responsivedesign/responsivedesign.jsm b/browser/de
 new file mode 100644
 --- /dev/null
 +++ b/browser/devtools/responsivedesign/responsivedesign.jsm
-@@ -0,0 +1,416 @@
+@@ -0,0 +1,509 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 +/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 +/* ***** BEGIN LICENSE BLOCK *****
@@ -359,11 +348,10 @@ new file mode 100644
 +
 +var EXPORTED_SYMBOLS = ["ResponsiveUIManager"];
 +
-+const MIN_WIDTH = 150;
-+const MIN_HEIGHT = 150;
++const MIN_WIDTH = 50;
++const MIN_HEIGHT = 50;
 +
-+const MIN_ZOOM = 0.5;
-+const MAX_ZOOM = 3.0;
++const MIN_ZOOM = 0.3;
 +
 +let presets = [
 +  {custom: true}, // custom
@@ -413,16 +401,17 @@ new file mode 100644
 +
 +  this.contentViewer = aBrowser.docShell.contentViewer.QueryInterface(Ci.nsIMarkupDocumentViewer);
 +  this.currentZoomValue = 1;
++
 +  this.initialZoom = this.contentViewer.fullZoom;
 +  this.contentViewer.fullZoom = 1;
 +
 +  // Default size
 +  let bbox = this.stack.getBoundingClientRect();
-+  presets[0].width = bbox.width - 40; // padding
-+  presets[0].height = bbox.height - 80; // padding + toolbar
++  presets[0].width = bbox.width - 40;
++  presets[0].height = bbox.height - 80;
 +
-+  this.container.setAttribute("expose", "true");
-+  this.stack.setAttribute("expose", "true");
++  this.container.setAttribute("responsivemode", "true");
++  this.stack.setAttribute("responsivemode", "true");
 +
 +  this.currentPreset = 0; // Custom
 +
@@ -433,14 +422,16 @@ new file mode 100644
 +  this.zoomIn = this.zoomIn.bind(this);
 +  this.zoomOut = this.zoomOut.bind(this);
 +  this.zoomRestore = this.zoomRestore.bind(this);
++  this.fitWindow = this.fitWindow.bind(this);
 +  this.startResizing = this.startResizing.bind(this);
 +  this.stopResizing = this.stopResizing.bind(this);
-+  this.onResize = this.onResize.bind(this);
 +  this.onDrag = this.onDrag.bind(this);
 +  this.onKeypress = this.onKeypress.bind(this);
 +  this.close = this.close.bind(this);
 +
-+  this.stack.addEventListener("resize", this.onResize, true);
++  this.browser.setAttribute("bottom", "0");
++  this.browser.setAttribute("right", "0");
++
 +  this.mainWindow.addEventListener("keypress", this.onKeypress, true);
 +
 +  this.chromeDoc.getElementById("menu_responsiveUI").setAttribute("checked", "true");
@@ -470,17 +461,22 @@ new file mode 100644
 +
 +    this.zoomLabel = null;
 +
-+    this.container.removeAttribute("expose");
-+    this.stack.removeAttribute("expose");
++    this.container.removeAttribute("responsivemode");
++    this.stack.removeAttribute("responsivemode");
 +    this.mainWindow.removeEventListener("keypress", this.onKeypress, true);
 +    this.menulist.removeEventListener("select", this.presetSelected, true);
 +    this.container.removeChild(this.toolbar);
 +    this.stack.removeChild(this.resizer);
 +    this.stack.removeChild(this.resizeBar);
-+    this.stack.removeEventListener("resize", this.onResize, true);
 +
 +    this.contentViewer.fullZoom = this.initialZoom;
 +    this.contentViewer = null;
++
++    this.browser.removeAttribute("top");
++    this.browser.removeAttribute("bottom");
++    this.browser.removeAttribute("left");
++    this.browser.removeAttribute("right");
++    this.browser.style.MozTransform = "none";
 +
 +    delete this.browser.responsiveUI;
 +    delete this.strings;
@@ -493,6 +489,16 @@ new file mode 100644
 +    this.toolbar = this.chromeDoc.createElement("toolbar");
 +    this.toolbar.className = "devtools-toolbar devtools-responsiveui-toolbar";
 +    this.container.insertBefore(this.toolbar, this.stack);
++
++    let sizebox = this.chromeDoc.createElement("hbox");
++    sizebox.className = "devtools-responsiveui-sizebox";
++
++    let sizeLabel = this.chromeDoc.createElement("label");
++    sizeLabel.setAttribute("value", this.strings.GetStringFromName("responsiveUI.size"));
++
++    let sizeLabelContainer = this.chromeDoc.createElement("vbox");
++    sizeLabelContainer.setAttribute("pack", "center");
++    sizeLabelContainer.appendChild(sizeLabel);
 +
 +    this.menulist = this.chromeDoc.createElement("menulist");
 +    this.menulist.className = "devtools-menulist";
@@ -527,6 +533,11 @@ new file mode 100644
 +    zoomrestore.setAttribute("label", this.strings.GetStringFromName("responsiveUI.resetZoom"));
 +    zoomrestore.onclick = this.zoomRestore;
 +
++    let fitWindow = this.chromeDoc.createElement("toolbarbutton");
++    fitWindow.className = "devtools-toolbarbutton";
++    fitWindow.setAttribute("label", this.strings.GetStringFromName("responsiveUI.fitWindow"));
++    fitWindow.onclick = this.fitWindow;
++
 +    this.zoomLabel = this.chromeDoc.createElement("label");
 +    this.updateZoomLabel();
 +
@@ -534,13 +545,17 @@ new file mode 100644
 +    zoomLabelContainer.setAttribute("pack", "center");
 +    zoomLabelContainer.appendChild(this.zoomLabel);
 +
++    sizebox.appendChild(sizeLabelContainer);
++    sizebox.appendChild(this.menulist);
++    sizebox.appendChild(rotateButton);
++
 +    zoombox.appendChild(zoomLabelContainer);
 +    zoombox.appendChild(zoomin);
 +    zoombox.appendChild(zoomout);
 +    zoombox.appendChild(zoomrestore);
++    zoombox.appendChild(fitWindow);
 +
-+    this.toolbar.appendChild(this.menulist);
-+    this.toolbar.appendChild(rotateButton);
++    this.toolbar.appendChild(sizebox);
 +    this.toolbar.appendChild(zoombox);
 +
 +    // Resizers
@@ -592,7 +607,7 @@ new file mode 100644
 +  },
 +
 +  loadPreset: function RUI_loadPreset(p) {
-+    this.setSize(p.width * this.currentZoomValue, p.height * this.currentZoomValue);
++    this.setSize(p.width, p.height);
 +  },
 +
 +  rotate: function RUI_rotate() {
@@ -600,29 +615,48 @@ new file mode 100644
 +  },
 +
 +  zoomIn: function RUI_zoomIn() {
-+    if (this.contentViewer.fullZoom >= MAX_ZOOM) return;
-+    this.contentViewer.fullZoom += 0.1;
++    this.currentZoomValue += 0.1;
++    this.applyZoom();
 +  },
 +
 +  zoomOut: function RUI_zoomOut() {
-+    if (this.contentViewer.fullZoom <= MIN_ZOOM) return;
-+    this.contentViewer.fullZoom -= 0.1;
++    if (this.currentZoomValue <= MIN_ZOOM) return;
++    this.currentZoomValue -= 0.1;
++    this.applyZoom();
 +  },
 +
 +  zoomRestore: function RUI_zoomRestore() {
-+    this.contentViewer.fullZoom = 1;
++    this.currentZoomValue = 1;
++    this.applyZoom();
 +  },
 +
-+  onResize: function RUI_onResize() {
-+    let newZoomValue = this.contentViewer.fullZoom;
-+    if (newZoomValue == this.currentZoomValue) return;
++  fitWindow: function RUI_toggleFitWindow() {
++    let style = this.mainWindow.getComputedStyle(this.container, null);
++    let width = parseInt(style.getPropertyValue("width"));
++    let height = parseInt(style.getPropertyValue("height"));
++    let paddingTop = parseInt(style.getPropertyValue("padding-top"));
++    let paddingBottom = parseInt(style.getPropertyValue("padding-bottom"));
++    let paddingLeft = parseInt(style.getPropertyValue("padding-left"));
++    let paddingRight = parseInt(style.getPropertyValue("padding-right"));
 +
-+    let lastZoomValue = this.currentZoomValue;
-+    this.currentZoomValue = newZoomValue;
++    style = this.mainWindow.getComputedStyle(this.toolbar, null);
++    height -= parseInt(style.getPropertyValue("height"));
++    height -= parseInt(style.getPropertyValue("margin-top"));
++    height -= parseInt(style.getPropertyValue("margin-bottom"));
 +
++    let zoomH, zoomV;
++    zoomH = zoomV = this.currentZoomValue;
++
++    zoomH = width / this.currentWidth;
++    zoomV = height / this.currentHeight;
++
++    this.currentZoomValue = Math.min(zoomH, zoomV);
++    this.applyZoom();
++  },
++
++  applyZoom: function RUI_applyZoom() {
++    this.setSize(this.currentWidth, this.currentHeight);
 +    this.updateZoomLabel();
-+
-+    this.setSize((this.currentWidth / lastZoomValue) * this.currentZoomValue, (this.currentHeight / lastZoomValue) * this.currentZoomValue);
 +  },
 +
 +  onKeypress: function RUI_onKeypress(e) {
@@ -635,14 +669,17 @@ new file mode 100644
 +  },
 +
 +  updateZoomLabel: function RUI_updateZoomLabel() {
-+    let str = this.strings.formatStringFromName("responsiveUI.zoom", [Math.round(100 * this.currentZoomValue) + "%"], 1);
++    let number = Math.round(100 * this.currentZoomValue);
++    if (number < 10) {
++      number = "  " + number;
++    } else {
++      if (number < 100) number = " " + number;
++    }
++    let str = this.strings.formatStringFromName("responsiveUI.zoom", [number + "%"], 1);
 +    this.zoomLabel.setAttribute("value", str);
 +  },
 +
-+  setSize: function RUI_setSize(width, height) {
-+    this.currentWidth = width;
-+    this.currentHeight = height;
-+
++  setStackSize: function RUI_setStackSize(width, height) {
 +    let style = (<r><![CDATA[
 +        width: %width;
 +        max-width: %width;
@@ -656,15 +693,60 @@ new file mode 100644
 +    style = style.replace(/%height/g, height + "px");
 +
 +    this.stack.setAttribute("style", style);
++  },
++
++  setSize: function RUI_setSize(width, height, notransition) {
++    this.currentWidth = width;
++    this.currentHeight = height;
++
++    let stackWidth = width * this.currentZoomValue;
++    let stackHeight = height * this.currentZoomValue;
++
++    this.setStackSize(stackWidth, stackHeight);
++
++    this.browser.style.MozTransform = "scale(" + this.currentZoomValue + ")";
++
++    let top = (this.currentZoomValue - 1) * this.currentHeight;
++    let left = (this.currentZoomValue - 1) * this.currentWidth;
++
++    if (notransition) {
++      this.browser.setAttribute("top", top);
++      this.browser.setAttribute("left", left);
++    } else {
++      this.animValue(this.browser, "top", top, 300);
++      this.animValue(this.browser, "left", left, 300);
++    }
 +
 +    if (presets[this.currentPreset].custom) {
 +      let preset = presets[this.currentPreset];
-+      preset.width = this.currentWidth / this.currentZoomValue;
-+      preset.height = this.currentHeight / this.currentZoomValue;
++      preset.width = this.currentWidth;
++      preset.height = this.currentHeight;
 +
 +      let menuitem = this.menulist.firstChild.childNodes[this.currentPreset];
 +      this.setMenuLabel(menuitem, preset);
 +    }
++  },
++
++  animValue: function RUI_animValue(elt, attr, finalValue, duration) {
++    let initialDate = Date.now();
++    let arrivalDate = initialDate + duration;
++    let originalValue = parseFloat(elt.getAttribute(attr));
++    let deltaValue = finalValue - originalValue;
++
++    let window = this.mainWindow;
++    function step() {
++      let currentDate = Date.now();
++      if (currentDate >= arrivalDate) {
++        elt.setAttribute(attr, finalValue);
++      } else {
++        deltaDate = currentDate - initialDate;
++        progression = deltaDate / duration;
++        currentValue = originalValue + deltaValue * progression;
++        elt.setAttribute(attr, currentValue);
++        window.mozRequestAnimationFrame(step);
++      }
++    }
++    step();
 +  },
 +
 +  getCustomMenuItem: function RUI_getCustomMenuItem() {
@@ -678,8 +760,8 @@ new file mode 100644
 +    if (!preset.custom) {
 +      this.currentPreset = 0;
 +      preset = presets[0];
-+      preset.width = this.currentWidth / this.currentZoomValue;
-+      preset.height = this.currentHeight / this.currentZoomValue;
++      preset.width = this.currentWidth;
++      preset.height = this.currentHeight;
 +      let menuitem = this.getCustomMenuItem();
 +      this.setMenuLabel(menuitem, preset);
 +      this.menulist.selectedIndex = 0;
@@ -702,22 +784,22 @@ new file mode 100644
 +
 +    if (this.ignoreY) deltaY = 0;
 +
-+    let width = this.currentWidth + deltaX;
-+    let height = this.currentHeight + deltaY;
++    let width = (this.currentWidth * this.currentZoomValue) + deltaX;
++    let height = (this.currentHeight * this.currentZoomValue) + deltaY;
 +
 +    if (width < MIN_WIDTH) {
-+        width = this.currentWidth;
++        width = MIN_WIDTH;
 +    } else {
 +        this.lastClientX = e.clientX;
 +    }
 +
 +    if (height < MIN_HEIGHT) {
-+        height = this.currentHeight;
++        height = MIN_HEIGHT;
 +    } else {
 +        this.lastClientY = e.clientY;
 +    }
 +
-+    this.setSize(width, height);
++    this.setSize(width / this.currentZoomValue, height / this.currentZoomValue, true);
 +  },
 +
 +  stopResizing: function RUI_stopResizing() {
@@ -817,7 +899,7 @@ new file mode 100644
 +  function onUIOpen() {
 +    // Is it open?
 +    let container = gBrowser.getBrowserContainer();
-+    is(container.getAttribute("expose"), "true", "Expose mode open.");
++    is(container.getAttribute("responsivemode"), "true", "In responsive mode.");
 +
 +    // Menus are correctly updated?
 +    is(document.getElementById("menu_responsiveUI").getAttribute("checked"), "true", "menu checked");
@@ -972,7 +1054,7 @@ diff --git a/browser/locales/en-US/chrome/browser/devtools/responsiveUI.properti
 new file mode 100644
 --- /dev/null
 +++ b/browser/locales/en-US/chrome/browser/devtools/responsiveUI.properties
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,31 @@
 +# LOCALIZATION NOTE These strings are used inside the Responsive Mode
 +# which is available from the Web Developer sub-menu -> 'Responsive Mode'.
 +#
@@ -991,14 +1073,19 @@ new file mode 100644
 +# current size of the page. For example: "400x600".
 +responsiveUI.customResolution=%S (custom)
 +
++# LOCALIZATION NOTE  (responsiveUI.size):
++responsiveUI.size=size: 
++
 +# LOCALIZATION NOTE  (responsiveUI.zoom): label of introducing the zoom box in
 +# the toolbar. It shows the current zoom level. %S is replaced by a percentage
 +# value. For example: 80%.
 +responsiveUI.zoom=zoom: %S
 +
-+# LOCALIZATION NOTE  (responsiveUI.resetZoom): label of the very last button in
-+# toolbar, that lets the user reset the zoom level of the page.
++# LOCALIZATION NOTE  (responsiveUI.resetZoom): label of the reset zoom button.
 +responsiveUI.resetZoom=1:1
++
++# LOCALIZATION NOTE  (responsiveUI.fitWindow ): label of the fit to window button.
++responsiveUI.fitWindow=fit window
 diff --git a/browser/locales/jar.mn b/browser/locales/jar.mn
 --- a/browser/locales/jar.mn
 +++ b/browser/locales/jar.mn
@@ -1023,7 +1110,7 @@ diff --git a/browser/locales/jar.mn b/browser/locales/jar.mn
 diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
 --- a/browser/themes/gnomestripe/browser.css
 +++ b/browser/themes/gnomestripe/browser.css
-@@ -2394,8 +2394,75 @@ html|*#highlighter-nodeinfobar-pseudo-cl
+@@ -2394,8 +2394,71 @@ html|*#highlighter-nodeinfobar-pseudo-cl
    -moz-appearance: none;
    border-top: 1px solid black;
    border-bottom-width: 0;
@@ -1033,13 +1120,13 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
    position: relative;
  }
 +
-+vbox[anonid=browserContainer][expose] {
++vbox[anonid=browserContainer][responsivemode] {
 +  background: #2a3643 url(data:image/png;base64,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);
 +  box-shadow: 0 0 7px black inset;
 +  padding: 0 20px 20px 20px;
 +}
 +
-+stack[anonid=browserStack][expose] {
++stack[anonid=browserStack][responsivemode] {
 +  box-shadow: 0 0 7px black;
 +}
 +
@@ -1050,28 +1137,24 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
 +  box-shadow: none;
 +}
 +
-+.devtools-responsiveui-toolbar > menulist {
-+  -moz-margin-start: 0;
-+}
-+
-+.devtools-responsiveui-toolbar > menulist,
-+.devtools-responsiveui-toolbar > toolbarbutton,
-+.devtools-responsiveui-zoombox > toolbarbutton {
-+  border-radius: 0;
-+}
-+
++.devtools-responsiveui-sizebox,
 +.devtools-responsiveui-zoombox {
 +  margin: 0 2px;
 +}
++
++.devtools-responsiveui-sizebox > menulist,
++.devtools-responsiveui-sizebox > toolbarbutton,
 +.devtools-responsiveui-zoombox > toolbarbutton {
 +  margin: 0;
 +  min-width: 22px;
 +  border-width: 1px;
 +  -moz-padding-start: 1px;
 +  -moz-border-start-width: 0;
++  border-radius: 0;
 +}
++.devtools-responsiveui-sizebox > vbox,
 +.devtools-responsiveui-zoombox > vbox {
-+  min-width: 92px;
++  font-family: monospace;
 +  padding: 0 6px;
 +  border: 1px solid hsla(210,8%,5%,.6);
 +  background: -moz-linear-gradient(hsla(220,6%,10%,.6), hsla(210,11%,18%,.45) 75%, hsla(210,11%,30%,.4));
@@ -1079,24 +1162,24 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
 +}
 +
 +.devtools-responsiveui-resizebar {
-+  width: 6px;
++  width: 8px;
 +  height: 35px;
 +  border: 1px solid hsla(210,8%,5%,.6);
 +  background: -moz-linear-gradient(hsla(220,6%,10%,.6), hsla(210,11%,18%,.45) 75%, hsla(210,11%,30%,.4));
 +  box-shadow: 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
 +  -moz-transform: translate(12px, 3px);
-+  border-radius: 3px;
++  border-radius: 4px;
 +  cursor: ew-resize;
 +}
 +
 +.devtools-responsiveui-resizehandle {
-+  width: 6px;
-+  height: 6px;
++  width: 8px;
++  height: 8px;
 +  border: 1px solid hsla(210,8%,5%,.6);
 +  background: -moz-linear-gradient(hsla(220,6%,10%,.6), hsla(210,11%,18%,.45) 75%, hsla(210,11%,30%,.4));
 +  box-shadow: 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
 +  -moz-transform: translate(12px, 12px);
-+  border-radius: 3px;
++  border-radius: 4px;
 +  cursor: se-resize;
 +}
 diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gnomestripe/devtools/common.css
@@ -1123,7 +1206,7 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
 diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
 --- a/browser/themes/pinstripe/browser.css
 +++ b/browser/themes/pinstripe/browser.css
-@@ -3120,8 +3120,75 @@ html|*#highlighter-nodeinfobar-pseudo-cl
+@@ -3120,8 +3120,72 @@ html|*#highlighter-nodeinfobar-pseudo-cl
    -moz-appearance: none;
    border-top: 1px solid black;
    border-bottom-width: 0;
@@ -1133,13 +1216,13 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
    position: relative;
  }
 +
-+vbox[anonid=browserContainer][expose] {
++vbox[anonid=browserContainer][responsivemode] {
 +  background: #2a3643 url(data:image/png;base64,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);
 +  box-shadow: 0 0 7px black inset;
 +  padding: 0 20px 20px 20px;
 +}
 +
-+stack[anonid=browserStack][expose] {
++stack[anonid=browserStack][responsivemode] {
 +  box-shadow: 0 0 7px black;
 +}
 +
@@ -1150,28 +1233,25 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
 +  box-shadow: none;
 +}
 +
-+.devtools-responsiveui-toolbar > menulist {
-+  -moz-margin-start: 0;
-+}
-+
-+.devtools-responsiveui-toolbar > menulist,
-+.devtools-responsiveui-toolbar > toolbarbutton,
-+.devtools-responsiveui-zoombox > toolbarbutton {
-+  border-radius: 0;
-+}
-+
++.devtools-responsiveui-sizebox,
 +.devtools-responsiveui-zoombox {
 +  margin: 0 2px;
 +}
++
++.devtools-responsiveui-sizebox > menulist,
++.devtools-responsiveui-sizebox > toolbarbutton,
 +.devtools-responsiveui-zoombox > toolbarbutton {
 +  margin: 0;
 +  min-width: 22px;
 +  border-width: 1px;
 +  -moz-padding-start: 1px;
 +  -moz-border-start-width: 0;
++  border-radius: 0;
 +}
++
++.devtools-responsiveui-sizebox > vbox,
 +.devtools-responsiveui-zoombox > vbox {
-+  min-width: 92px;
++  font-family: monospace;
 +  padding: 0 6px;
 +  border: 1px solid hsla(210,8%,5%,.6);
 +  background: -moz-linear-gradient(hsla(220,6%,10%,.6), hsla(210,11%,18%,.45) 75%, hsla(210,11%,30%,.4));
@@ -1179,24 +1259,24 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
 +}
 +
 +.devtools-responsiveui-resizebar {
-+  width: 6px;
++  width: 8px;
 +  height: 35px;
 +  border: 1px solid hsla(210,8%,5%,.6);
 +  background: -moz-linear-gradient(hsla(220,6%,10%,.6), hsla(210,11%,18%,.45) 75%, hsla(210,11%,30%,.4));
 +  box-shadow: 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
 +  -moz-transform: translate(12px, 3px);
-+  border-radius: 3px;
++  border-radius: 4px;
 +  cursor: ew-resize;
 +}
 +
 +.devtools-responsiveui-resizehandle {
-+  width: 6px;
-+  height: 6px;
++  width: 8px;
++  height: 8px;
 +  border: 1px solid hsla(210,8%,5%,.6);
 +  background: -moz-linear-gradient(hsla(220,6%,10%,.6), hsla(210,11%,18%,.45) 75%, hsla(210,11%,30%,.4));
 +  box-shadow: 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 3px hsla(210,8%,5%,.25) inset, 0 1px 0 hsla(210,16%,76%,.15);
 +  -moz-transform: translate(12px, 12px);
-+  border-radius: 3px;
++  border-radius: 4px;
 +  cursor: se-resize;
 +}
 diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinstripe/devtools/common.css

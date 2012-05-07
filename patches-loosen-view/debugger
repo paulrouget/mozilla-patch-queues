@@ -1,0 +1,185 @@
+# HG changeset patch
+# Parent fa583acbf15abe7fb36361a914259b863ddd48b8
+
+diff --git a/browser/devtools/debugger/debugger.xul b/browser/devtools/debugger/debugger.xul
+--- a/browser/devtools/debugger/debugger.xul
++++ b/browser/devtools/debugger/debugger.xul
+@@ -19,16 +19,17 @@
+    - Portions created by the Initial Developer are Copyright (C) 2011
+    - the Initial Developer. All Rights Reserved.
+    -
+    - Contributor(s):
+    -   Dave Camp <dcamp@mozilla.com>
+    -   Panos Astithas <past@mozilla.com>
+    -   Victor Porof <vporof@mozilla.com>
+    -   Rob Campbell <rcampbell@mozilla.com>
++   -   Paul Rouget <paul@mozilla.com>
+    -
+    - Alternatively, the contents of this file may be used under the terms of
+    - either the GNU General Public License Version 2 or later (the "GPL"), or
+    - the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+    - in which case the provisions of the GPL or the LGPL are applicable instead
+    - of those above. If you wish to allow use of your version of this file only
+    - under the terms of either the GPL or the LGPL, and not to allow others to
+    - use your version of this file under the terms of the MPL, indicate your
+@@ -74,36 +75,40 @@
+   <commandset id="sourceEditorCommands"/>
+   <keyset id="sourceEditorKeys"/>
+ 
+   <vbox id="body" flex="1">
+     <toolbar id="dbg-toolbar" class="devtools-toolbar">
+ #ifdef XP_MACOSX
+       <toolbarbutton id="close" class="devtools-closebutton"/>
+ #endif
+-      <button id="resume"
+-                  class="devtools-toolbarbutton"
+-                  type="checkbox"
+-                  image="chrome://browser/skin/devtools/pause.png"
+-                  tabindex="0"/>
+-      <button id="step-over"
+-                  class="devtools-toolbarbutton"
+-                  label="&debuggerUI.stepOverButton;"
+-                  tabindex="0"/>
+-      <button id="step-in"
+-                  class="devtools-toolbarbutton"
+-                  label="&debuggerUI.stepInButton;"
+-                  tabindex="0"/>
+-      <button id="step-out"
+-                  class="devtools-toolbarbutton"
+-                  label="&debuggerUI.stepOutButton;"
+-                  tabindex="0"/>
+-      <menulist id="scripts" class="devtools-menulist"/>
+-      <textbox id="scripts-search" type="search"
+-	       emptytext="&debuggerUI.emptyFilterText;"/>
++      <toolbarbutton id="resume"
++                     class="devtools-toolbarbutton"
++                     type="checkbox"
++                     image="chrome://browser/skin/devtools/pause.png"
++                     tabindex="0"/>
++      <toolbarbutton id="step-over"
++                     class="devtools-toolbarbutton"
++                     label="&debuggerUI.stepOverButton;"
++                     tabindex="0"/>
++      <toolbarbutton id="step-in"
++                     class="devtools-toolbarbutton"
++                     label="&debuggerUI.stepInButton;"
++                     tabindex="0"/>
++      <toolbarbutton id="step-out"
++                     class="devtools-toolbarbutton"
++                     label="&debuggerUI.stepOutButton;"
++                     tabindex="0"/>
++      <menulist id="scripts"
++                class="devtools-menulist"
++                tabindex="0"/>
++      <textbox id="scripts-search"
++               type="search"
++               class="devtools-searchinput"
++               emptytext="&debuggerUI.emptyFilterText;"/>
+       <spacer flex="1"/>
+ #ifndef XP_MACOSX
+       <toolbarbutton id="close" class="devtools-closebutton"/>
+ #endif
+     </toolbar>
+     <hbox id="dbg-content" flex="1">
+       <vbox id="stack" flex="1">
+         <div id="stackframes" class="vbox flex"/>
+diff --git a/browser/themes/gnomestripe/devtools/debugger.css b/browser/themes/gnomestripe/devtools/debugger.css
+--- a/browser/themes/gnomestripe/devtools/debugger.css
++++ b/browser/themes/gnomestripe/devtools/debugger.css
+@@ -45,28 +45,16 @@
+ 
+ div,
+ span,
+ a {
+   font: inherit;
+ }
+ 
+ /**
+- * Debugger toolbar
+- */
+-
+-#dbg-toolbar {
+-  padding: 2px;
+-}
+-
+-#dbg-toolbar > button {
+-  text-align: center;
+-}
+-
+-/**
+  * Debugger content
+  */
+ 
+ #dbg-content {
+   padding: 6px;
+ }
+ 
+ #dbg-content > * > .vbox {
+diff --git a/browser/themes/pinstripe/devtools/debugger.css b/browser/themes/pinstripe/devtools/debugger.css
+--- a/browser/themes/pinstripe/devtools/debugger.css
++++ b/browser/themes/pinstripe/devtools/debugger.css
+@@ -45,32 +45,16 @@
+ 
+ div,
+ span,
+ a {
+   font: inherit;
+ }
+ 
+ /**
+- * Debugger toolbar
+- */
+-
+-#dbg-toolbar {
+-  padding: 2px;
+-}
+-
+-#dbg-toolbar > button {
+-  text-align: center;
+-}
+-
+-#dbg-toolbar > button, menulist {
+-  -moz-appearance: toolbarbutton;
+-}
+-
+-/**
+  * Debugger content
+  */
+ 
+ #dbg-content {
+   padding: 6px;
+ }
+ 
+ #dbg-content > * > .vbox {
+diff --git a/browser/themes/winstripe/devtools/debugger.css b/browser/themes/winstripe/devtools/debugger.css
+--- a/browser/themes/winstripe/devtools/debugger.css
++++ b/browser/themes/winstripe/devtools/debugger.css
+@@ -45,28 +45,16 @@
+ 
+ div,
+ span,
+ a {
+   font: inherit;
+ }
+ 
+ /**
+- * Debugger toolbar
+- */
+-
+-#dbg-toolbar {
+-  padding: 2px;
+-}
+-
+-#dbg-toolbar > button {
+-  text-align: center;
+-}
+-
+-/**
+  * Debugger content
+  */
+ 
+ #dbg-content {
+   padding: 6px;
+ }
+ 
+ #dbg-content > * > .vbox {

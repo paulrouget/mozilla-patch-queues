@@ -1,6 +1,6 @@
 # HG changeset patch
-# Parent dc3bd5eab128eed2e3286e52b40f693cf5c5aec4
-Bug 749626 - Theme update: make the close button code generic and implement the dark theme for menulists
+# Parent d1195d800fde7d3faaf6ad9bb8512d7e0ca2f806
+Bug 749626 - Theme update: make the close button code generic and implement the dark theme for menulists. - try: -b do -p win32 -u none -t none
 
 diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
 --- a/browser/base/content/browser.xul
@@ -23,6 +23,24 @@ diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
                       command="Inspector:Inspect"/>
        <toolbarbutton id="inspector-treepanel-toolbutton"
                       class="devtools-toolbarbutton"
+@@ -1030,16 +1031,17 @@
+                        label="&inspectStyleButton.label;"
+                        accesskey="&inspectStyleButton.accesskey;"
+                        tabindex="0"
+                        command="Inspector:Sidebar"/>
+         <!-- registered tools go here -->
+       </hbox>
+ #ifndef XP_MACOSX
+       <toolbarbutton id="highlighter-closebutton"
++                     class="devtools-closebutton"
+                      oncommand="InspectorUI.closeInspectorUI(false);"
+                      tooltiptext="&inspectCloseButton.tooltiptext;"/>
+ #endif
+     </toolbar>
+     <toolbar id="addon-bar"
+              toolbarname="&addonBarCmd.label;" accesskey="&addonBarCmd.accesskey;"
+              collapsed="true"
+              class="toolbar-primary chromeclass-toolbar"
 diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
 --- a/browser/themes/gnomestripe/browser.css
 +++ b/browser/themes/gnomestripe/browser.css
@@ -58,7 +76,7 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
 diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gnomestripe/devtools/common.css
 --- a/browser/themes/gnomestripe/devtools/common.css
 +++ b/browser/themes/gnomestripe/devtools/common.css
-@@ -37,29 +37,31 @@
+@@ -37,85 +37,115 @@
  
  /* Toolbar and Toolbar items */
  
@@ -85,13 +103,14 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
 +  color: inherit;
  }
  
++.devtools-menulist:-moz-focusring,
  .devtools-toolbarbutton:-moz-focusring {
    outline: 1px dotted hsla(210,30%,85%,0.4);
    outline-offset: -4px;
  }
  
  .devtools-toolbarbutton:not([label]) {
-@@ -67,55 +69,81 @@
+   min-width: 32px;
  }
  
  .devtools-toolbarbutton:not([checked]):hover:active {
@@ -148,6 +167,7 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
                0 0 0 1px hsla(210,16%,76%,.1) inset,
                0 1px 0 hsla(210,16%,76%,.15);
 -  color: hsl(210,30%,85%);
++  color: inherit;
  }
  
  .devtools-searchinput:-moz-locale-dir(rtl) {
@@ -218,7 +238,7 @@ diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/bro
 diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinstripe/devtools/common.css
 --- a/browser/themes/pinstripe/devtools/common.css
 +++ b/browser/themes/pinstripe/devtools/common.css
-@@ -39,28 +39,34 @@
+@@ -39,30 +39,37 @@
  
  /* Toolbar and Toolbar items */
  
@@ -242,19 +262,22 @@ diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinst
    background: -moz-linear-gradient(hsla(212,7%,57%,.35), hsla(212,7%,57%,.1)) padding-box;
    box-shadow: 0 1px 0 hsla(210,16%,76%,.15) inset, 0 0 0 1px hsla(210,16%,76%,.15) inset, 0 1px 0 hsla(210,16%,76%,.15);
 +  color: inherit;
-+}
-+
-+.devtools-menulist {
-+  margin: 0 2px;
  }
  
++.devtools-menulist {
++  margin: 0 2px;
++}
++
++.devtools-menulist:-moz-focusring,
  .devtools-toolbarbutton:-moz-focusring {
    outline: 1px dotted hsla(210,30%,85%,0.4);
    outline-offset: -4px;
  }
  
  .devtools-toolbarbutton > .toolbarbutton-text {
-@@ -72,38 +78,52 @@
+   margin: 1px 6px;
+ }
+@@ -72,51 +79,87 @@
  }
  
  .devtools-toolbarbutton:not([checked]):hover:active {
@@ -307,8 +330,13 @@ diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinst
    box-shadow: 0 1px 1px hsla(210,8%,5%,.3) inset,
                0 0 0 1px hsla(210,16%,76%,.1) inset,
                0 1px 0 hsla(210,16%,76%,.15);
-   color: hsl(210,30%,85%);
-@@ -115,8 +135,30 @@
+-  color: hsl(210,30%,85%);
++  color: inherit;
+ }
+ 
+ .devtools-searchinput:-moz-locale-dir(rtl) {
+   background-position: -moz-calc(100% - 4px) 3px, top left, top left;
+ }
  
  .devtools-searchinput > .textbox-input-box > .textbox-search-icons {
    display: none;
@@ -376,10 +404,50 @@ diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/bro
  
  #highlighter-veil-container[locked] > #highlighter-veil-middlebox > #highlighter-veil-transparentbox {
    box-shadow: 0 0 0 1px black;
+@@ -2833,17 +2816,17 @@ html|*#highlighter-nodeinfobar-pseudo-cl
+ }
+ 
+ #inspector-breadcrumbs > .scrollbutton-up,
+ #inspector-breadcrumbs > .scrollbutton-down {
+   -moz-appearance: none;
+   border: 1px solid hsla(210,8%,5%,.45);
+   background: -moz-linear-gradient(hsla(212,7%,57%,.35), hsla(212,7%,57%,.1)) padding-box;
+   box-shadow: 0 1px 0 hsla(210,16%,76%,.15) inset, 0 0 0 1px hsla(210,16%,76%,.15) inset, 0 1px 0 hsla(210,16%,76%,.15);
+-  margin: 0 0 1px;
++  margin: 1px 0 1px;
+ }
+ 
+ #inspector-breadcrumbs > .scrollbutton-up {
+   -moz-border-start-width: 0;
+ }
+ 
+ #inspector-breadcrumbs > .scrollbutton-up:not([disabled]):active:hover,
+ #inspector-breadcrumbs > .scrollbutton-down:not([disabled]):active:hover {
+@@ -2885,16 +2868,20 @@ html|*#highlighter-nodeinfobar-pseudo-cl
+   width: 85px; /* Can't use max-width. See bug 723132 */
+   /* The content of the button can be larger than the button */
+   overflow: hidden;
+   min-height: 25px;
+   margin: 0 -11px 0 0;
+   padding: 0 9px;
+ }
+ 
++.inspector-breadcrumbs-button:-moz-focusring > .button-box {
++  border-width: 0;
++}
++
+ .inspector-breadcrumbs-button:-moz-focusring > label {
+   border-bottom: 1px dotted hsla(210,30%,85%,0.4);
+ }
+ 
+ .inspector-breadcrumbs-button[checked] > .inspector-breadcrumbs-tag {
+   color: hsl(200,100%,60%);
+ }
+ 
 diff --git a/browser/themes/winstripe/devtools/common.css b/browser/themes/winstripe/devtools/common.css
 --- a/browser/themes/winstripe/devtools/common.css
 +++ b/browser/themes/winstripe/devtools/common.css
-@@ -37,29 +37,31 @@
+@@ -37,31 +37,35 @@
  
  /* Toolbar and Toolbar items */
  
@@ -402,17 +470,21 @@ diff --git a/browser/themes/winstripe/devtools/common.css b/browser/themes/winst
    border-radius: 3px;
    background: -moz-linear-gradient(hsla(209,13%,54%,.35), hsla(209,13%,54%,.1) 85%, hsla(209,13%,54%,.2)) padding-box;
    box-shadow: 0 1px 0 hsla(209,29%,72%,.15) inset, 0 0 0 1px hsla(209,29%,72%,.1) inset, 0 0 0 1px hsla(209,29%,72%,.1), 0 1px 0 hsla(210,16%,76%,.1);
++  margin: 0;
    -moz-margin-end: 3px;
 +  color: inherit;
  }
  
++.devtools-menulist:-moz-focusring,
  .devtools-toolbarbutton:-moz-focusring {
    outline: 1px dotted hsla(210,30%,85%,0.4);
    outline-offset: -4px;
  }
  
  .devtools-toolbarbutton > .toolbarbutton-icon {
-@@ -71,39 +73,49 @@
+   margin: 0;
+ }
+@@ -71,47 +75,64 @@
  }
  
  .devtools-toolbarbutton:not([checked]):hover:active {
@@ -440,6 +512,13 @@ diff --git a/browser/themes/winstripe/devtools/common.css b/browser/themes/winst
 +.devtools-menulist > .menulist-dropmarker {
 +  -moz-appearance: none;
 +  list-style-image: url("chrome://browser/skin/devtools/dropmarker.png");
++  border-width: 0;
++  background-color: transparent;
++}
++
++.devtools-menulist:focus:not([open="true"]):not(.menulist-compact) > .menulist-label-box {
++  color: hsl(210,30%,85%) !important;
++  background-color: transparent;
 +}
 +
  /* Search input */
@@ -459,11 +538,20 @@ diff --git a/browser/themes/winstripe/devtools/common.css b/browser/themes/winst
    padding-bottom: 0;
    -moz-padding-start: 18px;
    -moz-padding-end: 12px;
-   color: hsl(210,30%,85%);
+-  color: hsl(210,30%,85%);
    -moz-transition-property: background-color, border-color, box-shadow;
    -moz-transition-duration: 150ms;
    -moz-transition-timing-function: ease;
-@@ -122,8 +134,31 @@
++  color: inherit;
+ }
+ 
+ .devtools-searchinput[focused] {
+   border-color: hsl(200,70%,40%) hsl(200,75%,37%) hsl(200,80%,35%);
+   background-origin: padding-box;
+   background-clip: padding-box;
+   box-shadow: inset 0 0 0 1px hsla(211,68%,6%,.1);
+ }
+@@ -122,8 +143,31 @@
  
  .devtools-searchinput > .textbox-input-box > .textbox-search-icons {
    display: none;

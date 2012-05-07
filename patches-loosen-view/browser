@@ -1,6 +1,6 @@
 # HG changeset patch
-# Parent 91a8fa9362a61f194c64c3140c708a614fda2a59
-Bug 749628 - Implement a "Responsive Design" tool
+# Parent 837dae572f6842fab417102c8ef44901d54b97d1
+Bug 749628 - Implement a Responsive Design tool
 
 diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrowser.xml
 --- a/browser/base/content/tabbrowser.xml
@@ -21,7 +21,7 @@ diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrows
 +            <xul:vbox flex="1" anonid="browserContainer">
 +              <xul:stack flex="1" anonid="browserStack">
 +                <xul:browser type="content-primary" message="true" disablehistory="true"
-+                            xbl:inherits="tooltip=contenttooltip,contextmenu=contentcontextmenu,autocompletepopup"/>
++                             xbl:inherits="tooltip=contenttooltip,contextmenu=contentcontextmenu,autocompletepopup"/>
 +              </xul:stack>
 +            </xul:vbox>
            </xul:notificationbox>
@@ -32,7 +32,7 @@ diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrows
      <implementation implements="nsIDOMEventListener">
  
        <property name="tabContextMenu" readonly="true"
-@@ -333,16 +335,25 @@
+@@ -334,16 +336,25 @@
          ]]>
          </body>
        </method>
@@ -67,7 +67,7 @@ diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrows
              stack.appendChild(b);
              stack.setAttribute("flex", "1");
  
-+            // Create the browserBox
++            // Create the browserContainer
 +            var box = document.createElementNS(
 +                                    "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
 +                                    "vbox");
@@ -90,7 +90,7 @@ diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrows
              t.linkedBrowser = b;
              t._tPos = position;
              if (t.previousSibling.selected)
-@@ -1754,22 +1773,24 @@
+@@ -1755,22 +1774,23 @@
  
              // update first-tab/last-tab/beforeselected/afterselected attributes
              this.selectedTab._selected = true;
@@ -101,7 +101,6 @@ diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrows
              // steps.
 -            var panel = browser.parentNode.parentNode;
 +
-+            // FIXME: I think it was wrong in the first place:
 +            var panel = browser.parentNode.parentNode.parentNode;
  
              // This will unload the document. An unload handler could remove
@@ -117,7 +116,7 @@ diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrows
              // As the browser is removed, the removal of a dependent document can
              // cause the whole window to close. So at this point, it's possible
              // that the binding is destructed.
-@@ -2520,17 +2541,17 @@
+@@ -2531,17 +2551,17 @@
                }
                break;
            }
@@ -136,3 +135,25 @@ diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrows
            this.mPanelContainer.childNodes[0].id = uniqueId;
            this.mCurrentTab.linkedPanel = uniqueId;
            this.mCurrentTab._tPos = 0;
+diff --git a/browser/base/content/test/browser_bug462673.js b/browser/base/content/test/browser_bug462673.js
+--- a/browser/base/content/test/browser_bug462673.js
++++ b/browser/base/content/test/browser_bug462673.js
+@@ -10,17 +10,17 @@ var runs = [
+     var newBrowser = newTab.linkedBrowser;
+     tabbrowser.removeTab(tab);
+     ok(!win.closed, "Window stays open");
+     if (!win.closed) {
+       is(tabbrowser.tabContainer.childElementCount, 1, "Window has one tab");
+       is(tabbrowser.browsers.length, 1, "Window has one browser");
+       is(tabbrowser.selectedTab, newTab, "Remaining tab is selected");
+       is(tabbrowser.selectedBrowser, newBrowser, "Browser for remaining tab is selected");
+-      is(tabbrowser.mTabBox.selectedPanel, newBrowser.parentNode.parentNode, "Panel for remaining tab is selected");
++      is(tabbrowser.mTabBox.selectedPanel, newBrowser.parentNode.parentNode.parentNode, "Panel for remaining tab is selected");
+     }
+   }
+ ];
+ 
+ function test() {
+   waitForExplicitFinish();
+   runOneTest();
+ }
