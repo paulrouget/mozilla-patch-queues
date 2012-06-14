@@ -1,0 +1,352 @@
+# HG changeset patch
+# Parent 61a03572e00a4215ca4ddba6519a5177546378a5
+
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -12,16 +12,17 @@ const Cr = Components.results;
+ var EXPORTED_SYMBOLS = ["InspectorUI"];
+ 
+ Cu.import("resource://gre/modules/Services.jsm");
+ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+ Cu.import("resource:///modules/TreePanel.jsm");
+ Cu.import("resource:///modules/highlighter.jsm");
+ Cu.import("resource:///modules/devtools/LayoutView.jsm");
+ Cu.import("resource:///modules/devtools/LayoutHelpers.jsm");
++Cu.import("resource:///modules/devtools/EventEmitter.jsm");
+ 
+ // Inspector notifications dispatched through the nsIObserverService.
+ const INSPECTOR_NOTIFICATIONS = {
+   // Fires once the Inspector completes the initialization and opens up on
+   // screen.
+   OPENED: "inspector-opened",
+ 
+   // Fires once the Inspector is closed.
+@@ -62,16 +63,17 @@ const LAYOUT_CHANGE_TIMER = 250;
+  * only be destroyed when user closes the inspector.
+  */
+ function Inspector(aIUI)
+ {
+   this._IUI = aIUI;
+   this._winID = aIUI.winID;
+   this._browser = aIUI.browser;
+   this._listeners = {};
++  this._eventEmitter = new EventEmitter();
+ 
+   this._browser.addEventListener("resize", this, true);
+ }
+ 
+ Inspector.prototype = {
+   /**
+    * True if the highlighter is locked on a node.
+    */
+@@ -131,17 +133,18 @@ Inspector.prototype = {
+   /**
+    * Called by the InspectorUI when the inspector is being destroyed.
+    */
+   _destroy: function Inspector__destroy()
+   {
+     this._cancelLayoutChange();
+     this._browser.removeEventListener("resize", this, true);
+     delete this._IUI;
+-    delete this._listeners;
++    this._eventEmitter.removeAllListeners();
++    delete this._eventEmitter;
+   },
+ 
+   /**
+    * Event handler for DOM events.
+    *
+    * @param DOMEvent aEvent
+    */
+   handleEvent: function Inspector_handleEvent(aEvent)
+@@ -198,90 +201,65 @@ Inspector.prototype = {
+     if (!this._frozen) {
+       return;
+     }
+ 
+     this._browser.addEventListener("resize", this, true);
+     delete this._frozen;
+   },
+ 
+-  /// Event stuff.  Would like to refactor this eventually.
+-  /// Emulates the jetpack event source, which has a nice API.
++  /// Forward the events related calls to the event emitter.
+ 
+   /**
+    * Connect a listener to this object.
+    *
+    * @param string aEvent
+    *        The event name to which we're connecting.
+    * @param function aListener
+    *        Called when the event is fired.
+    */
+   on: function Inspector_on(aEvent, aListener)
+   {
+-    if (!(aEvent in this._listeners)) {
+-      this._listeners[aEvent] = [];
+-    }
+-    this._listeners[aEvent].push(aListener);
++    this._eventEmitter.on(aEvent, aListener);
+   },
+ 
+   /**
+    * Listen for the next time an event is fired.
+    *
+    * @param string aEvent
+    *        The event name to which we're connecting.
+    * @param function aListener
+    *        Called when the event is fired.  Will be called at most one time.
+    */
+   once: function Inspector_once(aEvent, aListener)
+   {
+-    let handler = function() {
+-      this.removeListener(aEvent, handler);
+-      aListener();
+-    }.bind(this);
+-    this.on(aEvent, handler);
++    this._eventEmitter.once(aEvent, aListener);
+   },
+ 
+   /**
+    * Remove a previously-registered event listener.  Works for events
+    * registered with either on or once.
+    *
+    * @param string aEvent
+    *        The event name whose listener we're disconnecting.
+    * @param function aListener
+    *        The listener to remove.
+    */
+   removeListener: function Inspector_removeListener(aEvent, aListener)
+   {
+-    this._listeners[aEvent] = this._listeners[aEvent].filter(function(l) aListener != l);
++    this._eventEmitter.removeListener(aEvent, aListener);
+   },
+ 
+   /**
+    * Emit an event on the inspector.  All arguments to this method will
+    * be sent to listner functions.
+    */
+   _emit: function Inspector__emit(aEvent)
+   {
+-    if (!(aEvent in this._listeners))
+-      return;
+-
+-    let originalListeners = this._listeners[aEvent];
+-    for (let listener of this._listeners[aEvent]) {
+-      // If the inspector was destroyed during event emission, stop
+-      // emitting.
+-      if (!this._listeners) {
+-        break;
+-      }
+-
+-      // If listeners were removed during emission, make sure the
+-      // event handler we're going to fire wasn't removed.
+-      if (originalListeners === this._listeners[aEvent] ||
+-          this._listeners[aEvent].some(function(l) l === listener)) {
+-        listener.apply(null, arguments);
+-      }
+-    }
++    this._eventEmitter.emit(aEvent);
+   }
+ }
+ 
+ ///////////////////////////////////////////////////////////////////////////
+ //// InspectorUI
+ 
+ /**
+  * Main controller class for the Inspector.
+diff --git a/browser/devtools/shared/EventEmitter.jsm b/browser/devtools/shared/EventEmitter.jsm
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/shared/EventEmitter.jsm
+@@ -0,0 +1,92 @@
++var EXPORTED_SYMBOLS = ["EventEmitter"];
++
++function EventEmitter() {
++}
++
++EventEmitter.prototype = {
++  /**
++   * We use Map() to store the listeners.
++   */
++  get _listeners() {
++    if (!this._listenersMap)
++      this._listenersMap = new Map();
++    return this._listenersMap;
++  },
++
++  /**
++   * Connect a listener.
++   *
++   * @param string aEvent
++   *        The event name to which we're connecting.
++   * @param function aListener
++   *        Called when the event is fired.
++   */
++  on: function EventEmitter_on(aEvent, aListener) {
++    if (!this._listeners.has(aEvent)) {
++      this._listeners.set(aEvent, []);
++    }
++    this._listeners.get(aEvent).push(aListener);
++  },
++
++  /**
++   * Listen for the next time an event is fired.
++   *
++   * @param string aEvent
++   *        The event name to which we're connecting.
++   * @param function aListener
++   *        Called when the event is fired.  Will be called at most one time.
++   */
++  once: function EventEmitter_once(aEvent, aListener) {
++    let handler = function() {
++      this.removeListener(aEvent, handler);
++      aListener();
++    }.bind(this);
++    this.on(aEvent, handler);
++  },
++
++  /**
++   * Remove a previously-registered event listener.  Works for events
++   * registered with either on or once.
++   *
++   * @param string aEvent
++   *        The event name whose listener we're disconnecting.
++   * @param function aListener
++   *        The listener to remove.
++   */
++  removeListener: function EventEmitter_removeListener(aEvent, aListener) {
++    let listeners = this._listeners.get(aEvent);
++    this._listeners.set(aEvent, listeners.filter(function(l) aListener != l));
++  },
++
++  /**
++   * Emit an event.  All arguments to this method will
++   * be sent to listner functions.
++   */
++  emit: function EventEmitter_emit(aEvent) {
++    if (!this._listeners || !this._listeners.has(aEvent))
++      return;
++
++    let originalListeners = this._listeners.get(aEvent);
++    for (let listener of this._listeners.get(aEvent)) {
++      // If the object was destroyed during event emission, stop
++      // emitting.
++      if (!this._listeners) {
++        break;
++      }
++
++      // If listeners were removed during emission, make sure the
++      // event handler we're going to fire wasn't removed.
++      if (originalListeners === this._listeners.get(aEvent) ||
++          this._listeners.get(aEvent).some(function(l) l === listener)) {
++        listener.apply(null, arguments);
++      }
++    }
++  },
++
++  /**
++   * Destroy the references to the listeners.
++   */
++  removeAllListeners: function EventEmitter_destroy() {
++    delete this._listeners;
++  }
++}
+diff --git a/browser/devtools/shared/test/Makefile.in b/browser/devtools/shared/test/Makefile.in
+--- a/browser/devtools/shared/test/Makefile.in
++++ b/browser/devtools/shared/test/Makefile.in
+@@ -14,16 +14,17 @@ include $(topsrcdir)/config/rules.mk
+ 
+ _BROWSER_TEST_FILES = \
+   browser_browser_basic.js \
+   browser_promise_basic.js \
+   browser_require_basic.js \
+   browser_templater_basic.js \
+   browser_toolbar_basic.js \
+   browser_toolbar_tooltip.js \
++  browser_eventemitter_basic.js \
+   head.js \
+   $(NULL)
+ 
+ _BROWSER_TEST_PAGES = \
+   browser_templater_basic.html \
+   browser_toolbar_basic.html \
+   $(NULL)
+ 
+diff --git a/browser/devtools/shared/test/browser_eventemitter_basic.js b/browser/devtools/shared/test/browser_eventemitter_basic.js
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/shared/test/browser_eventemitter_basic.js
+@@ -0,0 +1,71 @@
++/* Any copyright is dedicated to the Public Domain.
++   http://creativecommons.org/publicdomain/zero/1.0/ */
++
++
++function test() {
++  Cu.import("resource:///modules/devtools/EventEmitter.jsm", this);
++  let emitter = new EventEmitter();
++  ok(emitter, "We have an event emitter");
++
++  emitter.on("next", next);
++  emitter.emit("next", "abc", "def");
++
++  let beenHere1 = false;
++  function next(eventName, str1, str2) {
++    is(eventName, "next", "Got event");
++    is(str1, "abc", "Argument 1 is correct");
++    is(str2, "def", "Argument 2 is correct");
++
++    ok(!beenHere1, "first time in next callback");
++    beenHere1 = true;
++
++    emitter.removeListener("next", next);
++
++    emitter.emit("next");
++
++    emitter.once("onlyonce", onlyOnce);
++
++    emitter.emit("onlyonce");
++    emitter.emit("onlyonce");
++  }
++
++  let beenHere2 = false;
++  function onlyOnce() {
++    ok(!beenHere2, "\"once\" listner has been called once");
++    beenHere2 = true;
++    emitter.emit("onlyonce");
++
++    killItWhileEmitting();
++  }
++
++  function killItWhileEmitting() {
++    function c1() {
++      ok(true, "c1 called");
++    }
++    function c2() {
++      ok(true, "c2 called");
++      emitter.removeListener("tick", c3);
++    }
++    function c3() {
++      ok(false, "c3 should not be called");
++    }
++    function c4() {
++      ok(true, "c4 called");
++      emitter.removeAllListeners();
++    }
++    function c5() {
++      ok(false, "c5 should not be called");
++    }
++
++    emitter.on("tick", c1);
++    emitter.on("tick", c2);
++    emitter.on("tick", c3);
++    emitter.on("tick", c4);
++    emitter.on("tick", c5);
++
++    emitter.emit("tick");
++
++    delete emitter;
++    finish();
++  }
++}

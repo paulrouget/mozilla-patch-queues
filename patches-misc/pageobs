@@ -1,0 +1,346 @@
+# HG changeset patch
+# Parent 6d9bf73dbbcef6ab58730e2a366a6b306f6a4a82
+* * *
+Bug 760171 - The inspector node menu feature allows the user to remove tabbed browsing. r=robcee
+
+diff --git a/browser/devtools/highlighter/Makefile.in b/browser/devtools/highlighter/Makefile.in
+--- a/browser/devtools/highlighter/Makefile.in
++++ b/browser/devtools/highlighter/Makefile.in
+@@ -10,16 +10,17 @@ VPATH		= @srcdir@
+ 
+ include $(DEPTH)/config/autoconf.mk
+ 
+ EXTRA_JS_MODULES = \
+ 	domplate.jsm \
+ 	InsideOutBox.jsm \
+ 	TreePanel.jsm \
+ 	highlighter.jsm \
++	pageobserver.jsm \
+ 	$(NULL)
+ 
+ EXTRA_PP_JS_MODULES = \
+ 	inspector.jsm \
+ 	$(NULL)
+ 
+ TEST_DIRS += test
+ 
+diff --git a/browser/devtools/highlighter/pageobserver.jsm b/browser/devtools/highlighter/pageobserver.jsm
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/highlighter/pageobserver.jsm
+@@ -0,0 +1,214 @@
++/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
++/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++// FIXME: should it be in /shared/?
++// FIXME: DOMUpdate only once loaded?
++//        maybe a public method ".startDOMTracking()"
++
++let EXPORTED_SYMBOLS = ["PageObserver", "WindowObserver"];
++
++const Cu = Components.utils;
++Cu.import("resource:///modules/devtools/EventEmitter.jsm");
++
++const PAGE_EVENTS = [
++  "tabClose",
++  "tabHidden",
++  "tabVisible",
++];
++
++const WINDOW_EVENTS = [
++  "close",
++  "DOMReady",
++  "allReady",
++  "DOMNodeUpdate",
++  "DOMTreeUpdate",
++  "resize",
++  "paint",
++  "reflow", // bug 453650
++];
++
++function PageObserver(aTab) {
++  this.tab = aTab;
++  this.init();
++}
++
++PageObserver.prototype = {
++  init: function() {
++    this._tabIsVisible = this.tab.selected;
++    this.windows = new Map();
++    this.tabContainer = this.tab.ownerDocument.defaultView.gBrowser.tabContainer;
++
++    let eventEmitter = new EventEmitter();
++    for (let i in eventEmitter)
++      this[i] = eventEmitter[i].bind(eventEmitter);
++
++    this.trackWindow(this.tab.linkedBrowser.contentWindow);
++    this.registerTabListeners();
++  },
++
++  destroy: function() {
++    // FIXME: call when no windows left
++    // FIXME: this.untrackAllWindows()
++    this.unregisterTabListeners();
++    this.removeAllListeners();
++
++    delete this.windows;
++    delete this.tab;
++    delete this.tabContainer;
++  },
++
++  trackWindow: function(window) {
++    if (this.windows.has(window)) {
++      // Window already tracked.
++      return;
++    }
++    let observer = new WindowObserver(window);
++    this.windows.set(window, observer);
++    for (let e of WINDOW_EVENTS)
++      observer.on(e, this.emit);
++    observer.once("close", function() {
++      this.untrackWindow(window);
++    }.bind(this));
++
++    if (window.document.readyState != "loading") {
++      this.trackInnerWindows(window, this);
++    } else {
++      observer.once("DOMReady", (function(window, pageobs, winobs) {
++        return function() this.trackInnerWindows(window, pageobs, winobs);
++      })(window, this, observer))
++    }
++
++  },
++
++  trackInnerWindows: function(parentWindow) {
++    // track exisiting iframe
++    let iframes = parentWindow.document.querySelectorAll("iframe");
++    for (let i = 0; i < iframes.length; i++) {
++      this.trackWindow(iframes[i].contentWindow);
++    }
++
++    // track future iframes
++    let observer = this.windows.get(parentWindow);
++    let self = this;
++    observer.on("DOMTreeUpdate", function(event, window, mutation) {
++      let addedNodes = mutation.addedNodes;
++      dump("DOMNodeUpdate: " + addedNodes[0] + "\n");
++      for (let i = 0; i < addedNodes.length; i++) {
++        let node = addedNodes[i];
++        let iframes = node.querySelectorAll("iframe");
++        for (let i = 0; i < iframes.length; i++) {
++          self.trackWindow(iframes[i].contentWindow);
++        }
++        if (node.nodeName instanceof HTMLIframeElement) {
++          self.trackWindow(node.contentWindow);
++        }
++      }
++    });
++  },
++
++  untrackWindow: function(window) {
++    if (!this.windows.has(window)) {
++      // Window not tracked.
++      return;
++    }
++    let observer = this.windows.get(window);
++    observer.destroy();
++    this.windows.delete(window);
++  },
++
++  registerTabListeners: function() {
++    this.tab.addEventListener("TabClose", this);
++    this.tabContainer.addEventListener("TabSelect", this);
++  },
++
++  unregisterTabListeners: function() {
++    this.tab.removeEventListener("TabClose", this);
++    this.tabContainer.removeEventListener("TabSelect", this);
++  },
++
++  handleEvent: function (aEvent) {
++    switch (aEvent.type) {
++      case "TabClose":
++        this.emit("tabClose", this.tab, aEvent);
++        this.unregisterTabListeners();
++        break;
++      case "TabSelect":
++        if (this.tab.selected) {
++          this.emit("tabVisible", this.tab, aEvent);
++          this._tabIsVisible = true;
++        } else {
++          if (this._tabIsVisible) {
++            this._tabIsVisible = false;
++            this.emit("tabHidden", this.tab, aEvent);
++          }
++        }
++        break;
++    }
++  },
++}
++
++function WindowObserver(window) {
++  this.window = window;
++  this.document = window.document;
++  this.init();
++}
++
++WindowObserver.prototype = {
++  init: function() {
++    let eventEmitter = new EventEmitter();
++    for (let i in eventEmitter)
++      this[i] = eventEmitter[i].bind(eventEmitter);
++
++    this.document.addEventListener("readystatechange", this, true);
++    this.window.addEventListener("unload", this, true);
++
++    this.registerDOMEvents();
++  },
++
++  registerDOMEvents: function() {
++    this.DOMMutationObserver = new this.window.MutationObserver(this);
++    let config = {
++      childList: true,
++      subtree: true,
++      characterData: true,
++      attributes: true,
++    };
++    this.DOMMutationObserver.observe(this.document.documentElement, config);
++  },
++
++  handleMutations: function(mutations) {
++    for (let m of mutations) {
++      if (m.type == "attributes")
++        this.emit("DOMNodeUpdate", this.window, m);
++      if (m.type == "childList")
++        this.emit("DOMTreeUpdate", this.window, m);
++    }
++  },
++
++  handleEvent: function(event) {
++    if (event.type == "readystatechange") {
++      if (this.document.readyState == "interactive")
++        this.emit("DOMReady", this.window, event);
++      if (this.document.readyState == "complete")
++        this.emit("allReady", this.window, event);
++    }
++    if (event.type == "unload") { // FIXME: Are we sure we want to do that on beforeunload? What if prevented?
++        this.emit("close", this.window, event);
++    }
++  },
++
++  destroy: function() {
++    this.document.removeEventListener("readystatechange", this, true);
++    this.document.removeEventListener("unload", this, true);
++    this.DOMMutationObserver.disconnect();
++    this.removeAllListeners();
++
++    delete this.DOMMutationObserver;
++    delete this.window;
++    delete this.document;
++  },
++
++}
+diff --git a/browser/devtools/shared/EventEmitter.jsm b/browser/devtools/shared/EventEmitter.jsm
+--- a/browser/devtools/shared/EventEmitter.jsm
++++ b/browser/devtools/shared/EventEmitter.jsm
+@@ -1,36 +1,29 @@
+ var EXPORTED_SYMBOLS = ["EventEmitter"];
+ 
+ function EventEmitter() {
+ }
+ 
+ EventEmitter.prototype = {
+   /**
+-   * We use Map() to store the listeners.
+-   */
+-  get _listeners() {
+-    if (!this._listenersMap)
+-      this._listenersMap = new Map();
+-    return this._listenersMap;
+-  },
+-
+-  /**
+    * Connect a listener.
+    *
+    * @param string aEvent
+    *        The event name to which we're connecting.
+    * @param function aListener
+    *        Called when the event is fired.
+    */
+   on: function EventEmitter_on(aEvent, aListener) {
+-    if (!this._listeners.has(aEvent)) {
+-      this._listeners.set(aEvent, []);
++    if (!this._eventEmitterListeners)
++      this._eventEmitterListeners = new Map();
++    if (!this._eventEmitterListeners.has(aEvent)) {
++      this._eventEmitterListeners.set(aEvent, []);
+     }
+-    this._listeners.get(aEvent).push(aListener);
++    this._eventEmitterListeners.get(aEvent).push(aListener);
+   },
+ 
+   /**
+    * Listen for the next time an event is fired.
+    *
+    * @param string aEvent
+    *        The event name to which we're connecting.
+    * @param function aListener
+@@ -49,44 +42,46 @@ EventEmitter.prototype = {
+    * registered with either on or once.
+    *
+    * @param string aEvent
+    *        The event name whose listener we're disconnecting.
+    * @param function aListener
+    *        The listener to remove.
+    */
+   removeListener: function EventEmitter_removeListener(aEvent, aListener) {
+-    let listeners = this._listeners.get(aEvent);
+-    this._listeners.set(aEvent, listeners.filter(function(l) aListener != l));
++    if (!this._eventEmitterListeners)
++      return;
++    let listeners = this._eventEmitterListeners.get(aEvent);
++    this._eventEmitterListeners.set(aEvent, listeners.filter(function(l) aListener != l));
+   },
+ 
+   /**
+    * Emit an event.  All arguments to this method will
+    * be sent to listner functions.
+    */
+   emit: function EventEmitter_emit(aEvent) {
+-    if (!this._listeners || !this._listeners.has(aEvent))
++    if (!this._eventEmitterListeners || !this._eventEmitterListeners.has(aEvent))
+       return;
+ 
+-    let originalListeners = this._listeners.get(aEvent);
+-    for (let listener of this._listeners.get(aEvent)) {
++    let originalListeners = this._eventEmitterListeners.get(aEvent);
++    for (let listener of this._eventEmitterListeners.get(aEvent)) {
+       // If the object was destroyed during event emission, stop
+       // emitting.
+-      if (!this._listeners) {
++      if (!this._eventEmitterListeners) {
+         break;
+       }
+ 
+       // If listeners were removed during emission, make sure the
+       // event handler we're going to fire wasn't removed.
+-      if (originalListeners === this._listeners.get(aEvent) ||
+-          this._listeners.get(aEvent).some(function(l) l === listener)) {
++      if (originalListeners === this._eventEmitterListeners.get(aEvent) ||
++          this._eventEmitterListeners.get(aEvent).some(function(l) l === listener)) {
+         listener.apply(null, arguments);
+       }
+     }
+   },
+ 
+   /**
+    * Destroy the references to the listeners.
+    */
+   removeAllListeners: function EventEmitter_destroy() {
+-    delete this._listeners;
++    delete this._eventEmitterListeners;
+   }
+ }

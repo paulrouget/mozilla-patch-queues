@@ -1,0 +1,87 @@
+# HG changeset patch
+# Parent 61a03572e00a4215ca4ddba6519a5177546378a5
+Bug 764318 - [responsive mode] use this.tab.selected
+
+diff --git a/browser/devtools/responsivedesign/responsivedesign.jsm b/browser/devtools/responsivedesign/responsivedesign.jsm
+--- a/browser/devtools/responsivedesign/responsivedesign.jsm
++++ b/browser/devtools/responsivedesign/responsivedesign.jsm
+@@ -52,16 +52,17 @@ let presets = [
+   {key: "1280x600", width: 1280, height: 600},
+   {key: "1920x900", width: 1920, height: 900},
+ ];
+ 
+ function ResponsiveUI(aWindow, aTab)
+ {
+   this.mainWindow = aWindow;
+   this.tab = aTab;
++  this.tabContainer = aWindow.gBrowser.tabContainer;
+   this.browser = aTab.linkedBrowser;
+   this.chromeDoc = aWindow.document;
+   this.container = aWindow.gBrowser.getBrowserContainer(this.browser);
+   this.stack = this.container.querySelector("[anonid=browserStack]");
+ 
+   // Try to load presets from prefs
+   if (Services.prefs.prefHasUserValue("devtools.responsiveUI.presets")) {
+     try {
+@@ -105,17 +106,17 @@ function ResponsiveUI(aWindow, aTab)
+   this.bound_rotate = this.rotate.bind(this);
+   this.bound_startResizing = this.startResizing.bind(this);
+   this.bound_stopResizing = this.stopResizing.bind(this);
+   this.bound_onDrag = this.onDrag.bind(this);
+   this.bound_onKeypress = this.onKeypress.bind(this);
+ 
+   // Events
+   this.tab.addEventListener("TabClose", this);
+-  this.tab.addEventListener("TabAttrModified", this);
++  this.tabContainer.addEventListener("TabSelect", this);
+   this.mainWindow.addEventListener("keypress", this.bound_onKeypress, true);
+ 
+   this.buildUI();
+   this.checkMenus();
+ 
+   try {
+     if (Services.prefs.getBoolPref("devtools.responsiveUI.rotate")) {
+       this.rotate();
+@@ -151,17 +152,17 @@ ResponsiveUI.prototype = {
+       this.stopResizing();
+ 
+     this.saveCurrentPreset();
+ 
+     // Remove listeners.
+     this.mainWindow.removeEventListener("keypress", this.bound_onKeypress, true);
+     this.menulist.removeEventListener("select", this.bound_presetSelected, true);
+     this.tab.removeEventListener("TabClose", this);
+-    this.tab.removeEventListener("TabAttrModified", this);
++    this.tabContainer.removeEventListener("TabSelect", this);
+     this.rotatebutton.removeEventListener("command", this.bound_rotate, true);
+ 
+     // Removed elements.
+     this.container.removeChild(this.toolbar);
+     this.stack.removeChild(this.resizer);
+     this.stack.removeChild(this.resizeBar);
+ 
+     // Unset the responsive mode.
+@@ -203,20 +204,20 @@ ResponsiveUI.prototype = {
+   /**
+    * Handle events
+    */
+   handleEvent: function (aEvent) {
+     switch (aEvent.type) {
+       case "TabClose":
+         this.close();
+         break;
+-      case "TabAttrModified":
+-        if (this.mainWindow.gBrowser.selectedBrowser == this.browser) {
++      case "TabSelect":
++        if (this.tab.selected) {
+           this.checkMenus();
+-        } else {
++        } else if (!this.mainWindow.gBrowser.selectedTab.responsiveUI) {
+           this.unCheckMenus();
+         }
+         break;
+     }
+   },
+ 
+   /**
+    * Check the menu items.
