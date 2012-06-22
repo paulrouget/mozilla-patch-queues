@@ -1,5 +1,5 @@
 # HG changeset patch
-# Parent ad3e3cc0ba34b352fcb95c1ef16f5ba6198a6c89
+# Parent 6659eb12f51a77dfcec729df028f206b1c7105ee
 Bug 764555 - [devtb] Implement the style for the buttons in the developer toolbar
 
 diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
@@ -61,7 +61,7 @@ diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe
 +  min-width: 78px;
 +  min-height: 22px;
 +  text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
-+  border-radius: @toolbarbuttonCornerRadius@;
++  border-radius: 3px;
 +  color: inherit;
 +  border: 1px solid transparent;
 +  margin: 0 5px;
