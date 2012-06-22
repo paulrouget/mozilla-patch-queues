@@ -1,0 +1,455 @@
+# HG changeset patch
+# Parent ad3e3cc0ba34b352fcb95c1ef16f5ba6198a6c89
+Bug 764555 - [devtb] Implement the style for the buttons in the developer toolbar
+
+diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul
++++ b/browser/base/content/browser.xul
+@@ -1031,31 +1031,31 @@
+             <hbox class="gclitoolbar-prompt">
+               <label class="gclitoolbar-prompt-label">&#187;</label>
+             </hbox>
+             <hbox class="gclitoolbar-complete-node"/>
+             <textbox class="gclitoolbar-input-node" rows="1"/>
+           </stack>
+           <toolbarbutton id="developer-toolbar-webconsole"
+                          label="&webConsoleButton.label;"
+-                         class="devtools-toolbarbutton"
++                         class="developer-toolbar-button"
+                          command="Tools:WebConsole"/>
+           <toolbarbutton id="developer-toolbar-inspector"
+                          label="&inspectorButton.label;"
+-                         class="devtools-toolbarbutton"
++                         class="developer-toolbar-button"
+                          hidden="true"
+                          command="Tools:Inspect"/>
+           <toolbarbutton id="developer-toolbar-styleeditor"
+                          label="&styleeditor.label;"
+-                         class="devtools-toolbarbutton"
++                         class="developer-toolbar-button"
+                          hidden="true"
+                          command="Tools:StyleEditor"/>
+           <toolbarbutton id="developer-toolbar-debugger"
+                          label="&scriptsButton.label;"
+-                         class="devtools-toolbarbutton"
++                         class="developer-toolbar-button"
+                          hidden="true"
+                          command="Tools:Debugger"/>
+ #ifndef XP_MACOSX
+           <toolbarbutton id="developer-toolbar-closebutton"
+                          class="devtools-closebutton"
+                          oncommand="DeveloperToolbar.hide();"
+                          tooltiptext="&devToolbarCloseButton.tooltiptext;"/>
+ #endif
+diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
+--- a/browser/themes/gnomestripe/browser.css
++++ b/browser/themes/gnomestripe/browser.css
+@@ -2518,8 +2518,52 @@ stack[anonid=browserStack][responsivemod
+ 
+ .devtools-responsiveui-resizehandle {
+   width: 16px;
+   height: 16px;
+   cursor: se-resize;
+   -moz-transform: translate(12px, 12px);
+   background-image: url("chrome://browser/skin/devtools/responsive-se-resizer.png");
+ }
++
++/* Developer Toolbar */
++
++.developer-toolbar-button {
++  -moz-appearance: none;
++  min-width: 78px;
++  min-height: 22px;
++  text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
++  border-radius: @toolbarbuttonCornerRadius@;
++  color: inherit;
++  border: 1px solid transparent;
++  margin: 0 5px;
++  padding: 0 10px;
++  list-style-image: url("chrome://browser/skin/devtools/tools-icons-small.png");
++}
++
++.developer-toolbar-button:active:hover,
++.developer-toolbar-button[checked=true] {
++  border-color: hsla(210,8%,5%,.6);
++  background: rgba(0,0,0,.6);
++  box-shadow: 0 1px 2px rgba(0,0,0,.5) inset, 0 1px 0 hsla(210,16%,76%,.15);
++}
++
++.developer-toolbar-button[checked=true] {
++  color: hsl(208,100%,60%) !important;
++  background: rgba(0,0,0,.4);
++  text-shadow: 0 0 6px hsl(208,100%,60%);
++}
++
++#developer-toolbar-webconsole {
++  -moz-image-region: rect(0, 16px, 16px, 0);
++}
++
++#developer-toolbar-inspector {
++  -moz-image-region: rect(16px, 16px, 32px, 0);
++}
++
++#developer-toolbar-styleeditor {
++  -moz-image-region: rect(32px, 16px, 48px, 0);
++}
++
++#developer-toolbar-debugger {
++  -moz-image-region: rect(48px, 16px, 64px, 0);
++}
+diff --git a/browser/themes/gnomestripe/devtools/tools-icons-small.png b/browser/themes/gnomestripe/devtools/tools-icons-small.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..644aa262ace601e4b1c99d02afb25863de71fffb
+GIT binary patch
+literal 2142
+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
+U$_f&CTL1t607*qoM6N<$f(I)A4*&oF
+
+diff --git a/browser/themes/gnomestripe/jar.mn b/browser/themes/gnomestripe/jar.mn
+--- a/browser/themes/gnomestripe/jar.mn
++++ b/browser/themes/gnomestripe/jar.mn
+@@ -155,16 +155,17 @@ browser.jar:
+   skin/classic/browser/devtools/debugger-play.png      (devtools/debugger-play.png)
+   skin/classic/browser/devtools/debugger-step-in.png   (devtools/debugger-step-in.png)
+   skin/classic/browser/devtools/debugger-step-out.png  (devtools/debugger-step-out.png)
+   skin/classic/browser/devtools/debugger-step-over.png (devtools/debugger-step-over.png)
+   skin/classic/browser/devtools/inspector-option-icon.png (devtools/inspector-option-icon.png)
+   skin/classic/browser/devtools/responsive-se-resizer.png (devtools/responsive-se-resizer.png)
+   skin/classic/browser/devtools/responsive-vertical-resizer.png (devtools/responsive-vertical-resizer.png)
+   skin/classic/browser/devtools/responsive-background.png (devtools/responsive-background.png)
++  skin/classic/browser/devtools/tools-icons-small.png     (devtools/tools-icons-small.png)
+ #ifdef MOZ_SERVICES_SYNC
+   skin/classic/browser/sync-16-throbber.png
+   skin/classic/browser/sync-16.png
+   skin/classic/browser/sync-24-throbber.png
+   skin/classic/browser/sync-32.png
+   skin/classic/browser/sync-bg.png
+   skin/classic/browser/sync-128.png
+   skin/classic/browser/sync-desktopIcon.png
+diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
+--- a/browser/themes/pinstripe/browser.css
++++ b/browser/themes/pinstripe/browser.css
+@@ -3145,17 +3145,17 @@ html|*#gcli-output-frame {
+   background-color: transparent;
+   margin-bottom: -2px;
+ }
+ 
+ .gclitoolbar-input-node,
+ .gclitoolbar-complete-node,
+ .gclitoolbar-prompt {
+   margin: 0;
+-  -moz-margin-end: 3px;
++  -moz-margin-end: 5px;
+   -moz-box-align: center;
+   padding-top: 0;
+   padding-bottom: 0;
+   padding-right: 4px;
+   border: 1px solid transparent;
+   border-radius: @toolbarbuttonCornerRadius@;
+   text-shadow: none;
+ }
+@@ -3259,8 +3259,52 @@ stack[anonid=browserStack][responsivemod
+ 
+ .devtools-responsiveui-resizehandle {
+   width: 16px;
+   height: 16px;
+   cursor: se-resize;
+   -moz-transform: translate(12px, 12px);
+   background-image: url("chrome://browser/skin/devtools/responsive-se-resizer.png");
+ }
++
++/* Developer Toolbar */
++
++.developer-toolbar-button {
++  -moz-appearance: none;
++  min-width: 78px;
++  min-height: 22px;
++  text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
++  border-radius: @toolbarbuttonCornerRadius@;
++  color: inherit;
++  border: 1px solid transparent;
++  margin: 0 5px;
++  padding: 0 10px;
++  list-style-image: url("chrome://browser/skin/devtools/tools-icons-small.png");
++}
++
++.developer-toolbar-button:active:hover,
++.developer-toolbar-button[checked=true] {
++  border-color: hsla(210,8%,5%,.6);
++  background: rgba(0,0,0,.6);
++  box-shadow: 0 1px 2px rgba(0,0,0,.5) inset, 0 1px 0 hsla(210,16%,76%,.15);
++}
++
++.developer-toolbar-button[checked=true] {
++  color: hsl(208,100%,60%) !important;
++  background: rgba(0,0,0,.4);
++  text-shadow: 0 0 6px hsl(208,100%,60%);
++}
++
++#developer-toolbar-webconsole {
++  -moz-image-region: rect(0, 16px, 16px, 0);
++}
++
++#developer-toolbar-inspector {
++  -moz-image-region: rect(16px, 16px, 32px, 0);
++}
++
++#developer-toolbar-styleeditor {
++  -moz-image-region: rect(32px, 16px, 48px, 0);
++}
++
++#developer-toolbar-debugger {
++  -moz-image-region: rect(48px, 16px, 64px, 0);
++}
+diff --git a/browser/themes/pinstripe/devtools/tools-icons-small.png b/browser/themes/pinstripe/devtools/tools-icons-small.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..644aa262ace601e4b1c99d02afb25863de71fffb
+GIT binary patch
+literal 2142
+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
+U$_f&CTL1t607*qoM6N<$f(I)A4*&oF
+
+diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
+--- a/browser/themes/pinstripe/jar.mn
++++ b/browser/themes/pinstripe/jar.mn
+@@ -196,16 +196,17 @@ browser.jar:
+   skin/classic/browser/devtools/debugger-play.png           (devtools/debugger-play.png)
+   skin/classic/browser/devtools/debugger-step-in.png        (devtools/debugger-step-in.png)
+   skin/classic/browser/devtools/debugger-step-out.png       (devtools/debugger-step-out.png)
+   skin/classic/browser/devtools/debugger-step-over.png      (devtools/debugger-step-over.png)
+   skin/classic/browser/devtools/inspector-option-icon.png   (devtools/inspector-option-icon.png)
+   skin/classic/browser/devtools/responsive-se-resizer.png   (devtools/responsive-se-resizer.png)
+   skin/classic/browser/devtools/responsive-vertical-resizer.png (devtools/responsive-vertical-resizer.png)
+   skin/classic/browser/devtools/responsive-background.png   (devtools/responsive-background.png)
++  skin/classic/browser/devtools/tools-icons-small.png       (devtools/tools-icons-small.png)
+ #ifdef MOZ_SERVICES_SYNC
+   skin/classic/browser/sync-throbber.png
+   skin/classic/browser/sync-16.png
+   skin/classic/browser/sync-32.png
+   skin/classic/browser/sync-bg.png
+   skin/classic/browser/sync-128.png
+   skin/classic/browser/sync-desktopIcon.png
+   skin/classic/browser/sync-mobileIcon.png
+diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/browser.css
+--- a/browser/themes/winstripe/browser.css
++++ b/browser/themes/winstripe/browser.css
+@@ -3192,8 +3192,52 @@ stack[anonid=browserStack][responsivemod
+ 
+ .devtools-responsiveui-resizehandle {
+   width: 16px;
+   height: 16px;
+   cursor: se-resize;
+   -moz-transform: translate(12px, 12px);
+   background-image: url("chrome://browser/skin/devtools/responsive-se-resizer.png");
+ }
++
++/* Developer Toolbar */
++
++.developer-toolbar-button {
++  -moz-appearance: none;
++  min-width: 78px;
++  min-height: 22px;
++  text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
++  border-radius: 3px;
++  color: inherit;
++  border: 1px solid transparent;
++  margin: 0 5px;
++  padding: 0 10px;
++  list-style-image: url("chrome://browser/skin/devtools/tools-icons-small.png");
++}
++
++.developer-toolbar-button:active:hover,
++.developer-toolbar-button[checked=true] {
++  border-color: hsla(210,8%,5%,.6);
++  background: rgba(0,0,0,.6);
++  box-shadow: 0 1px 2px rgba(0,0,0,.5) inset, 0 1px 0 hsla(210,16%,76%,.1);
++}
++
++.developer-toolbar-button[checked=true] {
++  color: hsl(208,100%,60%) !important;
++  background: rgba(0,0,0,.4);
++  text-shadow: 0 0 6px hsl(208,100%,60%);
++}
++
++#developer-toolbar-webconsole {
++  -moz-image-region: rect(0, 16px, 16px, 0);
++}
++
++#developer-toolbar-inspector {
++  -moz-image-region: rect(16px, 16px, 32px, 0);
++}
++
++#developer-toolbar-styleeditor {
++  -moz-image-region: rect(32px, 16px, 48px, 0);
++}
++
++#developer-toolbar-debugger {
++  -moz-image-region: rect(48px, 16px, 64px, 0);
++}
+diff --git a/browser/themes/winstripe/devtools/tools-icons-small.png b/browser/themes/winstripe/devtools/tools-icons-small.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..644aa262ace601e4b1c99d02afb25863de71fffb
+GIT binary patch
+literal 2142
+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
+U$_f&CTL1t607*qoM6N<$f(I)A4*&oF
+
+diff --git a/browser/themes/winstripe/jar.mn b/browser/themes/winstripe/jar.mn
+--- a/browser/themes/winstripe/jar.mn
++++ b/browser/themes/winstripe/jar.mn
+@@ -182,16 +182,17 @@ browser.jar:
+         skin/classic/browser/devtools/debugger-play.png             (devtools/debugger-play.png)
+         skin/classic/browser/devtools/debugger-step-in.png          (devtools/debugger-step-in.png)
+         skin/classic/browser/devtools/debugger-step-out.png         (devtools/debugger-step-out.png)
+         skin/classic/browser/devtools/debugger-step-over.png        (devtools/debugger-step-over.png)
+         skin/classic/browser/devtools/inspector-option-icon.png     (devtools/inspector-option-icon.png)
+         skin/classic/browser/devtools/responsive-se-resizer.png     (devtools/responsive-se-resizer.png)
+         skin/classic/browser/devtools/responsive-vertical-resizer.png (devtools/responsive-vertical-resizer.png)
+         skin/classic/browser/devtools/responsive-background.png     (devtools/responsive-background.png)
++        skin/classic/browser/devtools/tools-icons-small.png         (devtools/tools-icons-small.png)
+ #ifdef MOZ_SERVICES_SYNC
+         skin/classic/browser/sync-throbber.png
+         skin/classic/browser/sync-16.png
+         skin/classic/browser/sync-32.png
+         skin/classic/browser/sync-128.png
+         skin/classic/browser/sync-bg.png
+         skin/classic/browser/sync-desktopIcon.png
+         skin/classic/browser/sync-mobileIcon.png
+@@ -380,16 +381,17 @@ browser.jar:
+         skin/classic/aero/browser/devtools/debugger-play.png         (devtools/debugger-play.png)
+         skin/classic/aero/browser/devtools/debugger-step-in.png      (devtools/debugger-step-in.png)
+         skin/classic/aero/browser/devtools/debugger-step-out.png     (devtools/debugger-step-out.png)
+         skin/classic/aero/browser/devtools/debugger-step-over.png    (devtools/debugger-step-over.png)
+         skin/classic/aero/browser/devtools/inspector-option-icon.png (devtools/inspector-option-icon.png)
+         skin/classic/aero/browser/devtools/responsive-se-resizer.png (devtools/responsive-se-resizer.png)
+         skin/classic/aero/browser/devtools/responsive-vertical-resizer.png (devtools/responsive-vertical-resizer.png)
+         skin/classic/aero/browser/devtools/responsive-background.png (devtools/responsive-background.png)
++        skin/classic/aero/browser/devtools/tools-icons-small.png     (devtools/tools-icons-small.png)
+ #ifdef MOZ_SERVICES_SYNC
+         skin/classic/aero/browser/sync-throbber.png
+         skin/classic/aero/browser/sync-16.png
+         skin/classic/aero/browser/sync-32.png
+         skin/classic/aero/browser/sync-128.png
+         skin/classic/aero/browser/sync-bg.png
+         skin/classic/aero/browser/sync-desktopIcon.png
+         skin/classic/aero/browser/sync-mobileIcon.png
