@@ -1,0 +1,720 @@
+# HG changeset patch
+# Parent bdc9d9491026530d88bafa29b63b6c8e323089c0
+Bug 707906 - Dock the Style Editor
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -1070,16 +1070,18 @@ pref("devtools.tilt.outro_transition", t
+ pref("devtools.ruleview.enabled", true);
+ 
+ // Enable the Scratchpad tool.
+ pref("devtools.scratchpad.enabled", true);
+ 
+ // Enable the Style Editor.
+ pref("devtools.styleeditor.enabled", true);
+ pref("devtools.styleeditor.transitions", true);
++pref("devtools.styleeditor.docked", true);
++pref("devtools.styleeditor.height", 240);
+ 
+ // Enable tools for Chrome development.
+ pref("devtools.chrome.enabled", false);
+ 
+ // Display the introductory text
+ pref("devtools.gcli.hideIntro", false);
+ 
+ // How eager are we to show help: never=1, sometimes=2, always=3
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -7369,30 +7369,30 @@ var StyleEditor = {
+    * Opens the style editor. If the UI is already open, it will be focused.
+    *
+    * @param {CSSStyleSheet} [aSelectedStyleSheet] default Stylesheet.
+    * @param {Number} [aLine] Line to which the caret should be moved (one-indexed).
+    * @param {Number} [aCol] Column to which the caret should be moved (one-indexed).
+    */
+   openChrome: function SE_openChrome(aSelectedStyleSheet, aLine, aCol)
+   {
+-    let contentWindow = gBrowser.selectedBrowser.contentWindow;
++    let contentWindow = gBrowser.contentWindow;
+     let win = this.StyleEditorManager.getEditorForWindow(contentWindow);
+     if (win) {
+       this.StyleEditorManager.selectEditor(win);
+       return win;
+     } else {
+-      return this.StyleEditorManager.newEditor(contentWindow,
++      return this.StyleEditorManager.newEditor(window, contentWindow,
+                                                aSelectedStyleSheet, aLine, aCol);
+     }
+   },
+ 
+   toggle: function SE_toggle()
+   {
+-    this.StyleEditorManager.toggleEditor(gBrowser.contentWindow);
++    this.StyleEditorManager.toggleEditor(window, gBrowser.contentWindow);
+   }
+ };
+ 
+ XPCOMUtils.defineLazyGetter(StyleEditor, "StyleEditorManager", function() {
+   let tmp = {};
+   Cu.import("resource:///modules/devtools/StyleEditor.jsm", tmp);
+   return new tmp.StyleEditorManager(window);
+ });
+diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrowser.xml
+--- a/browser/base/content/tabbrowser.xml
++++ b/browser/base/content/tabbrowser.xml
+@@ -21,22 +21,24 @@
+ 
+     <content>
+       <xul:stringbundle anonid="tbstringbundle" src="chrome://browser/locale/tabbrowser.properties"/>
+       <xul:tabbox anonid="tabbox" class="tabbrowser-tabbox"
+                   flex="1" eventnode="document" xbl:inherits="handleCtrlPageUpDown"
+                   onselect="if (event.target.localName == 'tabpanels') this.parentNode.updateCurrentBrowser();">
+         <xul:tabpanels flex="1" class="plain" selectedIndex="0" anonid="panelcontainer">
+           <xul:notificationbox flex="1">
+-            <xul:vbox flex="1" anonid="browserContainer">
+-              <xul:stack flex="1" anonid="browserStack">
+-                <xul:browser type="content-primary" message="true" disablehistory="true"
+-                             xbl:inherits="tooltip=contenttooltip,contextmenu=contentcontextmenu,autocompletepopup"/>
+-              </xul:stack>
+-            </xul:vbox>
++            <xul:hbox flex="1" anonid="devtoolsContainer">
++              <xul:vbox flex="1" anonid="browserContainer">
++                <xul:stack flex="1" anonid="browserStack">
++                  <xul:browser type="content-primary" message="true" disablehistory="true"
++                              xbl:inherits="tooltip=contenttooltip,contextmenu=contentcontextmenu,autocompletepopup"/>
++                </xul:stack>
++              </xul:vbox>
++            </xul:hbox>
+           </xul:notificationbox>
+         </xul:tabpanels>
+       </xul:tabbox>
+       <children/>
+     </content>
+     <implementation implements="nsIDOMEventListener">
+ 
+       <property name="tabContextMenu" readonly="true"
+@@ -290,16 +292,25 @@
+         ]]>
+         </body>
+       </method>
+ 
+       <method name="getNotificationBox">
+         <parameter name="aBrowser"/>
+         <body>
+           <![CDATA[
++            return this.getDevtoolsContainer(aBrowser).parentNode;
++          ]]>
++        </body>
++      </method>
++
++      <method name="getDevtoolsContainer">
++        <parameter name="aBrowser"/>
++        <body>
++          <![CDATA[
+             return this.getBrowserContainer(aBrowser).parentNode;
+           ]]>
+         </body>
+       </method>
+ 
+       <method name="getBrowserContainer">
+         <parameter name="aBrowser"/>
+         <body>
+@@ -1291,29 +1302,37 @@
+             var stack = document.createElementNS(
+                                     "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+                                     "stack");
+             stack.setAttribute("anonid", "browserStack");
+             stack.appendChild(b);
+             stack.setAttribute("flex", "1");
+ 
+             // Create the browserContainer
+-            var box = document.createElementNS(
++            var browserContainer = document.createElementNS(
+                                     "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+                                     "vbox");
+-            box.setAttribute("anonid", "browserContainer");
+-            box.appendChild(stack);
+-            box.setAttribute("flex", "1");
++            browserContainer.setAttribute("anonid", "browserContainer");
++            browserContainer.appendChild(stack);
++            browserContainer.setAttribute("flex", "1");
++
++            // Create the browserDevtools
++            var devtoolsContainer = document.createElementNS(
++                                      "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
++                                      "hbox");
++            devtoolsContainer.setAttribute("anonid", "browserDevtools");
++            devtoolsContainer.appendChild(browserContainer);
++            devtoolsContainer.setAttribute("flex", "1");
+ 
+             // Add the Message and the Browser to the box
+             var notificationbox = document.createElementNS(
+                                     "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+                                     "notificationbox");
+             notificationbox.setAttribute("flex", "1");
+-            notificationbox.appendChild(box);
++            notificationbox.appendChild(devtoolsContainer);
+ 
+             var position = this.tabs.length - 1;
+             var uniqueId = "panel" + Date.now() + position;
+             notificationbox.id = uniqueId;
+             t.linkedPanel = uniqueId;
+             t.linkedBrowser = b;
+             t._tPos = position;
+             if (t.previousSibling.selected)
+@@ -1734,17 +1753,17 @@
+             // browser removal. So we remove the browser and the panel in two
+             // steps.
+ 
+             var panel = this.getNotificationBox(browser);
+ 
+             // This will unload the document. An unload handler could remove
+             // dependant tabs, so it's important that the tabbrowser is now in
+             // a consistent state (tab removed, tab positions updated, etc.).
+-            panel.removeChild(this.getBrowserContainer(browser));
++            panel.removeChild(this.getDevtoolsContainer(browser));
+ 
+             // Release the browser in case something is erroneously holding a
+             // reference to the tab after its removal.
+             aTab.linkedBrowser = null;
+ 
+             // As the browser is removed, the removal of a dependent document can
+             // cause the whole window to close. So at this point, it's possible
+             // that the binding is destructed.
+@@ -2505,17 +2524,17 @@
+               }
+               break;
+           }
+         ]]></body>
+       </method>
+ 
+       <constructor>
+         <![CDATA[
+-          this.mCurrentBrowser = this.mPanelContainer.firstChild.firstChild.firstChild.firstChild;
++          this.mCurrentBrowser = this.mPanelContainer.firstChild.firstChild.firstChild.firstChild.firstChild;
+           this.mCurrentTab = this.tabContainer.firstChild;
+           document.addEventListener("keypress", this, false);
+           window.addEventListener("sizemodechange", this, false);
+ 
+           var uniqueId = "panel" + Date.now();
+           this.mPanelContainer.childNodes[0].id = uniqueId;
+           this.mCurrentTab.linkedPanel = uniqueId;
+           this.mCurrentTab._tPos = 0;
+diff --git a/browser/base/content/test/browser_bug462673.js b/browser/base/content/test/browser_bug462673.js
+--- a/browser/base/content/test/browser_bug462673.js
++++ b/browser/base/content/test/browser_bug462673.js
+@@ -10,17 +10,17 @@ var runs = [
+     var newBrowser = newTab.linkedBrowser;
+     tabbrowser.removeTab(tab);
+     ok(!win.closed, "Window stays open");
+     if (!win.closed) {
+       is(tabbrowser.tabContainer.childElementCount, 1, "Window has one tab");
+       is(tabbrowser.browsers.length, 1, "Window has one browser");
+       is(tabbrowser.selectedTab, newTab, "Remaining tab is selected");
+       is(tabbrowser.selectedBrowser, newBrowser, "Browser for remaining tab is selected");
+-      is(tabbrowser.mTabBox.selectedPanel, newBrowser.parentNode.parentNode.parentNode, "Panel for remaining tab is selected");
++      is(tabbrowser.mTabBox.selectedPanel, newBrowser.parentNode.parentNode.parentNode.parentNode, "Panel for remaining tab is selected");
+     }
+   }
+ ];
+ 
+ function test() {
+   waitForExplicitFinish();
+   runOneTest();
+ }
+diff --git a/browser/devtools/jar.mn b/browser/devtools/jar.mn
+--- a/browser/devtools/jar.mn
++++ b/browser/devtools/jar.mn
+@@ -4,17 +4,17 @@
+ 
+ browser.jar:
+     content/browser/inspector.html                (highlighter/inspector.html)
+     content/browser/NetworkPanel.xhtml            (webconsole/NetworkPanel.xhtml)
+     content/browser/devtools/HUDService-content.js (webconsole/HUDService-content.js)
+ *   content/browser/scratchpad.xul                (scratchpad/scratchpad.xul)
+     content/browser/scratchpad.js                 (scratchpad/scratchpad.js)
+     content/browser/splitview.css                 (shared/splitview.css)
+-    content/browser/styleeditor.xul               (styleeditor/styleeditor.xul)
++*   content/browser/styleeditor.xul               (styleeditor/styleeditor.xul)
+     content/browser/styleeditor.css               (styleeditor/styleeditor.css)
+     content/browser/devtools/csshtmltree.xul      (styleinspector/csshtmltree.xul)
+     content/browser/devtools/cssruleview.xul      (styleinspector/cssruleview.xul)
+     content/browser/devtools/styleinspector.css   (styleinspector/styleinspector.css)
+     content/browser/devtools/layoutview/view.xhtml  (layoutview/view.xhtml)
+     content/browser/devtools/layoutview/view.css  (layoutview/view.css)
+     content/browser/orion.js                      (sourceeditor/orion/orion.js)
+ *   content/browser/source-editor-overlay.xul     (sourceeditor/source-editor-overlay.xul)
+diff --git a/browser/devtools/shared/SplitView.jsm b/browser/devtools/shared/SplitView.jsm
+--- a/browser/devtools/shared/SplitView.jsm
++++ b/browser/devtools/shared/SplitView.jsm
+@@ -92,16 +92,23 @@ SplitView.prototype = {
+   /**
+     * Retrieve the root element.
+     *
+     * @return DOMElement
+     */
+   get rootElement() this._root,
+ 
+   /**
++    * Retrieve the number of summary elements.
++    *
++    * @return number
++    */
++  get summaryCount() {return this._nav.querySelectorAll("* > li").length},
++
++  /**
+     * Retrieve the active item's summary element or null if there is none.
+     *
+     * @return DOMElement
+     */
+   get activeSummary() this._activeSummary,
+ 
+   /**
+     * Set the active item's summary element.
+diff --git a/browser/devtools/styleeditor/StyleEditor.jsm b/browser/devtools/styleeditor/StyleEditor.jsm
+--- a/browser/devtools/styleeditor/StyleEditor.jsm
++++ b/browser/devtools/styleeditor/StyleEditor.jsm
+@@ -1167,24 +1167,16 @@ function setupBracketCompletion(aSourceE
+ 
+ function StyleEditorManager(aWindow) {
+   this.chromeWindow = aWindow;
+   this.listenToTabs();
+   this.editors = new WeakMap();
+ }
+ 
+ StyleEditorManager.prototype = {
+-
+-  /**
+-   * Get the editor for a specific content window.
+-   */
+-  getEditorForWindow: function SEM_getEditorForWindow(aContentWindow) {
+-    return this.editors.get(aContentWindow);
+-  },
+-
+   /**
+    * Focus the editor and select a stylesheet.
+    *
+    * @param {CSSStyleSheet} [aSelectedStyleSheet] default Stylesheet.
+    * @param {Number} [aLine] Line to which the caret should be moved (one-indexed).
+    * @param {Number} [aCol] Column to which the caret should be moved (one-indexed).
+    */
+   selectEditor: function SEM_selectEditor(aWindow, aSelectedStyleSheet, aLine, aCol) {
+@@ -1197,82 +1189,171 @@ StyleEditorManager.prototype = {
+   /**
+    * Open a new editor.
+    *
+    * @param {Window} content window.
+    * @param {CSSStyleSheet} [aSelectedStyleSheet] default Stylesheet.
+    * @param {Number} [aLine] Line to which the caret should be moved (one-indexed).
+    * @param {Number} [aCol] Column to which the caret should be moved (one-indexed).
+    */
+-  newEditor: function SEM_newEditor(aContentWindow, aSelectedStyleSheet, aLine, aCol) {
++  newEditor: function SEM_newEditor(aBrowserWindow, aContentWindow, aSelectedStyleSheet, aLine, aCol) {
+     const CHROME_URL = "chrome://browser/content/styleeditor.xul";
+     const CHROME_WINDOW_FLAGS = "chrome,centerscreen,resizable,dialog=no";
+ 
+     let args = {
+       contentWindow: aContentWindow,
+       selectedStyleSheet: aSelectedStyleSheet,
+       line: aLine,
+-      col: aCol
++      col: aCol,
++      manager: this,
+     };
+-    args.wrappedJSObject = args;
+-    let chromeWindow = Services.ww.openWindow(null, CHROME_URL, "_blank",
+-                                              CHROME_WINDOW_FLAGS, args);
++
++    let chromeWindow;
++
++    let docked = Services.prefs.getBoolPref("devtools.styleeditor.docked");
++
++    if (!docked) {
++      chromeWindow = Services.ww.openWindow(null, CHROME_URL, "_blank",
++                                                CHROME_WINDOW_FLAGS, args);
++      chromeWindow.onload = function() {
++        chromeWindow.init(args);
++      }
++      this.editors.set(aContentWindow, {editor: chromeWindow,
++                                        ownerWindow: aBrowserWindow,
++                                        isDocked: false});
++    } else {
++      let browserDoc = aBrowserWindow.document;
++      //let splitter = browserDoc.createElement("splitter");
++      //splitter.setAttribute("class", "devtools-horizontal-splitter");
++
++      let frame = browserDoc.createElement("iframe");
++      frame.height = Services.prefs.getIntPref("devtools.styleeditor.height");
++      frame.width = 300;
++
++      let gBrowser = aBrowserWindow.gBrowser;
++      let nbox = gBrowser.getDevtoolsContainer(gBrowser.selectedBrowser);
++      //nbox.appendChild(splitter);
++      nbox.appendChild(frame);
++
++      frame.setAttribute("src", CHROME_URL);
++
++      chromeWindow = frame.contentWindow;
++
++
++      chromeWindow.onload = function() {
++        chromeWindow.init(args);
++      }
++
++      this.editors.set(aContentWindow, {editor: chromeWindow,
++                                        ownerWindow: aBrowserWindow,
++                                        isDocked: true,
++                                        frame: frame,
++                                        splitter: splitter});
++    }
+ 
+     chromeWindow.onunload = function() {
+       if (chromeWindow.location == CHROME_URL) {
+         // not about:blank being unloaded
+         this.unregisterEditor(aContentWindow);
+       }
+     }.bind(this);
+     chromeWindow.focus();
+ 
+-    this.editors.set(aContentWindow, chromeWindow);
+-
+     this.refreshCommand();
+ 
+     return chromeWindow;
+   },
+ 
+   /**
++   * Close an editor.
++   */
++  closeEditor: function SEM_closeEditor(aContentWindow) {
++    if (this.editors.has(aContentWindow)) {
++      let {editor: editor,
++           isDocked: isDocked,
++           frame: frame,
++           splitter: splitter} = this.editors.get(aContentWindow);
++
++      if (isDocked) {
++        let parent = frame.parentNode;
++        if (parent) {
++          parent.removeChild(splitter);
++          parent.removeChild(frame);
++        }
++      } else {
++        editor.close();
++      }
++    }
++  },
++
++  undock: function SEM_undock(aContentWindow) {
++    if (this.editors.has(aContentWindow)) {
++      let {isDocked: isDocked,
++           ownerWindow: ownerWindow,
++           editor: editor} = this.editors.get(aContentWindow);
++      if (isDocked) {
++        Services.prefs.setBoolPref("devtools.styleeditor.docked", false);
++        editor.addEventListener("unload", function onClose(aEvent) {
++          editor.removeEventListener("unload", onClose, false);
++          this.newEditor(ownerWindow, aContentWindow);
++        }.bind(this), false);
++        this.closeEditor(aContentWindow);
++      }
++    }
++  },
++
++  dock: function SEM_dock(aContentWindow) {
++    if (this.editors.has(aContentWindow)) {
++      let {isDocked: isDocked,
++           ownerWindow: ownerWindow,
++           editor: editor} = this.editors.get(aContentWindow);
++      if (!isDocked) {
++        Services.prefs.setBoolPref("devtools.styleeditor.docked", true);
++        editor.addEventListener("unload", function onClose(aEvent) {
++          editor.removeEventListener("unload", onClose, false);
++          this.newEditor(ownerWindow, aContentWindow);
++        }.bind(this), false);
++        this.closeEditor(aContentWindow);
++      }
++    }
++
++  },
++
++  /**
+    * Toggle an editor.
+    *
+    * @param {Window} associated content window.
+    */
+-  toggleEditor: function SEM_toggleEditor(aContentWindow) {
+-    let editor = this.getEditorForWindow(aContentWindow);
+-    if (editor) {
+-      editor.close();
++  toggleEditor: function SEM_toggleEditor(aBrowserWindow, aContentWindow) {
++    if (this.editors.has(aContentWindow)) {
++      this.closeEditor(aContentWindow);
+     } else {
+-      this.newEditor(aContentWindow);
++      this.newEditor(aBrowserWindow, aContentWindow);
+     }
+   },
+ 
+   /**
+    * Close an editor.
+    *
+    * @param {Window} associated content window.
+    */
+   unregisterEditor: function SEM_unregisterEditor(aContentWindow) {
+-    let chromeWindow = this.editors.get(aContentWindow);
+-    if (chromeWindow) {
+-      chromeWindow.close();
+-    }
++    this.closeEditor(aContentWindow);
+     this.editors.delete(aContentWindow);
+     this.refreshCommand();
+   },
+ 
+   /**
+    * Update the status of tool's menuitems and buttons.
+    */
+   refreshCommand: function SEM_refreshCommand() {
+     let contentWindow = this.chromeWindow.gBrowser.contentWindow;
+     let command = this.chromeWindow.document.getElementById("Tools:StyleEditor");
+ 
+-    let win = this.getEditorForWindow(contentWindow);
+-    if (win) {
++    if (this.editors.has(contentWindow)) {
+       command.setAttribute("checked", "true");
+     } else {
+       command.setAttribute("checked", "false");
+     }
+   },
+ 
+   /**
+    * Trigger refreshCommand when needed.
+diff --git a/browser/devtools/styleeditor/StyleEditorChrome.jsm b/browser/devtools/styleeditor/StyleEditorChrome.jsm
+--- a/browser/devtools/styleeditor/StyleEditorChrome.jsm
++++ b/browser/devtools/styleeditor/StyleEditorChrome.jsm
+@@ -27,23 +27,24 @@ const STYLE_EDITOR_TEMPLATE = "styleshee
+  * Manages the sheet selector, history, and opened editor(s) for the attached
+  * content window.
+  *
+  * @param DOMElement aRoot
+  *        Element that owns the chrome UI.
+  * @param DOMWindow aContentWindow
+  *        Content DOMWindow to attach to this chrome.
+  */
+-function StyleEditorChrome(aRoot, aContentWindow)
++function StyleEditorChrome(aRoot, aContentWindow, aManager)
+ {
+   assert(aRoot, "Argument 'aRoot' is required to initialize StyleEditorChrome.");
+ 
+   this._root = aRoot;
+   this._document = this._root.ownerDocument;
+   this._window = this._document.defaultView;
++  this._manager = aManager;
+ 
+   this._editors = [];
+   this._listeners = []; // @see addChromeListener
+ 
+   this._contentWindow = null;
+   this._isContentAttached = false;
+ 
+   let initializeUI = function (aEvent) {
+@@ -170,16 +171,40 @@ StyleEditorChrome.prototype = {
+       if (aEditor.styleSheetIndex >= 0) {
+         editors[aEditor.styleSheetIndex] = aEditor;
+       }
+     });
+     return editors;
+   },
+ 
+   /**
++   * Close the chrome window
++   */
++  close: function SEC_close()
++  {
++    this._manager.closeEditor(this.contentWindow);
++  },
++
++  /**
++   * Detach the UI from the browser window.
++   */
++   undock: function SEC_undock()
++   {
++     this._manager.undock(this.contentWindow);
++   },
++
++  /**
++   * Attach the UI to the browser window.
++   */
++   dock: function SEC_dock()
++   {
++     this._manager.dock(this.contentWindow);
++   },
++
++  /**
+    * Add a listener for StyleEditorChrome events.
+    *
+    * The listener implements IStyleEditorChromeListener := {
+    *   onContentAttach:        Called when a content window has been attached.
+    *                           All editors are instantiated, though they might
+    *                           not be loaded yet.
+    *                           Arguments: (StyleEditorChrome aChrome)
+    *                           @see contentWindow
+@@ -364,17 +389,17 @@ StyleEditorChrome.prototype = {
+ 
+         // If a line or column was specified we move the caret appropriately.
+         if (setCaret) {
+           aEditor.sourceEditor.setCaretPosition(aLine - 1, aCol - 1);
+         }
+       }
+     }.bind(this);
+ 
+-    if (!this.editors.length) {
++    if (this._view.summaryCount == 0) {
+       // We are in the main initialization phase so we wait for the editor
+       // containing the target stylesheet to be added and select the target
+       // stylesheet, optionally moving the cursor to a selected line.
+       this.addChromeListener({
+         onEditorAdded: function SEC_selectSheet_onEditorAdded(aChrome, aEditor) {
+           if ((!aSheet && aEditor.styleSheetIndex == 0) ||
+               aEditor.styleSheet == aSheet) {
+             aChrome.removeChromeListener(this);
+diff --git a/browser/devtools/styleeditor/styleeditor.xul b/browser/devtools/styleeditor/styleeditor.xul
+--- a/browser/devtools/styleeditor/styleeditor.xul
++++ b/browser/devtools/styleeditor/styleeditor.xul
+@@ -40,31 +40,36 @@
+     <xul:menuseparator/>
+     <xul:menuitem id="se-cMenu-gotoLine"/>
+   </xul:menupopup>
+ </xul:popupset>
+ 
+ <xul:commandset id="editMenuCommands"/>
+ <xul:commandset id="sourceEditorCommands"/>
+ <xul:commandset id="style-editor-commandset">
+-  <xul:command id="style-editor-cmd-close" oncommand="window.close();"/>
++  <xul:command id="style-editor-cmd-close" oncommand="styleEditorChrome.close()"/>
+ </xul:commandset>
+ 
+ <xul:keyset id="sourceEditorKeys"/>
+ <xul:keyset id="style-editor-keyset">
+   <xul:key id="style-editor-key-close"
+            key="&closeCmd.key;"
+            command="style-editor-cmd-close"
+            modifiers="accel"/>
+ </xul:keyset>
+ 
+ <xul:box id="style-editor-chrome" class="splitview-root loading">
+   <xul:box class="splitview-controller">
+     <xul:box class="splitview-main">
+       <xul:toolbar class="devtools-toolbar">
++#ifdef XP_MACOSX
++        <xul:toolbarbutton id="close"
++                    class="devtools-closebutton"
++                    command="style-editor-cmd-close"/>
++#endif
+         <xul:toolbarbutton class="style-editor-newButton devtools-toolbarbutton"
+                     accesskey="&newButton.accesskey;"
+                     tooltiptext="&newButton.tooltip;"
+                     label="&newButton.label;"
+                     disabled="true"/>
+         <xul:toolbarbutton class="style-editor-importButton devtools-toolbarbutton"
+                     accesskey="&importButton.accesskey;"
+                     tooltiptext="&importButton.tooltip;"
+@@ -108,25 +113,43 @@
+     <xul:box id="splitview-tpl-details-stylesheet" class="splitview-details">
+       <xul:resizer class="splitview-portrait-resizer"
+                    dir="bottom"
+                    element="splitview-resizer-target"/>
+       <xul:toolbar id="splitview-details-toolbar" class="devtools-toolbar">
+         <xul:resizer class="splitview-landscape-resizer"
+                      dir="bottomend"
+                      element="splitview-resizer-target"/>
++        <xul:spacer flex="1"/>
++        <xul:toolbarbutton class="devtools-toolbarbutton"
++                    id="undock-button"
++                    tooltiptext="undock"
++                    oncommand="styleEditorChrome.undock()"
++                    label="undock"/>
++        <xul:toolbarbutton class="devtools-toolbarbutton"
++                    id="dock-button"
++                    tooltiptext="dock"
++                    oncommand="styleEditorChrome.dock()"
++                    label="dock"/>
++#ifndef XP_MACOSX
++        <xul:toolbarbutton id="close"
++                    class="devtools-closebutton"
++                    command="style-editor-cmd-close"/>
++#endif
+       </xul:toolbar>
+       <xul:box class="stylesheet-editor-input textbox"
+                data-placeholder="&editorTextbox.placeholder;"/>
+     </xul:box>
+   </div> <!-- #splitview-templates -->
+ </xul:box>   <!-- .splitview-root -->
+ 
+ <xul:script type="application/javascript"><![CDATA[
+-Components.utils.import("resource:///modules/devtools/StyleEditorChrome.jsm");
+-let chromeRoot = document.getElementById("style-editor-chrome");
+-let args = window.arguments[0].wrappedJSObject;
+-let contentWindow = args.contentWindow;
+-let chrome = new StyleEditorChrome(chromeRoot, contentWindow);
+-chrome.selectStyleSheet(args.selectedStyleSheet, args.line, args.col);
+-window.styleEditorChrome = chrome;
++window.init = function(args) {
++  Components.utils.import("resource:///modules/devtools/StyleEditorChrome.jsm");
++  let chromeRoot = document.getElementById("style-editor-chrome");
++  let chrome = new StyleEditorChrome(chromeRoot,
++                                     args.contentWindow,
++                                     args.manager);
++  window.styleEditorChrome = chrome;
++  chrome.selectStyleSheet(args.selectedStyleSheet, args.line, args.col);
++}
+ ]]></xul:script>
+ </xul:window>
+diff --git a/browser/themes/pinstripe/devtools/splitview.css b/browser/themes/pinstripe/devtools/splitview.css
+--- a/browser/themes/pinstripe/devtools/splitview.css
++++ b/browser/themes/pinstripe/devtools/splitview.css
+@@ -63,42 +63,24 @@
+                     -moz-linear-gradient(left, black, black),
+                     -moz-linear-gradient(hsl(206,61%,40%), hsl(206,61%,31%));
+   background-repeat: no-repeat, no-repeat, repeat-x;
+   background-position: center left, top left, top right;
+ }
+ 
+ /* Toolbars */
+ 
+-.devtools-toolbar {
+-  height: 26px;
+-  background-origin: border-box;
+-  background-clip: border-box;
+-  border-top: 1px solid hsla(210,8%,5%,.5);
+-  border-bottom: 1px solid hsla(210,8%,5%,.65);
+-  padding: 3px;
+-}
+-
+ .splitview-main > toolbar:-moz-locale-dir(ltr) {
+   border-right: 1px solid hsla(210,8%,5%,.5);
+ }
+ 
+ .splitview-main > toolbar:-moz-locale-dir(rtl) {
+   border-left: 1px solid hsla(210,8%,5%,.5);
+ }
+ 
+-.devtools-toolbarbutton {
+-  font-size: 11px;
+-  padding: 0 8px;
+-  width: auto;
+-  min-width: 48px;
+-  min-height: 0;
+-}
+-
+-
+ /* Resizers */
+ 
+ .splitview-landscape-resizer {
+   -moz-appearance: none;
+   width: 7px;
+   background-image: -moz-linear-gradient(left, black 1px, rgba(255,255,255,0.2) 1px);
+   background-size: 2px 10px;
+   background-clip: padding-box;

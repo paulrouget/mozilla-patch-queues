@@ -1,0 +1,126 @@
+# HG changeset patch
+# Parent d9e78d7def12e59a301fbe90faaba250ffd26781
+
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -888,34 +888,49 @@ InspectorUI.prototype = {
+   },
+ 
+   /**
+    * Clear all pseudo-class locks applied to elements in the node hierarchy
+    */
+   clearPseudoClassLocks: function IUI_clearPseudoClassLocks()
+   {
+     this.breadcrumbs.nodeHierarchy.forEach(function(crumb) {
+-      DOMUtils.clearPseudoClassLocks(crumb.node);
+-    });
++      if (true || this.isNodeConnected(crumb.node)) {
++        DOMUtils.clearPseudoClassLocks(crumb.node);
++      }
++    }.bind(this));
+   },
+ 
+   /**
+    * Called when the highlighted node is changed by a tool.
+    *
+    * @param object aUpdater
+    *        The tool that triggered the update (if any), that tool's
+    *        onChanged will not be called.
+    */
+   nodeChanged: function IUI_nodeChanged(aUpdater)
+   {
+     this.highlighter.invalidateSize();
+     this.breadcrumbs.updateSelectors();
+     this._currentInspector._emit("change", aUpdater);
+   },
+ 
++  /**
++   * Check if a node and its document are still alive
++   * and attached to the window.
++   *
++   * @param aNode
++   */
++  isNodeConnected: function IUI_isNodeConnected(aNode)
++  {
++    return (aNode.ownerDocument && aNode.ownerDocument.defaultView &&
++          !(aNode.compareDocumentPosition(aNode.ownerDocument.documentElement) &
++            aNode.DOCUMENT_POSITION_DISCONNECTED));
++  },
++
+   /////////////////////////////////////////////////////////////////////////
+   //// Event Handling
+ 
+   highlighterReady: function IUI_highlighterReady()
+   {
+     let self = this;
+ 
+     this.highlighter.addListener("locked", function() {
+diff --git a/browser/devtools/highlighter/test/browser_inspector_destroyselection.html b/browser/devtools/highlighter/test/browser_inspector_destroyselection.html
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/highlighter/test/browser_inspector_destroyselection.html
+@@ -0,0 +1,4 @@
++<!DOCTYPE html>
++
++<h1>mop</h1>
++<iframe src="data:text/html;charset=utf-8,<!DOCTYPE HTML>%0D%0A<h1>kill me<span>.</span><%2Fh1>"></iframe>
+diff --git a/browser/devtools/highlighter/test/browser_inspector_destroyselection.js b/browser/devtools/highlighter/test/browser_inspector_destroyselection.js
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/highlighter/test/browser_inspector_destroyselection.js
+@@ -0,0 +1,54 @@
++/* Any copyright is dedicated to the Public Domain.
++   http://creativecommons.org/publicdomain/zero/1.0/ */
++
++function test()
++{
++  waitForExplicitFinish();
++  ignoreAllUncaughtExceptions();
++
++  let node, iframe;
++
++  gBrowser.selectedTab = gBrowser.addTab();
++  gBrowser.selectedBrowser.addEventListener("load", function onload() {
++    gBrowser.selectedBrowser.removeEventListener("load", onload, true);
++    waitForFocus(setupTest, content);
++  }, true);
++
++  content.location = "http://mochi.test:8888/browser/browser/devtools/highlighter/test/browser_inspector_destroyselection.html";
++
++  function setupTest()
++  {
++    iframe = content.document.querySelector("iframe");
++    node = iframe.contentDocument.querySelector("span");
++    InspectorUI.highlighter.addListener("nodeselected", runTests)
++    InspectorUI.openInspectorUI(node);
++  }
++
++  function runTests()
++  {
++    InspectorUI.highlighter.removeListener("nodeselected", runTests)
++    ok(InspectorUI.selection, node);
++    node = null;
++    iframe.parentNode.removeChild(iframe);
++    iframe = null;
++
++    Services.obs.addObserver(testBreadcrumbs,
++                             InspectorUI.INSPECTOR_NOTIFICATIONS.CLOSED, false);
++
++    executeSoon(function() {
++      InspectorUI.closeInspectorUI();
++    });
++  }
++
++  function testBreadcrumbs()
++  {
++    Services.obs.removeObserver(finishUp, InspectorUI.INSPECTOR_NOTIFICATIONS.CLOSED);
++    is(InspectorUI.breadcrumbs, undefined, "Breadcrumbs destroyed");
++  }
++
++  function finishUp() {
++    gBrowser.removeCurrentTab();
++    finish();
++  }
++}
++

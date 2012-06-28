@@ -1,5 +1,6 @@
 # HG changeset patch
-# Parent 61a03572e00a4215ca4ddba6519a5177546378a5
+# Parent d9e78d7def12e59a301fbe90faaba250ffd26781
+Bug 723904 - Implement a EventEmiter mechanism that can be used by any tool
 
 diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
 --- a/browser/devtools/highlighter/inspector.jsm
@@ -160,22 +161,13 @@ diff --git a/browser/devtools/shared/EventEmitter.jsm b/browser/devtools/shared/
 new file mode 100644
 --- /dev/null
 +++ b/browser/devtools/shared/EventEmitter.jsm
-@@ -0,0 +1,92 @@
+@@ -0,0 +1,87 @@
 +var EXPORTED_SYMBOLS = ["EventEmitter"];
 +
 +function EventEmitter() {
 +}
 +
 +EventEmitter.prototype = {
-+  /**
-+   * We use Map() to store the listeners.
-+   */
-+  get _listeners() {
-+    if (!this._listenersMap)
-+      this._listenersMap = new Map();
-+    return this._listenersMap;
-+  },
-+
 +  /**
 +   * Connect a listener.
 +   *
@@ -185,10 +177,12 @@ new file mode 100644
 +   *        Called when the event is fired.
 +   */
 +  on: function EventEmitter_on(aEvent, aListener) {
-+    if (!this._listeners.has(aEvent)) {
-+      this._listeners.set(aEvent, []);
++    if (!this._eventEmitterListeners)
++      this._eventEmitterListeners = new Map();
++    if (!this._eventEmitterListeners.has(aEvent)) {
++      this._eventEmitterListeners.set(aEvent, []);
 +    }
-+    this._listeners.get(aEvent).push(aListener);
++    this._eventEmitterListeners.get(aEvent).push(aListener);
 +  },
 +
 +  /**
@@ -217,8 +211,10 @@ new file mode 100644
 +   *        The listener to remove.
 +   */
 +  removeListener: function EventEmitter_removeListener(aEvent, aListener) {
-+    let listeners = this._listeners.get(aEvent);
-+    this._listeners.set(aEvent, listeners.filter(function(l) aListener != l));
++    if (!this._eventEmitterListeners)
++      return;
++    let listeners = this._eventEmitterListeners.get(aEvent);
++    this._eventEmitterListeners.set(aEvent, listeners.filter(function(l) aListener != l));
 +  },
 +
 +  /**
@@ -226,21 +222,21 @@ new file mode 100644
 +   * be sent to listner functions.
 +   */
 +  emit: function EventEmitter_emit(aEvent) {
-+    if (!this._listeners || !this._listeners.has(aEvent))
++    if (!this._eventEmitterListeners || !this._eventEmitterListeners.has(aEvent))
 +      return;
 +
-+    let originalListeners = this._listeners.get(aEvent);
-+    for (let listener of this._listeners.get(aEvent)) {
++    let originalListeners = this._eventEmitterListeners.get(aEvent);
++    for (let listener of this._eventEmitterListeners.get(aEvent)) {
 +      // If the object was destroyed during event emission, stop
 +      // emitting.
-+      if (!this._listeners) {
++      if (!this._eventEmitterListeners) {
 +        break;
 +      }
 +
 +      // If listeners were removed during emission, make sure the
 +      // event handler we're going to fire wasn't removed.
-+      if (originalListeners === this._listeners.get(aEvent) ||
-+          this._listeners.get(aEvent).some(function(l) l === listener)) {
++      if (originalListeners === this._eventEmitterListeners.get(aEvent) ||
++          this._eventEmitterListeners.get(aEvent).some(function(l) l === listener)) {
 +        listener.apply(null, arguments);
 +      }
 +    }
@@ -250,21 +246,21 @@ new file mode 100644
 +   * Destroy the references to the listeners.
 +   */
 +  removeAllListeners: function EventEmitter_destroy() {
-+    delete this._listeners;
++    delete this._eventEmitterListeners;
 +  }
 +}
 diff --git a/browser/devtools/shared/test/Makefile.in b/browser/devtools/shared/test/Makefile.in
 --- a/browser/devtools/shared/test/Makefile.in
 +++ b/browser/devtools/shared/test/Makefile.in
-@@ -14,16 +14,17 @@ include $(topsrcdir)/config/rules.mk
- 
- _BROWSER_TEST_FILES = \
+@@ -16,16 +16,17 @@ include $(topsrcdir)/config/rules.mk
    browser_browser_basic.js \
    browser_promise_basic.js \
    browser_require_basic.js \
    browser_templater_basic.js \
    browser_toolbar_basic.js \
    browser_toolbar_tooltip.js \
+   browser_toolbar_webconsole_errors_count.js \
+   browser_layoutHelpers.js \
 +  browser_eventemitter_basic.js \
    head.js \
    $(NULL)
@@ -272,8 +268,8 @@ diff --git a/browser/devtools/shared/test/Makefile.in b/browser/devtools/shared/
  _BROWSER_TEST_PAGES = \
    browser_templater_basic.html \
    browser_toolbar_basic.html \
-   $(NULL)
- 
+   browser_toolbar_webconsole_errors_count.html \
+   browser_layoutHelpers.html \
 diff --git a/browser/devtools/shared/test/browser_eventemitter_basic.js b/browser/devtools/shared/test/browser_eventemitter_basic.js
 new file mode 100644
 --- /dev/null

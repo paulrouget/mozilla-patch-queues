@@ -1,0 +1,242 @@
+# HG changeset patch
+# Parent f34790c74ca66526f3bd11f6573030a3ddc73652
+Bug 765564 - [devtb] Add a DevTools menu to the developer toolbar - try: -b do -p all -u all -t none
+
+diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul
++++ b/browser/base/content/browser.xul
+@@ -1050,16 +1050,25 @@
+                          class="developer-toolbar-button"
+                          hidden="true"
+                          command="Tools:StyleEditor"/>
+           <toolbarbutton id="developer-toolbar-debugger"
+                          label="&debuggerMenu.label2;"
+                          class="developer-toolbar-button"
+                          hidden="true"
+                          command="Tools:Debugger"/>
++          <toolbarbutton id="developer-toolbar-menu"
++                         class="developer-toolbar-button"
++                         type="menu"
++                         label="&devToolbarMenuButton.label;"
++                         tooltiptext="&devToolbarMenuButton.tooltiptext;">
++            <menupopup position="before_end"
++                       onpopupshowing="DeveloperToolbar.onMenuShowing()"/>
++          </toolbarbutton>
++
+ #ifndef XP_MACOSX
+           <toolbarbutton id="developer-toolbar-closebutton"
+                          class="devtools-closebutton"
+                          oncommand="DeveloperToolbar.hide();"
+                          tooltiptext="&devToolbarCloseButton.tooltiptext;"/>
+ #endif
+    </toolbar>
+ 
+diff --git a/browser/devtools/shared/DeveloperToolbar.jsm b/browser/devtools/shared/DeveloperToolbar.jsm
+--- a/browser/devtools/shared/DeveloperToolbar.jsm
++++ b/browser/devtools/shared/DeveloperToolbar.jsm
+@@ -209,16 +209,45 @@ DeveloperToolbar.prototype._onload = fun
+ 
+   if (!DeveloperToolbar.introShownThisSession) {
+     this.display.maybeShowIntro();
+     DeveloperToolbar.introShownThisSession = true;
+   }
+ };
+ 
+ /**
++ * Populate the tools menu. Does not include tool already present in
++ * the toolbar.
++ */
++DeveloperToolbar.prototype.onMenuShowing = function DT_onMenuShowing()
++{
++  if (this._menuPopulated) {
++    return;
++  }
++
++  let reference = this._doc.getElementById("menuWebDeveloperPopup");
++  let popup = this._doc.getElementById("developer-toolbar-menu").firstChild;
++  for (let item of reference.childNodes) {
++    let command = item.getAttribute("command");
++
++    if (command) {
++      let selector = "#developer-toolbar > toolbarbutton[command=\"" + command + "\"]";
++      let isInToolbar = !!this._doc.querySelector(selector)
++      if (isInToolbar) {
++        continue;
++      }
++    }
++
++    popup.appendChild(item.cloneNode());
++  }
++
++  this._menuPopulated = true;
++},
++
++/**
+  * Initialize the listeners needed for tracking the number of errors for a given
+  * tab.
+  *
+  * @private
+  * @param nsIDOMNode aTab the xul:tab for which you want to track the number of
+  * errors.
+  */
+ DeveloperToolbar.prototype._initErrorsCount = function DT__initErrorsCount(aTab)
+diff --git a/browser/locales/en-US/chrome/browser/browser.dtd b/browser/locales/en-US/chrome/browser/browser.dtd
+--- a/browser/locales/en-US/chrome/browser/browser.dtd
++++ b/browser/locales/en-US/chrome/browser/browser.dtd
+@@ -234,16 +234,18 @@ These should match what Safari and other
+ <!ENTITY scratchpad.keytext           "F4">
+ 
+ <!ENTITY inspectCloseButton.tooltiptext "Close Inspector">
+ 
+ <!ENTITY devToolbarCloseButton.tooltiptext "Close Developer Toolbar">
+ <!ENTITY devToolbarMenu.label              "Developer Toolbar">
+ <!ENTITY devToolbarMenu.accesskey          "v">
+ <!ENTITY devToolbar.commandkey             "v">
++<!ENTITY devToolbarMenuButton.label        "Tools">
++<!ENTITY devToolbarMenuButton.tooltiptext  "More tools">
+ 
+ <!ENTITY webConsoleButton.label "Web Console">
+ <!ENTITY inspectorButton.label "Inspector">
+ 
+ <!ENTITY inspectorHTMLCopyInner.label       "Copy Inner HTML">
+ <!ENTITY inspectorHTMLCopyInner.accesskey   "I">
+ 
+ <!ENTITY inspectorHTMLCopyOuter.label       "Copy Outer HTML">
+diff --git a/browser/themes/gnomestripe/browser.css b/browser/themes/gnomestripe/browser.css
+--- a/browser/themes/gnomestripe/browser.css
++++ b/browser/themes/gnomestripe/browser.css
+@@ -2530,16 +2530,17 @@ stack[anonid=browserStack][responsivemod
+   border-radius: 3px;
+   color: inherit;
+   border: 1px solid transparent;
+   margin: 0 5px;
+   padding: 0 10px;
+   list-style-image: url("chrome://browser/skin/devtools/tools-icons-small.png");
+ }
+ 
++.developer-toolbar-button[open=true],
+ .developer-toolbar-button:active:hover,
+ .developer-toolbar-button[checked=true] {
+   border-color: hsla(210,8%,5%,.6);
+   background: rgba(0,0,0,.6);
+   box-shadow: 0 1px 2px rgba(0,0,0,.5) inset, 0 1px 0 hsla(210,16%,76%,.15);
+ }
+ 
+ .developer-toolbar-button[checked=true] {
+@@ -2559,16 +2560,24 @@ stack[anonid=browserStack][responsivemod
+ #developer-toolbar-styleeditor {
+   -moz-image-region: rect(32px, 16px, 48px, 0);
+ }
+ 
+ #developer-toolbar-debugger {
+   -moz-image-region: rect(48px, 16px, 64px, 0);
+ }
+ 
++#developer-toolbar-menu {
++  -moz-image-region: rect(64px, 16px, 80px, 0);
++}
++
++#developer-toolbar-menu > .toolbarbutton-menu-dropmarker {
++  display: none;
++}
++
+ /* Error counter */
+ 
+ #developer-toolbar-webconsole[error-count] > .toolbarbutton-icon {
+   display: none;
+ }
+ 
+ #developer-toolbar-webconsole[error-count]:before {
+   content: attr(error-count);
+diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
+--- a/browser/themes/pinstripe/browser.css
++++ b/browser/themes/pinstripe/browser.css
+@@ -3271,16 +3271,17 @@ stack[anonid=browserStack][responsivemod
+   border-radius: @toolbarbuttonCornerRadius@;
+   color: inherit;
+   border: 1px solid transparent;
+   margin: 0 5px;
+   padding: 0 10px;
+   list-style-image: url("chrome://browser/skin/devtools/tools-icons-small.png");
+ }
+ 
++.developer-toolbar-button[open=true],
+ .developer-toolbar-button:active:hover,
+ .developer-toolbar-button[checked=true] {
+   border-color: hsla(210,8%,5%,.6);
+   background: rgba(0,0,0,.6);
+   box-shadow: 0 1px 2px rgba(0,0,0,.5) inset, 0 1px 0 hsla(210,16%,76%,.15);
+ }
+ 
+ .developer-toolbar-button[checked=true] {
+@@ -3300,16 +3301,24 @@ stack[anonid=browserStack][responsivemod
+ #developer-toolbar-styleeditor {
+   -moz-image-region: rect(32px, 16px, 48px, 0);
+ }
+ 
+ #developer-toolbar-debugger {
+   -moz-image-region: rect(48px, 16px, 64px, 0);
+ }
+ 
++#developer-toolbar-menu {
++  -moz-image-region: rect(64px, 16px, 80px, 0);
++}
++
++#developer-toolbar-menu > .toolbarbutton-menu-dropmarker {
++  display: none;
++}
++
+ /* Error counter */
+ 
+ #developer-toolbar-webconsole[error-count] > .toolbarbutton-icon {
+   display: none;
+ }
+ 
+ #developer-toolbar-webconsole[error-count]:before {
+   content: attr(error-count);
+diff --git a/browser/themes/winstripe/browser.css b/browser/themes/winstripe/browser.css
+--- a/browser/themes/winstripe/browser.css
++++ b/browser/themes/winstripe/browser.css
+@@ -3205,16 +3205,17 @@ stack[anonid=browserStack][responsivemod
+   border-radius: 3px;
+   color: inherit;
+   border: 1px solid transparent;
+   margin: 0 5px;
+   padding: 0 10px;
+   list-style-image: url("chrome://browser/skin/devtools/tools-icons-small.png");
+ }
+ 
++.developer-toolbar-button[open=true],
+ .developer-toolbar-button:active:hover,
+ .developer-toolbar-button[checked=true] {
+   border-color: hsla(210,8%,5%,.6);
+   background: rgba(0,0,0,.6);
+   box-shadow: 0 1px 2px rgba(0,0,0,.5) inset, 0 1px 0 hsla(210,16%,76%,.1);
+ }
+ 
+ .developer-toolbar-button[checked=true] {
+@@ -3234,16 +3235,24 @@ stack[anonid=browserStack][responsivemod
+ #developer-toolbar-styleeditor {
+   -moz-image-region: rect(32px, 16px, 48px, 0);
+ }
+ 
+ #developer-toolbar-debugger {
+   -moz-image-region: rect(48px, 16px, 64px, 0);
+ }
+ 
++#developer-toolbar-menu {
++  -moz-image-region: rect(64px, 16px, 80px, 0);
++}
++
++#developer-toolbar-menu > .toolbarbutton-menu-dropmarker {
++  display: none;
++}
++
+ /* Error counter */
+ 
+ #developer-toolbar-webconsole[error-count] > .toolbarbutton-icon {
+   display: none;
+ }
+ 
+ #developer-toolbar-webconsole[error-count]:before {
+   content: attr(error-count);

@@ -1,0 +1,172 @@
+# HG changeset patch
+# Parent d18cc3e23639bf86b2aae30c78263d42c9c72b28
+Bug 768442 - It's impossible to add a sidebar inside a tab
+
+diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrowser.xml
+--- a/browser/base/content/tabbrowser.xml
++++ b/browser/base/content/tabbrowser.xml
+@@ -21,22 +21,24 @@
+ 
+     <content>
+       <xul:stringbundle anonid="tbstringbundle" src="chrome://browser/locale/tabbrowser.properties"/>
+       <xul:tabbox anonid="tabbox" class="tabbrowser-tabbox"
+                   flex="1" eventnode="document" xbl:inherits="handleCtrlPageUpDown"
+                   onselect="if (event.target.localName == 'tabpanels') this.parentNode.updateCurrentBrowser();">
+         <xul:tabpanels flex="1" class="plain" selectedIndex="0" anonid="panelcontainer">
+           <xul:notificationbox flex="1">
+-            <xul:vbox flex="1" anonid="browserContainer">
+-              <xul:stack flex="1" anonid="browserStack">
+-                <xul:browser type="content-primary" message="true" disablehistory="true"
+-                             xbl:inherits="tooltip=contenttooltip,contextmenu=contentcontextmenu,autocompletepopup"/>
+-              </xul:stack>
+-            </xul:vbox>
++            <xul:hbox flex="1" anonid="sidebarContainer">
++              <xul:vbox flex="1" anonid="browserContainer">
++                <xul:stack flex="1" anonid="browserStack">
++                  <xul:browser type="content-primary" message="true" disablehistory="true"
++                               xbl:inherits="tooltip=contenttooltip,contextmenu=contentcontextmenu,autocompletepopup"/>
++                </xul:stack>
++              </xul:vbox>
++            </xul:hbox>
+           </xul:notificationbox>
+         </xul:tabpanels>
+       </xul:tabbox>
+       <children/>
+     </content>
+     <implementation implements="nsIDOMEventListener">
+ 
+       <property name="tabContextMenu" readonly="true"
+@@ -290,16 +292,25 @@
+         ]]>
+         </body>
+       </method>
+ 
+       <method name="getNotificationBox">
+         <parameter name="aBrowser"/>
+         <body>
+           <![CDATA[
++            return this.getSidebarContainer(aBrowser).parentNode;
++          ]]>
++        </body>
++      </method>
++
++      <method name="getSidebarContainer">
++        <parameter name="aBrowser"/>
++        <body>
++          <![CDATA[
+             return this.getBrowserContainer(aBrowser).parentNode;
+           ]]>
+         </body>
+       </method>
+ 
+       <method name="getBrowserContainer">
+         <parameter name="aBrowser"/>
+         <body>
+@@ -1291,29 +1302,37 @@
+             var stack = document.createElementNS(
+                                     "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+                                     "stack");
+             stack.setAttribute("anonid", "browserStack");
+             stack.appendChild(b);
+             stack.setAttribute("flex", "1");
+ 
+             // Create the browserContainer
+-            var box = document.createElementNS(
++            var browserContainer = document.createElementNS(
+                                     "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+                                     "vbox");
+-            box.setAttribute("anonid", "browserContainer");
+-            box.appendChild(stack);
+-            box.setAttribute("flex", "1");
++            browserContainer.setAttribute("anonid", "browserContainer");
++            browserContainer.appendChild(stack);
++            browserContainer.setAttribute("flex", "1");
++
++            // Create the sidebar container
++            var sidebarContainer = document.createElementNS(
++                                      "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
++                                      "hbox");
++            sidebarContainer.setAttribute("anonid", "sidebarContainer");
++            sidebarContainer.appendChild(browserContainer);
++            sidebarContainer.setAttribute("flex", "1");
+ 
+             // Add the Message and the Browser to the box
+             var notificationbox = document.createElementNS(
+                                     "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+                                     "notificationbox");
+             notificationbox.setAttribute("flex", "1");
+-            notificationbox.appendChild(box);
++            notificationbox.appendChild(sidebarContainer);
+ 
+             var position = this.tabs.length - 1;
+             var uniqueId = "panel" + Date.now() + position;
+             notificationbox.id = uniqueId;
+             t.linkedPanel = uniqueId;
+             t.linkedBrowser = b;
+             t._tPos = position;
+             if (t.previousSibling.selected)
+@@ -1730,21 +1749,22 @@
+             this.selectedTab._selected = true;
+ 
+             // Removing the panel requires fixing up selectedPanel immediately
+             // (see below), which would be hindered by the potentially expensive
+             // browser removal. So we remove the browser and the panel in two
+             // steps.
+ 
+             var panel = this.getNotificationBox(browser);
++            var stack = this.getBrowserContainer(browser).firstChild;
+ 
+             // This will unload the document. An unload handler could remove
+             // dependant tabs, so it's important that the tabbrowser is now in
+             // a consistent state (tab removed, tab positions updated, etc.).
+-            panel.removeChild(this.getBrowserContainer(browser));
++            stack.removeChild(browser);
+ 
+             // Release the browser in case something is erroneously holding a
+             // reference to the tab after its removal.
+             aTab.linkedBrowser = null;
+ 
+             // As the browser is removed, the removal of a dependent document can
+             // cause the whole window to close. So at this point, it's possible
+             // that the binding is destructed.
+@@ -2505,17 +2525,17 @@
+               }
+               break;
+           }
+         ]]></body>
+       </method>
+ 
+       <constructor>
+         <![CDATA[
+-          this.mCurrentBrowser = this.mPanelContainer.firstChild.firstChild.firstChild.firstChild;
++          this.mCurrentBrowser = document.getAnonymousElementByAttribute(this, "anonid", "browserStack").firstChild;
+           this.mCurrentTab = this.tabContainer.firstChild;
+           document.addEventListener("keypress", this, false);
+           window.addEventListener("sizemodechange", this, false);
+ 
+           var uniqueId = "panel" + Date.now();
+           this.mPanelContainer.childNodes[0].id = uniqueId;
+           this.mCurrentTab.linkedPanel = uniqueId;
+           this.mCurrentTab._tPos = 0;
+diff --git a/browser/base/content/test/browser_bug462673.js b/browser/base/content/test/browser_bug462673.js
+--- a/browser/base/content/test/browser_bug462673.js
++++ b/browser/base/content/test/browser_bug462673.js
+@@ -10,17 +10,17 @@ var runs = [
+     var newBrowser = newTab.linkedBrowser;
+     tabbrowser.removeTab(tab);
+     ok(!win.closed, "Window stays open");
+     if (!win.closed) {
+       is(tabbrowser.tabContainer.childElementCount, 1, "Window has one tab");
+       is(tabbrowser.browsers.length, 1, "Window has one browser");
+       is(tabbrowser.selectedTab, newTab, "Remaining tab is selected");
+       is(tabbrowser.selectedBrowser, newBrowser, "Browser for remaining tab is selected");
+-      is(tabbrowser.mTabBox.selectedPanel, newBrowser.parentNode.parentNode.parentNode, "Panel for remaining tab is selected");
++      is(tabbrowser.mTabBox.selectedPanel, newBrowser.parentNode.parentNode.parentNode.parentNode, "Panel for remaining tab is selected");
+     }
+   }
+ ];
+ 
+ function test() {
+   waitForExplicitFinish();
+   runOneTest();
+ }

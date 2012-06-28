@@ -1,0 +1,185 @@
+# HG changeset patch
+# Parent cf6d687f0784bbedac50cb5b7572393cc224c635
+Bug 751904 - [responsive] design view GCLI commands
+
+diff --git a/browser/devtools/commandline/GcliCommands.jsm b/browser/devtools/commandline/GcliCommands.jsm
+--- a/browser/devtools/commandline/GcliCommands.jsm
++++ b/browser/devtools/commandline/GcliCommands.jsm
+@@ -427,8 +427,60 @@ gcli.addCommand({
+       });
+     } catch (ex) {
+       // If the debugger has been closed already, don't scare the user.
+       promise.resolve(gcli.lookup("breakdelRemoved"));
+     }
+     return promise;
+   }
+ });
++
++/* Responsive Mode commands */
++
++gcli.addCommand({
++  name: 'responsivemode',
++  description: gcli.lookup('responsiveModeDesc'),
++  manual: gcli.lookup('responsiveModeManual'),
++  params: [
++    {
++      name: 'status',
++      type: 'string',
++      defaultValue: 'toggle',
++      description: gcli.lookup("responsiveModeArgStatus"),
++    },
++  ],
++  exec: function(args, context) {
++    let browserDoc = context.environment.chromeDocument;
++    let browserWindow = browserDoc.defaultView;
++    let mgr = browserWindow.ResponsiveUI.ResponsiveUIManager;
++    mgr.handleGcliCommand(browserWindow,
++                          browserWindow.gBrowser.selectedTab,
++                          this.name,
++                          args);
++  }
++});
++
++gcli.addCommand({
++  name: 'resizepage',
++  description: gcli.lookup('resizePageDesc'),
++  manual: gcli.lookup('resizePageManual'),
++  params: [
++    {
++      name: 'width',
++      type: 'number',
++      description: gcli.lookup("resizePageArgWidthDesc"),
++    },
++    {
++      name: 'height',
++      type: 'number',
++      description: gcli.lookup("resizePageArgHeightDesc"),
++    },
++  ],
++  exec: function(args, context) {
++    let browserDoc = context.environment.chromeDocument;
++    let browserWindow = browserDoc.defaultView;
++    let mgr = browserWindow.ResponsiveUI.ResponsiveUIManager;
++    mgr.handleGcliCommand(browserWindow,
++                          browserWindow.gBrowser.selectedTab,
++                          this.name,
++                          args);
++  }
++});
+diff --git a/browser/devtools/responsivedesign/responsivedesign.jsm b/browser/devtools/responsivedesign/responsivedesign.jsm
+--- a/browser/devtools/responsivedesign/responsivedesign.jsm
++++ b/browser/devtools/responsivedesign/responsivedesign.jsm
+@@ -29,16 +29,47 @@ let ResponsiveUIManager = {
+    */
+   toggle: function(aWindow, aTab) {
+     if (aTab.__responsiveUI) {
+       aTab.__responsiveUI.close();
+     } else {
+       aTab.__responsiveUI = new ResponsiveUI(aWindow, aTab);
+     }
+   },
++
++  /**
++   * Handle gcli commands.
++   *
++   * @param aWindow the browser window.
++   * @param aTab the tab targeted.
++   * @param aArgs command arguments.
++   */
++  handleGcliCommand: function(aWindow, aTab, aCommand, aArgs) {
++    switch (aCommand) {
++      case "resizepage":
++        if (!aTab.__responsiveUI) {
++          aTab.__responsiveUI = new ResponsiveUI(aWindow, aTab);
++        }
++        aTab.__responsiveUI.setSize(aArgs.width, aArgs.height);
++        break;
++      case "responsivemode":
++        if (aArgs.status == "toggle") {
++          this.toggle(aWindow, aTab);
++          return;
++        }
++        if (aTab.__responsiveUI && aArgs.status == "off") {
++          aTab.__responsiveUI.close();
++        }
++        if (!aTab.__responsiveUI && aArgs.status == "on") {
++          aTab.__responsiveUI = new ResponsiveUI(aWindow, aTab);
++        }
++        break;
++      default:
++    }
++  },
+ }
+ 
+ let presets = [
+   // Phones
+   {key: "320x480", width: 320, height: 480},    // iPhone, B2G, with <meta viewport>
+   {key: "360x640", width: 360, height: 640},    // Android 4, phones, with <meta viewport>
+ 
+   // Tablets
+@@ -357,18 +388,18 @@ ResponsiveUI.prototype = {
+ 
+   /**
+    * Change the size of the browser.
+    *
+    * @param aWidth width of the browser.
+    * @param aHeight height of the browser.
+    */
+   setSize: function RUI_setSize(aWidth, aHeight) {
+-    this.currentWidth = aWidth;
+-    this.currentHeight = aHeight;
++    this.currentWidth = Math.min(Math.max(aWidth, MIN_WIDTH), MAX_WIDTH);
++    this.currentHeight = Math.min(Math.max(aHeight, MIN_HEIGHT), MAX_WIDTH);
+ 
+     // We resize the containing stack.
+     let style = "max-width: %width;" +
+                 "min-width: %width;" +
+                 "max-height: %height;" +
+                 "min-height: %height;";
+ 
+     style = style.replace(/%width/g, this.currentWidth + "px");
+diff --git a/browser/locales/en-US/chrome/browser/devtools/gclicommands.properties b/browser/locales/en-US/chrome/browser/devtools/gclicommands.properties
+--- a/browser/locales/en-US/chrome/browser/devtools/gclicommands.properties
++++ b/browser/locales/en-US/chrome/browser/devtools/gclicommands.properties
+@@ -327,8 +327,41 @@ editManual2=Edit one of the resources th
+ # 'resource' parameter to the 'edit' command, which is displayed in a dialog
+ # when the user is using this command.
+ editResourceDesc=URL to edit
+ 
+ # LOCALIZATION NOTE (editLineToJumpToDesc) A very short string to describe the
+ # 'line' parameter to the 'edit' command, which is displayed in a dialog
+ # when the user is using this command.
+ editLineToJumpToDesc=Line to jump to
++
++# LOCALIZATION NOTE (resizePageDesc) A very short string to describe the
++# 'resizepage' command. This string is designed to be shown in a menu
++# alongside the command name, which is why it should be as short as possible.
++resizePageDesc=Resize the page
++
++# LOCALIZATION NOTE (resizePageManual) A fuller description of the 'resizepage' command,
++# displayed when the user asks for help on what it does.
++resizePageManual=Resize the page.<br/>See also <span class="gcli-out-shortcut">responsivemode</span>
++
++# LOCALIZATION NOTE (resizePageArgWidthDesc) A very short string to describe the
++# 'width' parameter to the 'resizepage' command, which is displayed in a dialog
++# when the user is using this command.
++resizePageArgWidthDesc=width in pixels
++
++# LOCALIZATION NOTE (resizePageArgWidthDesc) A very short string to describe the
++# 'height' parameter to the 'resizepage' command, which is displayed in a dialog
++# when the user is using this command.
++resizePageArgHeightDesc=height in pixels
++
++# LOCALIZATION NOTE (responsiveModeDesc) A very short string to describe the
++# 'responsivemode' command. This string is designed to be shown in a menu
++# alongside the command name, which is why it should be as short as possible.
++responsiveModeDesc=Turn the Responsive Design Mode on and off.
++
++# LOCALIZATION NOTE (responsiveModeManual) A fuller description of the 'responsivemode' command,
++# displayed when the user asks for help on what it does.
++responsiveModeManual=Turn the Responsive Design Mode on and off.<br/>See also: <span class="gcli-out-shortcut">resizepage</span>
++
++# LOCALIZATION NOTE (responsiveModeArgStatus) A very short string to describe the
++# 'status' parameter to the 'responsivemode' command, which is displayed in a dialog
++# when the user is using this command.
++responsiveModeArgStatus=status: 'on', 'off', 'toggle'

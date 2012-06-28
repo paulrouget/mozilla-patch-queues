@@ -1,7 +1,6 @@
 # HG changeset patch
-# Parent 6d9bf73dbbcef6ab58730e2a366a6b306f6a4a82
-* * *
-Bug 760171 - The inspector node menu feature allows the user to remove tabbed browsing. r=robcee
+# Parent c6bd842a20a85dec13cd5991ef7427107f3fd673
+Bug 762499 - The inspector should be updated when the DOM is updated.
 
 diff --git a/browser/devtools/highlighter/Makefile.in b/browser/devtools/highlighter/Makefile.in
 --- a/browser/devtools/highlighter/Makefile.in
@@ -53,7 +52,7 @@ new file mode 100644
 +const WINDOW_EVENTS = [
 +  "close",
 +  "DOMReady",
-+  "allReady",
++  "ready",
 +  "DOMNodeUpdate",
 +  "DOMTreeUpdate",
 +  "resize",
@@ -224,7 +223,7 @@ new file mode 100644
 +      if (this.document.readyState == "interactive")
 +        this.emit("DOMReady", this.window, event);
 +      if (this.document.readyState == "complete")
-+        this.emit("allReady", this.window, event);
++        this.emit("ready", this.window, event);
 +    }
 +    if (event.type == "unload") { // FIXME: Are we sure we want to do that on beforeunload? What if prevented?
 +        this.emit("close", this.window, event);
@@ -243,104 +242,195 @@ new file mode 100644
 +  },
 +
 +}
-diff --git a/browser/devtools/shared/EventEmitter.jsm b/browser/devtools/shared/EventEmitter.jsm
---- a/browser/devtools/shared/EventEmitter.jsm
-+++ b/browser/devtools/shared/EventEmitter.jsm
-@@ -1,36 +1,29 @@
- var EXPORTED_SYMBOLS = ["EventEmitter"];
+diff --git a/browser/devtools/highlighter/test/Makefile.in b/browser/devtools/highlighter/test/Makefile.in
+--- a/browser/devtools/highlighter/test/Makefile.in
++++ b/browser/devtools/highlighter/test/Makefile.in
+@@ -35,16 +35,20 @@ include $(topsrcdir)/config/rules.mk
+ 		browser_inspector_bug_699308_iframe_navigation.js \
+ 		browser_inspector_changes.js \
+ 		browser_inspector_ruleviewstore.js \
+ 		browser_inspector_invalidate.js \
+ 		browser_inspector_sidebarstate.js \
+ 		browser_inspector_treePanel_menu.js \
+ 		browser_inspector_pseudoclass_lock.js \
+ 		browser_inspector_pseudoClass_menu.js \
++		browser_pageobserver_mutations.js \
++		browser_pageobserver_pageA.html \
++		browser_pageobserver_pageB.html \
++		browser_pageobserver_pageC.html \
+ 		head.js \
+ 		$(NULL)
  
- function EventEmitter() {
- }
+ # Disabled due to constant failures
+ # 		browser_inspector_treePanel_click.js \
  
- EventEmitter.prototype = {
-   /**
--   * We use Map() to store the listeners.
--   */
--  get _listeners() {
--    if (!this._listenersMap)
--      this._listenersMap = new Map();
--    return this._listenersMap;
--  },
--
--  /**
-    * Connect a listener.
-    *
-    * @param string aEvent
-    *        The event name to which we're connecting.
-    * @param function aListener
-    *        Called when the event is fired.
-    */
-   on: function EventEmitter_on(aEvent, aListener) {
--    if (!this._listeners.has(aEvent)) {
--      this._listeners.set(aEvent, []);
-+    if (!this._eventEmitterListeners)
-+      this._eventEmitterListeners = new Map();
-+    if (!this._eventEmitterListeners.has(aEvent)) {
-+      this._eventEmitterListeners.set(aEvent, []);
-     }
--    this._listeners.get(aEvent).push(aListener);
-+    this._eventEmitterListeners.get(aEvent).push(aListener);
-   },
- 
-   /**
-    * Listen for the next time an event is fired.
-    *
-    * @param string aEvent
-    *        The event name to which we're connecting.
-    * @param function aListener
-@@ -49,44 +42,46 @@ EventEmitter.prototype = {
-    * registered with either on or once.
-    *
-    * @param string aEvent
-    *        The event name whose listener we're disconnecting.
-    * @param function aListener
-    *        The listener to remove.
-    */
-   removeListener: function EventEmitter_removeListener(aEvent, aListener) {
--    let listeners = this._listeners.get(aEvent);
--    this._listeners.set(aEvent, listeners.filter(function(l) aListener != l));
-+    if (!this._eventEmitterListeners)
-+      return;
-+    let listeners = this._eventEmitterListeners.get(aEvent);
-+    this._eventEmitterListeners.set(aEvent, listeners.filter(function(l) aListener != l));
-   },
- 
-   /**
-    * Emit an event.  All arguments to this method will
-    * be sent to listner functions.
-    */
-   emit: function EventEmitter_emit(aEvent) {
--    if (!this._listeners || !this._listeners.has(aEvent))
-+    if (!this._eventEmitterListeners || !this._eventEmitterListeners.has(aEvent))
-       return;
- 
--    let originalListeners = this._listeners.get(aEvent);
--    for (let listener of this._listeners.get(aEvent)) {
-+    let originalListeners = this._eventEmitterListeners.get(aEvent);
-+    for (let listener of this._eventEmitterListeners.get(aEvent)) {
-       // If the object was destroyed during event emission, stop
-       // emitting.
--      if (!this._listeners) {
-+      if (!this._eventEmitterListeners) {
-         break;
-       }
- 
-       // If listeners were removed during emission, make sure the
-       // event handler we're going to fire wasn't removed.
--      if (originalListeners === this._listeners.get(aEvent) ||
--          this._listeners.get(aEvent).some(function(l) l === listener)) {
-+      if (originalListeners === this._eventEmitterListeners.get(aEvent) ||
-+          this._eventEmitterListeners.get(aEvent).some(function(l) l === listener)) {
-         listener.apply(null, arguments);
-       }
-     }
-   },
- 
-   /**
-    * Destroy the references to the listeners.
-    */
-   removeAllListeners: function EventEmitter_destroy() {
--    delete this._listeners;
-+    delete this._eventEmitterListeners;
-   }
- }
+ libs::	$(_BROWSER_FILES)
+ 	$(INSTALL) $(foreach f,$^,"$f") $(DEPTH)/_tests/testing/mochitest/browser/$(relativesrcdir)
+diff --git a/browser/devtools/highlighter/test/browser_pageobserver_mutations.js b/browser/devtools/highlighter/test/browser_pageobserver_mutations.js
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/highlighter/test/browser_pageobserver_mutations.js
+@@ -0,0 +1,63 @@
++
++
++
++
++function test() {
++  waitForExplicitFinish();
++  function finishup() {
++    gBrowser.removeCurrentTab();
++    finish();
++  }
++
++  Cu.import("resource:///modules/devtools/pageobserver.jsm");
++
++  const URL = "http://mochi.test:8888/browser/browser/devtools/highlighter/test/browser_pageobserver_pageA.html";
++
++  gBrowser.selectedTab = gBrowser.addTab();
++  content.location = URL;
++
++  let rootWindow = gBrowser.contentWindow;
++  let obs = new PageObserver(gBrowser.selectedTab);
++
++  obs.on("tabClose", this);
++  obs.on("tabHidden", this);
++  obs.on("tabVisible", this);
++  obs.on("close", this);
++  obs.on("DOMReady", this);
++  obs.on("ready", this);
++  obs.on("DOMNodeUpdate", this);
++  obs.on("DOMTreeUpdate", this);
++  obs.on("resize", this);
++  obs.on("reflow", this);
++
++  function buildTree(aDOMnode) {
++    if (aDOMnode.nodeType == 3) return null;
++    let node = {};
++    node.name = aDOMnode.tagName;
++    node.attributes = {};
++    node.textContent = aDOMnode.textContent;
++    for (var i = 0; i < aDOMnode.attributes.length; i++) {
++      node.attributes[aDOMnode.attributes[i].name] = aDOMnode.attributes[i].value;
++    }
++
++    node.childNodes = [];
++    for (var i = 0; i < aDOMnode.childNodes.length; i++) {
++      let newNode = buildTree(aDOMnode.childNodes[i]);
++      if (newNode)
++        node.push(newNode);
++    }
++    if (node.contentWindow &&
++        node.contentWindow.document &&
++        node.contentWindow.document.readyState == "interactive") {
++      node.childNodes.push(buildTree(aDOMnode.contentWindow.document.documentElement));
++    }
++    return node;
++  }
++
++  function startTest() {
++  }
++
++  function handleEvents() {
++  }
++}
++
+diff --git a/browser/devtools/highlighter/test/browser_pageobserver_pageA.html b/browser/devtools/highlighter/test/browser_pageobserver_pageA.html
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/highlighter/test/browser_pageobserver_pageA.html
+@@ -0,0 +1,31 @@
++<h1 foobar>page A</h1>
++<div>
++  <p>foobar A</p>
++  <iframe src="browser_pageobserver_pageB.html"></iframe>
++</div>
++
++<script>
++  window.onmessage = function(msg) {
++    if (msg.data == "A1") {
++      var p = document.querySelector("p");
++      p.id = "fooA";
++      p.setAttribute("class", "barA");
++    }
++    if (msg.data == "A2") {
++      var p = document.querySelector("p");
++      p.innerHTML = "<span>mop A</span>"
++    }
++    if (msg.data == "A3") {
++      var div = document.querySelector("div");
++      div.innerHTML = "";
++    }
++    if (msg.data == "A4") {
++      var div = document.querySelector("div");
++      div.innerHTML = "";
++      div.classList.add("classA4");
++    }
++
++    msg.source.postMessage(msg.data, "*");
++  }
++</script>
++
+diff --git a/browser/devtools/highlighter/test/browser_pageobserver_pageB.html b/browser/devtools/highlighter/test/browser_pageobserver_pageB.html
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/highlighter/test/browser_pageobserver_pageB.html
+@@ -0,0 +1,27 @@
++<h1>page B</h1>
++<div>
++  <p>foobar B</p>
++</div>
++
++<script>
++  window.onmessage = function(msg) {
++    if (msg.data == "B1") {
++      var p = document.querySelector("p");
++      p.id = "fooB";
++      p.setAttribute("class", "barB");
++    }
++    if (msg.data == "B2") {
++      var p = document.querySelector("p");
++      p.innerHTML = "<span>mop B</span>"
++    }
++    if (msg.data == "B3") {
++      var div = document.querySelector("div");
++      div.innerHTML = "";
++    }
++    if (msg.data == "B4") {
++      var div = document.querySelector("div");
++      div.innerHTML = "<iframe src=browser_pageobserver_pageC.html></iframe>";
++    }
++    msg.source.postMessage(msg.data, "*");
++  }
++</script>
+diff --git a/browser/devtools/highlighter/test/browser_pageobserver_pageC.html b/browser/devtools/highlighter/test/browser_pageobserver_pageC.html
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/highlighter/test/browser_pageobserver_pageC.html
+@@ -0,0 +1,27 @@
++<h1>page C</h1>
++<div>
++  <p>foobar C</p>
++</div>
++
++<script>
++  window.onmessage = function(msg) {
++    if (msg.data == "C1") {
++      var p = document.querySelector("p");
++      p.id = "foo";
++      p.setAttribute("class", "barC");
++    }
++    if (msg.data == "C2") {
++      var p = document.querySelector("p");
++      p.innerHTML = "<span>mopC</span>"
++    }
++    if (msg.data == "C3") {
++      var div = document.querySelector("div");
++      div.innerHTML = "";
++    }
++    if (msg.data == "C4") {
++      var div = document.querySelector("div");
++      div.innerHTML = "mopC";
++    }
++    msg.source.postMessage(msg.data, "*");
++  }
++</script>
