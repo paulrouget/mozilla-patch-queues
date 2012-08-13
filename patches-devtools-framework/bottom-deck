@@ -1,0 +1,175 @@
+# HG changeset patch
+# Parent b658834ae434835b1f249a8aec8d91f85c08285d
+
+diff --git a/browser/devtools/debugger/DebuggerUI.jsm b/browser/devtools/debugger/DebuggerUI.jsm
+--- a/browser/devtools/debugger/DebuggerUI.jsm
++++ b/browser/devtools/debugger/DebuggerUI.jsm
+@@ -9,16 +9,17 @@ const Cc = Components.classes;
+ const Ci = Components.interfaces;
+ const Cu = Components.utils;
+ 
+ const DBG_XUL = "chrome://browser/content/debugger.xul";
+ const DBG_STRINGS_URI = "chrome://browser/locale/devtools/debugger.properties";
+ const REMOTE_PROFILE_NAME = "_remote-debug";
+ const TAB_SWITCH_NOTIFICATION = "debugger-tab-switch";
+ 
++Cu.import("resource://gre/modules/devtools/gDevTools.jsm");
+ Cu.import("resource://gre/modules/devtools/dbg-server.jsm");
+ Cu.import("resource://gre/modules/Services.jsm");
+ Cu.import("resource://gre/modules/FileUtils.jsm");
+ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+ 
+ let EXPORTED_SYMBOLS = ["DebuggerUI"];
+ 
+ /**
+@@ -253,25 +254,22 @@ DebuggerPane.prototype = {
+    * Creates and initializes the widgets containing the debugger UI.
+    */
+   _create: function DP__create() {
+     this.globalUI._scriptDebugger = this;
+ 
+     let gBrowser = this._win.gBrowser;
+     let ownerDocument = gBrowser.parentNode.ownerDocument;
+ 
+-    this._splitter = ownerDocument.createElement("splitter");
+-    this._splitter.setAttribute("class", "devtools-horizontal-splitter");
++    this._deck = gDevTools.getBrowserBottomDeck(this._tab.linkedBrowser);
+ 
+     this._frame = ownerDocument.createElement("iframe");
+-    this._frame.height = DebuggerPreferences.height;
+ 
+-    this._nbox = gBrowser.getNotificationBox(this._tab.linkedBrowser);
+-    this._nbox.appendChild(this._splitter);
+-    this._nbox.appendChild(this._frame);
++    this._deck.appendChild(this._frame);
++    this._deck.selectedPanel = this._frame;
+ 
+     this.close = this.close.bind(this);
+     let self = this;
+ 
+     this._frame.addEventListener("Debugger:Loaded", function dbgLoaded() {
+       self._frame.removeEventListener("Debugger:Loaded", dbgLoaded, true);
+       self._frame.addEventListener("Debugger:Close", self.close, true);
+       self._frame.addEventListener("unload", self.close, true);
+@@ -297,36 +295,34 @@ DebuggerPane.prototype = {
+   close: function DP_close(aCloseCallback) {
+     if (!this.globalUI) {
+       return;
+     }
+     delete this.globalUI._scriptDebugger;
+     this._win = null;
+     this._tab = null;
+ 
+-    DebuggerPreferences.height = this._frame.height;
+     this._frame.removeEventListener("Debugger:Close", this.close, true);
+     this._frame.removeEventListener("unload", this.close, true);
+ 
+     // This method is also used as an event handler, so only
+     // use aCloseCallback if it's a function.
+     if (typeof(aCloseCallback) == "function") {
+       let frame = this._frame;
+       frame.addEventListener("unload", function onUnload() {
+         frame.removeEventListener("unload", onUnload, true);
+         aCloseCallback();
+       }, true)
+     }
+ 
+-    this._nbox.removeChild(this._splitter);
+-    this._nbox.removeChild(this._frame);
++    this._deck.removeChild(this._frame);
++    this._deck = null;
+ 
+     this._splitter = null;
+     this._frame = null;
+-    this._nbox = null;
+ 
+     this.globalUI.refreshCommand();
+     this.globalUI = null;
+   },
+ 
+   /**
+    * Gets the tab owning this debugger instance.
+    * @return XULElement
+@@ -588,38 +584,17 @@ let L10N = {
+ 
+ XPCOMUtils.defineLazyGetter(L10N, "stringBundle", function() {
+   return Services.strings.createBundle(DBG_STRINGS_URI);
+ });
+ 
+ /**
+  * Various debugger preferences.
+  */
+-let DebuggerPreferences = {
+-
+-  /**
+-   * Gets the preferred height of the debugger pane.
+-   * @return number
+-   */
+-  get height() {
+-    if (this._height === undefined) {
+-      this._height = Services.prefs.getIntPref("devtools.debugger.ui.height");
+-    }
+-    return this._height;
+-  },
+-
+-  /**
+-   * Sets the preferred height of the debugger pane.
+-   * @param number value
+-   */
+-  set height(value) {
+-    Services.prefs.setIntPref("devtools.debugger.ui.height", value);
+-    this._height = value;
+-  }
+-};
++let DebuggerPreferences = {};
+ 
+ /**
+  * Gets the preferred width of the remote debugger window.
+  * @return number
+  */
+ XPCOMUtils.defineLazyGetter(DebuggerPreferences, "remoteWinWidth", function() {
+   return Services.prefs.getIntPref("devtools.debugger.ui.remote-win.width");
+ });
+diff --git a/browser/devtools/webconsole/HUDService.jsm b/browser/devtools/webconsole/HUDService.jsm
+--- a/browser/devtools/webconsole/HUDService.jsm
++++ b/browser/devtools/webconsole/HUDService.jsm
+@@ -9,16 +9,17 @@ const Ci = Components.interfaces;
+ const Cu = Components.utils;
+ 
+ const CONSOLEAPI_CLASS_ID = "{b49c18f8-3379-4fc0-8c90-d7772c1a9ff3}";
+ 
+ const MIXED_CONTENT_LEARN_MORE = "https://developer.mozilla.org/en/Security/MixedContent";
+ 
+ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+ Cu.import("resource://gre/modules/Services.jsm");
++Cu.import("resource://gre/modules/devtools/gDevTools.jsm");
+ 
+ var EXPORTED_SYMBOLS = ["HUDService", "ConsoleUtils"];
+ 
+ XPCOMUtils.defineLazyServiceGetter(this, "clipboardHelper",
+                                    "@mozilla.org/widget/clipboardhelper;1",
+                                    "nsIClipboardHelper");
+ 
+ XPCOMUtils.defineLazyModuleGetter(this, "PropertyPanel",
+@@ -1357,18 +1358,19 @@ HeadsUpDisplay.prototype = {
+     }
+ 
+     // remove the console and splitter and reposition
+     if (this.splitter.parentNode) {
+       this.splitter.parentNode.removeChild(this.splitter);
+     }
+ 
+     if (aPosition == "below") {
+-      nBox.appendChild(this.splitter);
+-      nBox.appendChild(this.HUDBox);
++      let deck = gDevTools.getBrowserBottomDeck(this.browser);
++      deck.appendChild(this.HUDBox);
++      deck.selectedPanel = this.HUDBox;
+     }
+     else {
+       nBox.insertBefore(this.splitter, node);
+       nBox.insertBefore(this.HUDBox, this.splitter);
+     }
+ 
+     this.positionMenuitems[aPosition].setAttribute("checked", true);
+     if (this.positionMenuitems.last) {

@@ -1,0 +1,69 @@
+# HG changeset patch
+# Parent 5772c851cb5c9e7e6504a388d208405a6b314c75
+
+diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul
++++ b/browser/base/content/browser.xul
+@@ -938,16 +938,42 @@
+         <image/>
+       </toolbaritem>
+ 
+       <toolbarbutton id="tabview-button" class="toolbarbutton-1 chromeclass-toolbar-additional"
+                      label="&tabGroupsButton.label;"
+                      command="Browser:ToggleTabView"
+                      tooltiptext="&tabGroupsButton.tooltip;"
+                      observes="tabviewGroupsNumber"/>
++
++      <toolbaritem id="devtools-menu-button-container"
++                   class="chromeclass-toolbar-additional"
++                   removable="true"
++                   title="&webDeveloperMenu.label;">
++        <toolbarbutton id="devtools-menu-button" class="toolbarbutton-1"
++                      label="&webDeveloperMenu.label;"
++                      tooltiptext="&webDeveloperMenu.label;"
++                      type="menu">
++          <menupopup>
++            <menuitem observes="devtoolsMenuBroadcaster_DevToolbar" accesskey="&devToolbarMenu.accesskey;"/>
++            <menuitem observes="devtoolsMenuBroadcaster_WebConsole" accesskey="&webConsoleCmd.accesskey;"/>
++            <menuitem observes="devtoolsMenuBroadcaster_Inspect" accesskey="&inspectMenu.accesskey;"/>
++            <menuitem observes="devtoolsMenuBroadcaster_ResponsiveUI" accesskey="&responsiveDesignTool.accesskey;"/>
++            <menuitem observes="devtoolsMenuBroadcaster_Debugger"/>
++            <menuitem observes="devtoolsMenuBroadcaster_RemoteDebugger"/>
++            <menuitem observes="devtoolsMenuBroadcaster_ChromeDebugger"/>
++            <menuitem observes="devtoolsMenuBroadcaster_Scratchpad" accesskey="&scratchpad.accesskey;"/>
++            <menuitem observes="devtoolsMenuBroadcaster_StyleEditor" accesskey="&styleeditor.accesskey;"/>
++            <menuitem observes="devtoolsMenuBroadcaster_PageSource" accesskey="&pageSourceCmd.accesskey;"/>
++            <menuitem observes="devtoolsMenuBroadcaster_ErrorConsole" accesskey="&errorConsoleCmd.accesskey;"/>
++            <menuseparator/>
++            <menuitem observes="devtoolsMenuBroadcaster_GetMoreTools" accesskey="&getMoreDevtoolsCmd.accesskey;"/>
++          </menupopup>
++        </toolbarbutton>
++      </toolbaritem>
+     </toolbarpalette>
+   </toolbox>
+ 
+   <hbox flex="1" id="browser">
+     <vbox id="browser-border-start" hidden="true" layer="true"/>
+     <vbox id="sidebar-box" hidden="true" class="chromeclass-extrachrome">
+       <sidebarheader id="sidebar-header" align="center">
+         <label id="sidebar-title" persist="value" flex="1" crop="end" control="sidebar"/>
+diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
+--- a/browser/themes/pinstripe/browser.css
++++ b/browser/themes/pinstripe/browser.css
+@@ -3347,8 +3347,16 @@ stack[anonid=browserStack][responsivemod
+ 
+ #developer-toolbar-webconsole[error-count]:before {
+   color: #FDF3DE;
+   min-width: 16px;
+   text-shadow: none;
+   background-image: -moz-linear-gradient(top, #B4211B, #8A1915);
+   border-radius: 1px;
+ }
++
++/* Developer Tools button (Firefox Palette) */
++
++#devtools-menu-button {
++  list-style-image: url("chrome://browser/skin/devtools/tools-icons-small.png");
++  -moz-image-region: rect(64px, 16px, 80px, 0);
++  -moz-box-orient: horizontal;
++}

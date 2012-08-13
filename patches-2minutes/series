@@ -1,2 +1,3 @@
-bug-761251-exception
-bug-751904-resizecmd
+security
+bug-754481-toolbar-menu
+bug-736465-kill-menuitem

@@ -1,6 +1,6 @@
 # HG changeset patch
-# Parent d18cc3e23639bf86b2aae30c78263d42c9c72b28
-Bug 768442 - It's impossible to add a sidebar inside a tab
+# Parent b658834ae434835b1f249a8aec8d91f85c08285d
+Bug 768442 - It's impossible to add a sidebar inside a tab - try: -b do -p all -u all -t none
 
 diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrowser.xml
 --- a/browser/base/content/tabbrowser.xml
@@ -22,7 +22,7 @@ diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrows
 -            </xul:vbox>
 +            <xul:hbox flex="1" anonid="sidebarContainer">
 +              <xul:vbox flex="1" anonid="browserContainer">
-+                <xul:stack flex="1" anonid="browserStack">
++                <xul:stack flex="1" anonid="browserStack" paul="1">
 +                  <xul:browser type="content-primary" message="true" disablehistory="true"
 +                               xbl:inherits="tooltip=contenttooltip,contextmenu=contentcontextmenu,autocompletepopup"/>
 +                </xul:stack>
@@ -62,11 +62,16 @@ diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrows
        <method name="getBrowserContainer">
          <parameter name="aBrowser"/>
          <body>
-@@ -1291,29 +1302,37 @@
+@@ -1287,33 +1298,42 @@
+               b.setAttribute("autocompletepopup", this.getAttribute("autocompletepopup"));
+             b.setAttribute("autoscrollpopup", this._autoScrollPopup.id);
+ 
+             // Create the browserStack container
              var stack = document.createElementNS(
                                      "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
                                      "stack");
              stack.setAttribute("anonid", "browserStack");
++            stack.setAttribute("paul", "2");
              stack.appendChild(b);
              stack.setAttribute("flex", "1");
  
@@ -105,22 +110,17 @@ diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrows
              t.linkedBrowser = b;
              t._tPos = position;
              if (t.previousSibling.selected)
-@@ -1730,21 +1749,22 @@
-             this.selectedTab._selected = true;
- 
-             // Removing the panel requires fixing up selectedPanel immediately
-             // (see below), which would be hindered by the potentially expensive
+@@ -1735,17 +1755,17 @@
              // browser removal. So we remove the browser and the panel in two
              // steps.
  
              var panel = this.getNotificationBox(browser);
-+            var stack = this.getBrowserContainer(browser).firstChild;
  
              // This will unload the document. An unload handler could remove
              // dependant tabs, so it's important that the tabbrowser is now in
              // a consistent state (tab removed, tab positions updated, etc.).
 -            panel.removeChild(this.getBrowserContainer(browser));
-+            stack.removeChild(browser);
++            browser.parentNode.removeChild(browser);
  
              // Release the browser in case something is erroneously holding a
              // reference to the tab after its removal.
@@ -129,7 +129,7 @@ diff --git a/browser/base/content/tabbrowser.xml b/browser/base/content/tabbrows
              // As the browser is removed, the removal of a dependent document can
              // cause the whole window to close. So at this point, it's possible
              // that the binding is destructed.
-@@ -2505,17 +2525,17 @@
+@@ -2506,17 +2526,17 @@
                }
                break;
            }

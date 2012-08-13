@@ -1,0 +1,452 @@
+# HG changeset patch
+# Parent 4770bca010461123a3bfde393bdebd1884dc3fcf
+Bug 781147 - Experiment with a 'Security Diagnostic' tool
+
+diff --git a/browser/devtools/Makefile.in b/browser/devtools/Makefile.in
+--- a/browser/devtools/Makefile.in
++++ b/browser/devtools/Makefile.in
+@@ -20,11 +20,12 @@ DIRS = \
+   styleeditor \
+   styleinspector \
+   tilt \
+   scratchpad \
+   debugger \
+   layoutview \
+   shared \
+   responsivedesign \
++  security-report \
+   $(NULL)
+ 
+ include $(topsrcdir)/config/rules.mk
+diff --git a/browser/devtools/commandline/GcliCommands.jsm b/browser/devtools/commandline/GcliCommands.jsm
+--- a/browser/devtools/commandline/GcliCommands.jsm
++++ b/browser/devtools/commandline/GcliCommands.jsm
+@@ -1542,8 +1542,52 @@ gcli.addCommand({
+                         xhr.status + " " + xhr.statusText);
+       }
+     };
+   }
+   xhr.send(null);
+   return promise;
+   }
+ });
++
++/**
++ * Security Report commands
++ */
++
++gcli.addCommand({
++  name: "security-report-show",
++  exec: function(args, context) {
++    Cu.import("resource:///modules/devtools/reporter.jsm");
++    let browserDoc = context.environment.chromeDocument;
++    let gBrowser = browserDoc.defaultView.gBrowser;
++    let contentDoc = gBrowser.contentDocument;
++    let url = "chrome://browser/content/devtools/security-report.html"
++    ReportManager.showReport("security", gBrowser, url, contentDoc);
++  },
++});
++
++gcli.addCommand({
++  name: "security-report-start",
++  exec: function(args, context) {
++    Cu.import("resource:///modules/devtools/reporter.jsm");
++    Cu.import("resource:///modules/devtools/security-recorder.jsm");
++    Cu.import("resource:///modules/devtools/security-renderer.jsm");
++    let browserDoc = context.environment.chromeDocument;
++    let gBrowser = browserDoc.defaultView.gBrowser;
++    let contentDoc = gBrowser.contentDocument;
++    ReportManager.newReport("security", contentDoc,
++                            new SecurityRecorder(contentDoc),
++                            SecurityRenderer);
++    ReportManager.recordDocument("security", contentDoc);
++  },
++});
++
++
++gcli.addCommand({
++  name: "security-report-stop",
++  exec: function(args, context) {
++    Cu.import("resource:///modules/devtools/reporter.jsm");
++    let browserDoc = context.environment.chromeDocument;
++    let gBrowser = browserDoc.defaultView.gBrowser;
++    let contentDoc = gBrowser.contentDocument;
++    ReportManager.destroyReport("security", contentDoc);
++  },
++});
+diff --git a/browser/devtools/jar.mn b/browser/devtools/jar.mn
+--- a/browser/devtools/jar.mn
++++ b/browser/devtools/jar.mn
+@@ -22,8 +22,9 @@ browser.jar:
+ *   content/browser/source-editor-overlay.xul     (sourceeditor/source-editor-overlay.xul)
+ *   content/browser/debugger.xul                  (debugger/debugger.xul)
+     content/browser/debugger.css                  (debugger/debugger.css)
+     content/browser/debugger-controller.js        (debugger/debugger-controller.js)
+     content/browser/debugger-view.js              (debugger/debugger-view.js)
+     content/browser/devtools/gcli.css             (commandline/gcli.css)
+     content/browser/devtools/gclioutput.xhtml     (commandline/gclioutput.xhtml)
+     content/browser/devtools/gclitooltip.xhtml    (commandline/gclitooltip.xhtml)
++    content/browser/devtools/security-report.html (security-report/security-report.html)
+diff --git a/browser/devtools/security-report/Makefile.in b/browser/devtools/security-report/Makefile.in
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/security-report/Makefile.in
+@@ -0,0 +1,18 @@
++#
++# This Source Code Form is subject to the terms of the Mozilla Public
++# License, v. 2.0. If a copy of the MPL was not distributed with this
++# file, You can obtain one at http://mozilla.org/MPL/2.0/.
++
++DEPTH		= @DEPTH@
++topsrcdir	= @top_srcdir@
++srcdir		= @srcdir@
++VPATH		= @srcdir@
++
++include $(DEPTH)/config/autoconf.mk
++
++#TEST_DIRS += test
++
++include $(topsrcdir)/config/rules.mk
++
++libs::
++	$(NSINSTALL) $(srcdir)/*.jsm $(FINAL_TARGET)/modules/devtools
+diff --git a/browser/devtools/security-report/reporter.jsm b/browser/devtools/security-report/reporter.jsm
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/security-report/reporter.jsm
+@@ -0,0 +1,109 @@
++/* vim:set ts=2 sw=2 sts=2 et tw=80:
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++"use strict";
++
++let EXPORTED_SYMBOLS = ["ReportManager"];
++
++let ReportManager = {
++
++  _reports: {},
++
++  hasReport: function SR_hasReport(type, targetDoc) {
++    return (type in this._reports && this._reports[type].has(targetDoc));
++  },
++
++  /**
++   * Register recorder and renderer for document.
++   *
++   * recorder = {
++   *   start: function(targetDoc, data){},
++   *   stop: function(targetDoc, data){},
++   *   isRecording: function(targetDoc, data){}
++   * }
++   *
++   * renderer = {
++   *  buildReport: function(newTabDoc, data){},
++   *  updateReport: function(newTabDoc, data){}
++   * }
++   */
++  newReport: function SR_newReport(type, targetDoc, recorder, renderer) {
++    if (this.hasReport(type, targetDoc)) {
++      return; // Report already created
++    }
++    let data = {};
++    if (!(type in this._reports)) {
++      this._reports[type] = new WeakMap();
++    }
++    this._reports[type].set(targetDoc, {data: data,
++                                        recorder: recorder,
++                                        renderer: renderer});
++  },
++
++  destroyReport: function SR_stopReport(type, targetDoc) {
++    if (!this.hasReport(type, targetDoc)) {
++      return; // Not report to destroy.
++    }
++
++    let recorder = this._reports[type].get(targetDoc).recorder;
++    if (recorder.isRecording()) {
++      let data = this._reports[type].get(targetDoc).data;
++      recorder.stop(targetDoc, data);
++    }
++
++    this._reports[type].delete(targetDoc);
++  },
++
++  recordDocument: function SR_recordDocument(type, targetDoc) {
++    if (!this.hasReport(type, targetDoc)) {
++      throw "No report registered for document.";
++    }
++    let recorder = this._reports[type].get(targetDoc).recorder;
++    let data = this._reports[type].get(targetDoc).data;
++    recorder.start(targetDoc, data);
++  },
++
++  stopRecordingDocument: function SR_stopRecordingDocument(type, targetDoc) {
++    if (!this.hasReport(type, targetDoc)) {
++      throw "No report registered for document.";
++    }
++
++    let recorder = this._reports[type].get(targetDoc).recorder;
++    if (!recorder.isRecording()) {
++      return; // Not recording.
++    }
++
++    let data = this._reports[type].get(targetDoc).data;
++    recorder.stop(targetDoc, data);
++  },
++
++  showReport: function SR_showReport(type, gBrowser, url, targetDoc) {
++    if (!this.hasReport(type, targetDoc)) {
++      throw "No report registered for document.";
++    }
++
++    let tab = gBrowser.addTab(url);
++    let browser = tab.linkedBrowser;
++
++    let onNewTabLoaded = function() {
++      browser.removeEventListener("load", onNewTabLoaded, true);
++
++      let renderer =  this._reports[type].get(targetDoc).renderer;
++      let data =  this._reports[type].get(targetDoc).data;
++
++      let newTabDoc = browser.contentDocument;
++      renderer.buildReport(newTabDoc, data);
++
++      let button = newTabDoc.querySelector("#updatebutton");
++      if (button) {
++        button.onclick = function() {
++          renderer.updateReport(newTabDoc, data);
++        }
++      }
++    }.bind(this);
++
++    browser.addEventListener("load", onNewTabLoaded, true);
++  },
++};
+diff --git a/browser/devtools/security-report/security-recorder.jsm b/browser/devtools/security-report/security-recorder.jsm
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/security-report/security-recorder.jsm
+@@ -0,0 +1,50 @@
++/* vim:set ts=2 sw=2 sts=2 et tw=80:
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++"use strict";
++
++let EXPORTED_SYMBOLS = ["SecurityRecorder"];
++
++/**
++ *   start: function(targetDoc, data){},
++ *   stop: function(targetDoc, data){},
++ *   isRecording: function(targetDoc, data){}
++ */
++
++let SecurityRecorder = function(doc){
++  this._clickCounter = this._clickCounter.bind(this);
++};
++
++SecurityRecorder.prototype = {
++  start: function(doc, data) {
++    this._recording = true;
++
++    this._doc = doc;
++    this._win = doc.defaultView;
++    this._data = data;
++
++    this._data.title = doc.title;
++    this._data.url = doc.location;
++    this._data.clickCount = 0;
++    this._win.addEventListener("click", this._clickCounter, true);
++  },
++
++  stop: function(doc, data) {
++    this._win.removeEventListener("click", this._clickCounter, true);
++
++    this._data = this._doc = this._win = null;
++    this._recording = false;
++  },
++
++  isRecording: function(doc, data) {
++    return this._recording;
++  },
++
++  /* internal methods: */
++
++  _clickCounter: function() {
++    this._data.clickCount++;
++  },
++};
+diff --git a/browser/devtools/security-report/security-renderer.jsm b/browser/devtools/security-report/security-renderer.jsm
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/security-report/security-renderer.jsm
+@@ -0,0 +1,25 @@
++/* vim:set ts=2 sw=2 sts=2 et tw=80:
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++"use strict";
++
++let EXPORTED_SYMBOLS = ["SecurityRenderer"];
++
++/**
++ *  buildReport: function(newTabDoc, data){},
++ *  updateReport: function(newTabDoc, data){}
++ */
++
++let SecurityRenderer = {
++  buildReport: function(tabdoc, data) {
++    tabdoc.querySelector("#securityShortDesc > p").textContent = data.title + " (" + data.url + ")";
++    tabdoc.querySelector("#securityLongDesc").innerHTML = "<p>Click counter: " + data.clickCount + "</p>";
++  },
++
++  updateReport: function(tabdoc, data) {
++    tabdoc.querySelector("#securityLongDesc").innerHTML = "<p>Click counter: " + data.clickCount + "</p>";
++  },
++};
++
+diff --git a/browser/devtools/security-report/security-report.html b/browser/devtools/security-report/security-report.html
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/security-report/security-report.html
+@@ -0,0 +1,136 @@
++<html xmlns="http://www.w3.org/1999/xhtml">
++  <head>
++    <title>Security Report</title>
++    <link rel="icon" type="image/png" id="favicon" href="chrome://global/skin/icons/warning-16.png" />
++    <style>
++        html {
++          height: 100%;
++          width: 100%;
++          font-size: medium;
++        }
++
++        body {
++          padding: 0 1em;
++          background-image: linear-gradient(to bottom, #fff, #BFC6D1);
++        }
++
++        html > body,
++        button {
++          font: message-box;
++          font-size: 100%; /* default: 16px; */
++          color: rgb(64,68,72);
++        }
++
++        h1 {
++          text-align: center;
++          font-size: 100%;
++          line-height: 2.25;
++          margin-bottom: 0;
++        }
++
++        ul, ol {
++          margin: 0;
++          -moz-margin-start: 1.5em;
++          padding: 0;
++        }
++
++        ul > li, ol > li {
++          margin-bottom: 14px;
++        }
++
++        #securityPageContainer {
++          min-width: 13em;
++          max-width: 36em;
++          margin: 4em auto;
++          border-radius: 4px;
++          background-image: linear-gradient(rgb(234,236,239), rgb(226,229,233));
++          box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset,
++                      0 -2px 0 rgba(10,12,15,0.1) inset,
++                      0 0 10px rgba(255,255,255,0.5) inset,
++                      0 0 0 1px rgba(10,12,15,0.1),
++                      0 2px 4px rgba(10,12,15,0.15);
++        }
++
++        #securityTitle {
++          background-color: rgba(255,255,255,0.4);
++          background-image: url(http://i.imgur.com/6jzix.png);
++          background-size: auto 100%;
++          border-bottom: 2px solid;
++          -moz-border-bottom-colors: rgba(255,255,255,0.2) rgba(12,23,38,0.13);
++        }
++
++        #securityLongContent {
++          line-height: 1.3;
++          padding: 0 24px 24px;
++        }
++
++        #securityShortDesc > p {
++          white-space: pre-wrap;
++        }
++
++        #securityLongDesc {
++          -moz-padding-end: 3em;
++          font-size: 81.25%; /* default: 16px; */
++        }
++
++        button {
++          -moz-appearance: none;
++          -moz-user-select: none;
++          font: message-box;
++          padding: 2px 6px;
++          background-color: hsla(210,30%,95%,.1);
++          background-image: -moz-linear-gradient(hsla(0,0%,100%,.6), hsla(0,0%,100%,.1));
++          background-clip: padding-box;
++          border: 1px solid hsla(210,15%,25%,.4);
++          border-color: hsla(210,15%,25%,.3) hsla(210,15%,25%,.35) hsla(210,15%,25%,.4);
++          border-radius: 3px;
++          box-shadow: 0 1px 0 hsla(0,0%,100%,.3) inset,
++                      0 0 0 1px hsla(0,0%,100%,.3) inset,
++                      0 1px 0 hsla(0,0%,100%,.1);
++          font-size: 81.25%; /* default: 16px; */
++          line-height: 1.5;
++          text-align: center;
++          -moz-transition-property: background-color, border-color, box-shadow;
++          -moz-transition-duration: 150ms;
++          -moz-transition-timing-function: ease;
++        }
++
++        button:hover {
++          background-color: hsla(210,30%,95%,.8);
++          border-color: hsla(210,15%,25%,.45) hsla(210,15%,25%,.5) hsla(210,15%,25%,.55);
++          box-shadow: 0 1px 0 hsla(0,0%,100%,.3) inset,
++                      0 0 0 1px hsla(0,0%,100%,.3) inset,
++                      0 1px 0 hsla(0,0%,100%,.1),
++                      0 0 3px hsla(210,15%,25%,.1);
++          -moz-transition-property: background-color, border-color, box-shadow;
++          -moz-transition-duration: 150ms;
++          -moz-transition-timing-function: ease;
++        }
++
++        button:hover:active {
++          background-color: hsla(210,15%,25%,.2);
++          box-shadow: 0 1px 1px hsla(210,15%,25%,.2) inset,
++                      0 0 2px hsla(210,15%,25%,.4) inset;
++          -moz-transition-property: background-color, border-color, box-shadow;
++          -moz-transition-duration: 10ms;
++          -moz-transition-timing-function: linear;
++        }
++    </style>
++  </head>
++
++  <body dir="ltr">
++    <div id="securityPageContainer">
++      <div id="securityTitle">
++        <h1>Security Report</h1>
++      </div>
++      <div id="securityLongContent">
++        <div id="securityShortDesc">
++          <p>2nd title</p>
++        </div>
++        <div id="securityLongDesc">
++        </div>
++        <button id="updatebutton">Update</button>
++      </div>
++    </div>
++  </body>
++</html>

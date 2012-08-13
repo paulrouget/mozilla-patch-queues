@@ -1,0 +1,19 @@
+# HG changeset patch
+# Parent 6cd95399dfc32528268e3c6d3e16412e26e3ba14
+
+diff --git a/browser/devtools/highlighter/inspector-toolbar.jsm b/browser/devtools/highlighter/inspector-toolbar.jsm
+new file mode 100644
+--- /dev/null
++++ b/browser/devtools/highlighter/inspector-toolbar.jsm
+@@ -0,0 +1,11 @@
++function InspectorBottomBox(aInspector) {
++  this.inspector = aInspector;
++  this.buildUI();
++}
++
++InspectorBottomBox.prototype = {
++  buildUI: function() {
++    let inspector = aInspector;
++    let chromeDoc = this.inspector.chromeWindow.document;
++  }
++}

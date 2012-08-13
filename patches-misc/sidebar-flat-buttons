@@ -1,0 +1,385 @@
+# HG changeset patch
+# Parent 1ede483e8d9161086f1e1376371ed66dfeaa3537
+
+diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul
++++ b/browser/base/content/browser.xul
+@@ -1039,20 +1039,16 @@
+       <browser id="social-sidebar-browser"
+                type="content"
+                flex="1"
+                style="min-width: 14em; width: 18em; max-width: 36em;"/>
+     </vbox>
+     <splitter id="devtools-side-splitter" hidden="true"/>
+     <vbox id="devtools-sidebar-box" hidden="true"
+           style="min-width: 18em; width: 22em; max-width: 42em;" persist="width">
+-      <toolbar id="devtools-sidebar-toolbar"
+-               class="devtools-toolbar"
+-               nowindowdrag="true"/>
+-      <deck id="devtools-sidebar-deck" flex="1"/>
+     </vbox>
+     <vbox id="browser-border-end" hidden="true" layer="true"/>
+   </hbox>
+ 
+   <hbox id="full-screen-warning-container" hidden="true" fadeout="true">
+     <hbox style="width: 100%;" pack="center"> <!-- Inner hbox needed due to bug 579776. -->
+       <vbox id="full-screen-warning-message" align="center">
+         <description id="full-screen-domain-text"/>
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -1874,16 +1874,17 @@ InspectorStyleSidebar.prototype = {
+ 
+     this._toolbar = doc.createElement("toolbar");
+     this._toolbar.setAttribute("class", this._host.toolbarClass);
+     this._toolbar.setAttribute("nowindowdrag", "true");
+     container.appendChild(this._toolbar);
+ 
+     this._toolbarBox = doc.createElement("hbox");
+     this._toolbarBox.setAttribute("flex", "1");
++    this._toolbarBox.setAttribute("pack", "center");
+     this._toolbar.appendChild(this._toolbarBox);
+ 
+     if (this.position == "sidebar") {
+       let detach = doc.createElement("toolbarbutton");
+       detach.classList.add("devtools-toolbox-detach");
+       detach.addEventListener("click", function onDetach() {
+         this.setPosition("panel");
+       }.bind(this), false);
+@@ -1977,17 +1978,18 @@ InspectorStyleSidebar.prototype = {
+   addTool: function ISS_addTool(aRegObj)
+   {
+     if (aRegObj.id in this._tools) {
+       return;
+     }
+ 
+     let btn = this._chromeDoc.createElement("toolbarbutton");
+     btn.setAttribute("label", aRegObj.label);
+-    btn.setAttribute("class", "devtools-toolbarbutton");
++    btn.setAttribute("flex", "1");
++    btn.setAttribute("class", "devtools-sidebar-toolbarbutton");
+     btn.setAttribute("tooltiptext", aRegObj.tooltiptext);
+     btn.setAttribute("accesskey", aRegObj.accesskey);
+     btn.setAttribute("image", aRegObj.icon || "");
+     btn.setAttribute("type", "radio");
+     btn.setAttribute("group", "sidebar-tools");
+     this._toolbarBox.appendChild(btn);
+ 
+     // create tool iframe
+diff --git a/browser/devtools/styleinspector/CssHtmlTree.jsm b/browser/devtools/styleinspector/CssHtmlTree.jsm
+--- a/browser/devtools/styleinspector/CssHtmlTree.jsm
++++ b/browser/devtools/styleinspector/CssHtmlTree.jsm
+@@ -866,17 +866,17 @@ PropertyView.prototype = {
+     this.element = doc.createElementNS(HTML_NS, "tr");
+     this.element.setAttribute("class", this.propertyHeaderClassName);
+ 
+     this.propertyHeader = doc.createElementNS(HTML_NS, "td");
+     this.element.appendChild(this.propertyHeader);
+     this.propertyHeader.setAttribute("class", "property-header");
+ 
+     this.matchedExpander = doc.createElementNS(HTML_NS, "div");
+-    this.matchedExpander.setAttribute("class", "match expander");
++    this.matchedExpander.setAttribute("class", "match devtools-twisty");
+     this.matchedExpander.setAttribute("tabindex", "0");
+     this.matchedExpander.addEventListener("click",
+       this.matchedExpanderClick.bind(this), false);
+     this.matchedExpander.addEventListener("keydown", function(aEvent) {
+       let keyEvent = Ci.nsIDOMKeyEvent;
+       if (aEvent.keyCode == keyEvent.DOM_VK_F1) {
+         this.mdnLinkClick();
+       }
+diff --git a/browser/devtools/styleinspector/CssRuleView.jsm b/browser/devtools/styleinspector/CssRuleView.jsm
+--- a/browser/devtools/styleinspector/CssRuleView.jsm
++++ b/browser/devtools/styleinspector/CssRuleView.jsm
+@@ -1528,26 +1528,25 @@ TextPropertyEditor.prototype = {
+    * Create the property editor's DOM.
+    */
+   _create: function TextPropertyEditor_create()
+   {
+     this.element = this.doc.createElementNS(HTML_NS, "li");
+     this.element.classList.add("ruleview-property");
+ 
+     // The enable checkbox will disable or enable the rule.
+-    this.enable = createChild(this.element, "input", {
+-      class: "ruleview-enableproperty",
+-      type: "checkbox",
++    this.enable = createChild(this.element, "div", {
++      class: "devtools-checkbox",
+       tabindex: "-1"
+     });
+     this.enable.addEventListener("click", this._onEnableClicked, true);
+ 
+     // Click to expand the computed properties of the text property.
+     this.expander = createChild(this.element, "span", {
+-      class: "ruleview-expander"
++      class: "devtools-twisty"
+     });
+     this.expander.addEventListener("click", this._onExpandClicked, true);
+ 
+     this.nameContainer = createChild(this.element, "span", {
+       class: "ruleview-namecontainer"
+     });
+     this.nameContainer.addEventListener("click", function(aEvent) {
+       // Clicks within the name shouldn't propagate any further.
+@@ -1729,18 +1728,23 @@ TextPropertyEditor.prototype = {
+     aEvent.stopPropagation();
+   },
+ 
+   /**
+    * Handles clicks on the computed property expander.
+    */
+   _onExpandClicked: function TextPropertyEditor_onExpandClicked(aEvent)
+   {
+-    this.expander.classList.toggle("styleinspector-open");
+-    this.computed.classList.toggle("styleinspector-open");
++    if (this.computed.classList.has("styleinspector-open")) {
++      this.expander.removeAttribute("open");
++      this.computed.classList.remove("styleinspector-open");
++    } else {
++      this.expander.setAttribute("open", "true");
++      this.computed.classList.add("styleinspector-open");
++    }
+     aEvent.stopPropagation();
+   },
+ 
+   /**
+    * Called when the property name's inplace editor is closed.
+    * Ignores the change if the user pressed escape, otherwise
+    * commits it.
+    *
+diff --git a/browser/devtools/styleinspector/csshtmltree.xul b/browser/devtools/styleinspector/csshtmltree.xul
+--- a/browser/devtools/styleinspector/csshtmltree.xul
++++ b/browser/devtools/styleinspector/csshtmltree.xul
+@@ -1,16 +1,17 @@
+ <?xml version="1.0"?>
+ <!-- This Source Code Form is subject to the terms of the Mozilla Public
+    - License, v. 2.0. If a copy of the MPL was not distributed with this
+    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+ 
+ <?xml-stylesheet href="chrome://global/skin/global.css"?>
+ <?xml-stylesheet href="chrome://browser/content/devtools/styleinspector.css" type="text/css"?>
+ <?xml-stylesheet href="chrome://browser/skin/devtools/csshtmltree.css" type="text/css"?>
++<?xml-stylesheet href="chrome://browser/skin/devtools/csshtmltree-dark.css" type="text/css"?>
+ 
+ <!DOCTYPE window [
+   <!ENTITY % inspectorDTD SYSTEM "chrome://browser/locale/devtools/styleinspector.dtd">
+   %inspectorDTD;
+   <!ELEMENT loop ANY>
+   <!ATTLIST li foreach CDATA #IMPLIED>
+   <!ATTLIST div foreach CDATA #IMPLIED>
+   <!ATTLIST loop foreach CDATA #IMPLIED>
+diff --git a/browser/devtools/styleinspector/cssruleview.xul b/browser/devtools/styleinspector/cssruleview.xul
+--- a/browser/devtools/styleinspector/cssruleview.xul
++++ b/browser/devtools/styleinspector/cssruleview.xul
+@@ -1,12 +1,13 @@
+ <?xml version="1.0"?>
+ <!-- This Source Code Form is subject to the terms of the Mozilla Public
+    - License, v. 2.0. If a copy of the MPL was not distributed with this
+    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+ <?xml-stylesheet href="chrome://global/skin/global.css"?>
+ <?xml-stylesheet href="chrome://browser/content/devtools/styleinspector.css" type="text/css"?>
+ <?xml-stylesheet href="chrome://browser/skin/devtools/csshtmltree.css" type="text/css"?>
++<?xml-stylesheet href="chrome://browser/skin/devtools/csshtmltree-dark.css" type="text/css"?>
+ <!DOCTYPE window [
+   <!ENTITY % inspectorDTD SYSTEM "chrome://browser/locale/devtools/styleinspector.dtd">
+   %inspectorDTD;
+ ]>
+ <window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"/>
+diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinstripe/devtools/common.css
+--- a/browser/themes/pinstripe/devtools/common.css
++++ b/browser/themes/pinstripe/devtools/common.css
+@@ -151,30 +151,64 @@
+   border: 0;
+   -moz-border-start: 1px solid black;
+   min-width: 0;
+   width: 3px;
+   -moz-margin-end: -3px;
+   position: relative;
+ }
+ 
++/* Sidebar buttons */
++
++.devtools-sidebar-toolbarbutton {
++  -moz-appearance: none;
++  min-height: 22px;
++  min-width: 60px;
++  text-shadow: 0 -1px 0 hsla(210,8%,5%,.45);
++  color: inherit;
++  margin: 0;
++  padding: 4px 0;
++  border-width: 0;
++  background-color: transparent;
++}
++
++.devtools-sidebar-toolbarbutton:first-of-type {
++  border-radius: 2px 0 0 0;
++  border-top: 1px solid transparent;
++  border-right: 1px solid transparent;
++}
++
++.devtools-sidebar-toolbarbutton:last-of-type {
++  border-radius: 0 2px 0 0;
++  border-top: 1px solid transparent;
++  border-left: 1px solid transparent;
++}
++
++.devtools-sidebar-toolbarbutton[checked=true] {
++  background-color: rgba(0,0,0,0.2);
++  background-image: -moz-linear-gradient(top, rgba(0,0,0,0.5), transparent 80%);
++  color: hsl(208,100%,60%) !important;
++  text-shadow: 0 0 -1px hsl(208,100%,60%);
++  border-color: rgba(0,0,0,0.35);
++}
++
+ /* Toolbox Panels */
+ 
+ .devtools-toolbox-panel {
+   border: 1px solid hsl(210,11%,10%);
+   box-shadow: 0 1px 0 hsla(209,29%,72%,.25) inset;
+   background-image: url(background-noise-toolbar.png),
+                     -moz-linear-gradient(top, hsla(209,18%,18%,0.9), hsl(210,11%,16%));
+   border-radius: 3px;
+   padding: 5px 0 0 5px;
+ }
+ 
+ .devtools-toolbar-flat {
+   -moz-appearance: none;
+-  padding: 4px 3px;
++  padding: 4px 0 0 0;
+   color: hsl(210,30%,85%);
+ }
+ 
+ .devtools-toolbox-resizer {
+   -moz-appearance: none;
+ }
+ 
+ .devtools-toolbox-resizer[dir=bottom] {
+@@ -205,8 +239,38 @@
+   -moz-image-region: rect(0px 16px 16px 0px);
+   border: none;
+ }
+ 
+ .devtools-toolbox-detach > .toolbarbutton-text,
+ .devtools-toolbox-attach > .toolbarbutton-text {
+   display: none;
+ }
++
++/* twisty */
++
++.devtools-twisty {
++  margin: 0 5px;
++  width: 8px;
++  height: 8px;
++  transform: rotate(-45deg);
++  background-image: linear-gradient(to top left, hsla(0,0%,100%,0.5) 50%, transparent 50%);
++  transition: 100ms transform;
++}
++
++.devtools-twisty[open] {
++  transform: none;
++}
++
++/* checkbox */
++
++.devtools-checkbox {
++  -moz-appearance: none;
++  margin: 0 5px;
++  width: 8px;
++  height: 8px;
++  border: 1px solid red;
++  background-image: url(background-noise-toolbar.png),
++                    linear-gradient(to bottom, #223347, #1D2935),
++                    linear-gradient(45deg, transparent 40%, blue 40%, blue 60%, transparent 60%);
++  box-shadow: 0 0 2px black inset;
++  background-size: 100% 100%, 100% 100%, 4px 4px;
++}
+diff --git a/browser/themes/pinstripe/devtools/csshtmltree.css b/browser/themes/pinstripe/devtools/csshtmltree.css
+--- a/browser/themes/pinstripe/devtools/csshtmltree.css
++++ b/browser/themes/pinstripe/devtools/csshtmltree.css
+@@ -44,30 +44,16 @@
+   visibility: hidden;
+ }
+ 
+ .rulelink {
+   color: -moz-dialogtext;
+   padding: 0;
+ }
+ 
+-.expander {
+-  -moz-appearance: treetwisty;
+-  width: 12px;
+-  height: 12px;
+-  padding-top: 12px;
+-  -moz-margin-start: 5px;
+-  -moz-margin-end: 5px;
+-  vertical-align: middle;
+-}
+-
+-.expander[open] {
+-  -moz-appearance: treetwistyopen;
+-}
+-
+ .match {
+   visibility: hidden;
+ }
+ 
+ .expandable {
+   cursor: pointer;
+   visibility: visible;
+ }
+@@ -211,32 +197,19 @@
+   transition-delay: 200ms;
+ }
+ 
+ .ruleview-property:not(:hover) > .ruleview-enableproperty {
+   opacity: 0;
+   transition: none;
+ }
+ 
+-.ruleview-expander {
+-  width: 8px;
+-  height: 8px;
+-  background: url("chrome://browser/skin/devtools/arrows.png") 24px 0;
+-  cursor: pointer;
+-  -moz-margin-start: 2px;
+-  -moz-margin-end: 5px;
+-}
+-
+-.ruleview-expander.styleinspector-open {
+-  background-position: 8px 0;
+-}
+-
+ .ruleview-newproperty {
+-  /* (enable checkbox width: 12px) + (expander width: 15px) */
+-  -moz-margin-start: 27px;
++  /* (enable checkbox width: 12px) + (expander width: 12px) */
++  -moz-margin-start: 24px;
+ }
+ 
+ .ruleview-propertyname {
+   padding: 1px 0;
+   color: hsl(210,100%,38%); /* blue */
+ }
+ 
+ .ruleview-propertyvalue {
+diff --git a/browser/themes/pinstripe/jar.mn b/browser/themes/pinstripe/jar.mn
+--- a/browser/themes/pinstripe/jar.mn
++++ b/browser/themes/pinstripe/jar.mn
+@@ -142,16 +142,17 @@ browser.jar:
+   skin/classic/browser/tabview/tabview.png                  (tabview/tabview.png)
+   skin/classic/browser/tabview/tabview.css                  (tabview/tabview.css)
+ * skin/classic/browser/devtools/common.css                  (devtools/common.css)
+   skin/classic/browser/devtools/arrows.png                  (devtools/arrows.png)
+   skin/classic/browser/devtools/commandline.png             (devtools/commandline.png)
+   skin/classic/browser/devtools/alerticon-warning.png       (devtools/alerticon-warning.png)
+   skin/classic/browser/devtools/goto-mdn.png                (devtools/goto-mdn.png)
+   skin/classic/browser/devtools/csshtmltree.css             (devtools/csshtmltree.css)
++  skin/classic/browser/devtools/csshtmltree-dark.css        (devtools/csshtmltree-dark.css)
+   skin/classic/browser/devtools/gcli.css                    (devtools/gcli.css)
+   skin/classic/browser/devtools/htmlpanel.css               (devtools/htmlpanel.css)
+   skin/classic/browser/devtools/orion.css                   (devtools/orion.css)
+   skin/classic/browser/devtools/orion-container.css         (devtools/orion-container.css)
+   skin/classic/browser/devtools/orion-task.png              (devtools/orion-task.png)
+   skin/classic/browser/devtools/orion-breakpoint.png        (devtools/orion-breakpoint.png)
+   skin/classic/browser/devtools/orion-debug-location.png    (devtools/orion-debug-location.png)
+   skin/classic/browser/devtools/toolbarbutton-close.png     (devtools/toolbarbutton-close.png)

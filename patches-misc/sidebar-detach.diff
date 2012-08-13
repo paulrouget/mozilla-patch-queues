@@ -1,0 +1,1372 @@
+# vim: se ft=diff :
+# HG changeset patch
+# User Dave Camp <dcamp>
+# Date 2012-06-28 20:46
+Bug 769534 - "Add the ability to detach the style sidebar" [f+f=dcamp]
+
+# HG changeset patch
+# Parent b658834ae434835b1f249a8aec8d91f85c08285d
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -1028,16 +1028,17 @@ pref("devtools.toolbar.visible", false);
+ pref("devtools.gcli.allowSet", false);
+ pref("devtools.commands.dir", "");
+ 
+ // Enable the Inspector
+ pref("devtools.inspector.enabled", true);
+ pref("devtools.inspector.htmlHeight", 112);
+ pref("devtools.inspector.htmlPanelOpen", false);
+ pref("devtools.inspector.sidebarOpen", false);
++pref("devtools.inspector.sidebarPosition", "sidebar");
+ pref("devtools.inspector.activeSidebar", "ruleview");
+ pref("devtools.inspector.highlighterShowVeil", true);
+ pref("devtools.inspector.highlighterShowInfobar", true);
+ 
+ // Enable the Layout View
+ pref("devtools.layoutview.enabled", true);
+ pref("devtools.layoutview.open", false);
+ 
+diff --git a/browser/base/content/browser.xul b/browser/base/content/browser.xul
+--- a/browser/base/content/browser.xul
++++ b/browser/base/content/browser.xul
+@@ -1039,20 +1039,16 @@
+       <browser id="social-sidebar-browser"
+                type="content"
+                flex="1"
+                style="min-width: 14em; width: 18em; max-width: 36em;"/>
+     </vbox>
+     <splitter id="devtools-side-splitter" hidden="true"/>
+     <vbox id="devtools-sidebar-box" hidden="true"
+           style="min-width: 18em; width: 22em; max-width: 42em;" persist="width">
+-      <toolbar id="devtools-sidebar-toolbar"
+-               class="devtools-toolbar"
+-               nowindowdrag="true"/>
+-      <deck id="devtools-sidebar-deck" flex="1"/>
+     </vbox>
+     <vbox id="browser-border-end" hidden="true" layer="true"/>
+   </hbox>
+ 
+   <hbox id="full-screen-warning-container" hidden="true" fadeout="true">
+     <hbox style="width: 100%;" pack="center"> <!-- Inner hbox needed due to bug 579776. -->
+       <vbox id="full-screen-warning-message" align="center">
+         <description id="full-screen-domain-text"/>
+diff --git a/browser/devtools/highlighter/inspector.jsm b/browser/devtools/highlighter/inspector.jsm
+--- a/browser/devtools/highlighter/inspector.jsm
++++ b/browser/devtools/highlighter/inspector.jsm
+@@ -64,16 +64,18 @@ const LAYOUT_CHANGE_TIMER = 250;
+ function Inspector(aIUI)
+ {
+   this._IUI = aIUI;
+   this._winID = aIUI.winID;
+   this._browser = aIUI.browser;
+   this._listeners = {};
+ 
+   this._browser.addEventListener("resize", this, true);
++
++  this._create();
+ }
+ 
+ Inspector.prototype = {
+   /**
+    * True if the highlighter is locked on a node.
+    */
+   get locked() {
+     return !this._IUI.inspecting;
+@@ -82,16 +84,21 @@ Inspector.prototype = {
+   /**
+    * The currently selected node in the highlighter.
+    */
+   get selection() {
+     return this._IUI.selection;
+   },
+ 
+   /**
++   * The InspectorStyleSidebar instance for this inspector.
++   */
++  get sidebar() this._sidebar,
++
++  /**
+    * Indicate that a tool has modified the state of the page.  Used to
+    * decide whether to show the "are you sure you want to navigate"
+    * notification.
+    */
+   markDirty: function Inspector_markDirty()
+   {
+     this._IUI.isDirty = true;
+   },
+@@ -99,16 +106,27 @@ Inspector.prototype = {
+   /**
+    * The chrome window the inspector lives in.
+    */
+   get chromeWindow() {
+     return this._IUI.chromeWin;
+   },
+ 
+   /**
++   * Initialize the inspector object.
++   */
++  _create: function Inspector__create()
++  {
++    this._sidebar = new InspectorStyleSidebar({
++      document: this._IUI.chromeDoc,
++      inspector: this,
++    });
++  },
++
++  /**
+    * Notify the inspector that the current selection has changed.
+    *
+    * @param string aContext
+    *        An string that will be passed to the change event.  Allows
+    *        a tool to recognize when it sent a change notification itself
+    *        to avoid unnecessary refresh.
+    */
+   change: function Inspector_change(aContext)
+@@ -130,16 +148,21 @@ Inspector.prototype = {
+ 
+   /**
+    * Called by the InspectorUI when the inspector is being destroyed.
+    */
+   _destroy: function Inspector__destroy()
+   {
+     this._cancelLayoutChange();
+     this._browser.removeEventListener("resize", this, true);
++
++    // close the sidebar
++    this._sidebar.destroy();
++    delete this._sidebar;
++
+     delete this._IUI;
+     delete this._listeners;
+   },
+ 
+   /**
+    * Event handler for DOM events.
+    *
+    * @param DOMEvent aEvent
+@@ -181,29 +204,31 @@ Inspector.prototype = {
+   /**
+    * Called by InspectorUI after a tab switch, when the
+    * inspector is no longer the active tab.
+    */
+   _freeze: function Inspector__freeze()
+   {
+     this._cancelLayoutChange();
+     this._browser.removeEventListener("resize", this, true);
++    this.sidebar._freeze();
+     this._frozen = true;
+   },
+ 
+   /**
+    * Called by InspectorUI after a tab switch when the
+    * inspector is back to being the active tab.
+    */
+   _thaw: function Inspector__thaw()
+   {
+     if (!this._frozen) {
+       return;
+     }
+ 
++    this.sidebar._thaw();
+     this._browser.addEventListener("resize", this, true);
+     delete this._frozen;
+   },
+ 
+   /// Event stuff.  Would like to refactor this eventually.
+   /// Emulates the jetpack event source, which has a nice API.
+ 
+   /**
+@@ -321,17 +346,17 @@ InspectorUI.prototype = {
+   /**
+    * The Inspector object for the current tab.
+    */
+   get currentInspector() this._currentInspector,
+ 
+   /**
+    * The InspectorStyleSidebar for the current tab.
+    */
+-  get sidebar() this._sidebar,
++  get sidebar() this.currentInspector._sidebar,
+ 
+   /**
+    * Toggle the inspector interface elements on or off.
+    *
+    * @param aEvent
+    *        The event that requested the UI change. Toolbar button or menu.
+    */
+   toggleInspectorUI: function IUI_toggleInspectorUI(aEvent)
+@@ -566,27 +591,16 @@ InspectorUI.prototype = {
+ 
+     this.chromeWin.addEventListener("keypress", this, false);
+ 
+     // initialize the highlighter
+     this.highlighter = new Highlighter(this.chromeWin);
+ 
+     this.initializeStore();
+ 
+-    this._sidebar = new InspectorStyleSidebar({
+-      document: this.chromeDoc,
+-      inspector: this._currentInspector,
+-    });
+-
+-    // Create UI for any sidebars registered with
+-    // InspectorUI.registerSidebar()
+-    for each (let tool in InspectorUI._registeredSidebars) {
+-      this._sidebar.addTool(tool);
+-    }
+-
+     this.setupNavigationKeys();
+     this.highlighterReady();
+ 
+     // Focus the first focusable element in the toolbar
+     this.chromeDoc.commandDispatcher.advanceFocusIntoSubtree(this.toolbar);
+ 
+     // If nothing is focused in the toolbar, it means that the focus manager
+     // is limited to some specific elements and has moved the focus somewhere else.
+@@ -623,22 +637,16 @@ InspectorUI.prototype = {
+       this.store.addInspector(this.winID, inspector);
+       inspector._selectedNode = null;
+       inspector._inspecting = true;
+       inspector._isDirty = this.isDirty;
+ 
+       inspector._htmlPanelOpen =
+         Services.prefs.getBoolPref("devtools.inspector.htmlPanelOpen");
+ 
+-      inspector._sidebarOpen =
+-        Services.prefs.getBoolPref("devtools.inspector.sidebarOpen");
+-
+-      inspector._activeSidebar =
+-        Services.prefs.getCharPref("devtools.inspector.activeSidebar");
+-
+       inspector._highlighterShowVeil =
+         Services.prefs.getBoolPref("devtools.inspector.highlighterShowVeil");
+ 
+       inspector._highlighterShowInfobar =
+         Services.prefs.getBoolPref("devtools.inspector.highlighterShowInfobar");
+ 
+       this.win.addEventListener("pagehide", this, true);
+ 
+@@ -716,22 +724,16 @@ InspectorUI.prototype = {
+     if (this.store.isEmpty()) {
+       this.tabbrowser.tabContainer.removeEventListener("TabSelect", this, false);
+     }
+ 
+     this.chromeWin.removeEventListener("keypress", this, false);
+ 
+     this.stopInspecting();
+ 
+-    // close the sidebar
+-    if (this._sidebar) {
+-      this._sidebar.destroy();
+-      this._sidebar = null;
+-    }
+-
+     if (this.highlighter) {
+       this.highlighter.destroy();
+       this.highlighter = null;
+     }
+ 
+     if (this.breadcrumbs) {
+       this.breadcrumbs.destroy();
+       this.breadcrumbs = null;
+@@ -938,20 +940,16 @@ InspectorUI.prototype = {
+     Services.obs.notifyObservers(null, INSPECTOR_NOTIFICATIONS.STATE_RESTORED, null);
+ 
+     this.highlighter.highlight();
+ 
+     if (this.currentInspector._htmlPanelOpen) {
+       this.treePanel.open();
+     }
+ 
+-    if (this.currentInspector._sidebarOpen) {
+-      this._sidebar.show();
+-    }
+-
+     let menu = this.chromeDoc.getElementById("inspectorToggleVeil");
+     if (this.currentInspector._highlighterShowVeil) {
+       menu.setAttribute("checked", "true");
+     } else {
+       menu.removeAttribute("checked");
+       this.highlighter.hideVeil();
+     }
+ 
+@@ -1512,52 +1510,471 @@ InspectorUI.unregisterSidebar = function
+ {
+   InspectorUI._registeredSidebars = InspectorUI._registeredSidebars.filter(function(aReg) aReg.id != aID);
+ }
+ 
+ ///////////////////////////////////////////////////////////////////////////
+ //// Style Sidebar
+ 
+ /**
++ * Used when the style sidebar is docked in a sidebar.
++ *
++ * @param document aDoc
++ *        The chrome document containing the style sidebar.
++ */
++function StyleHostSidebar(aDoc)
++{
++  this.doc = aDoc;
++}
++
++StyleHostSidebar.prototype = {
++  toolbarClass: "devtools-toolbar",
++
++  /**
++   * True if the sidebar is visible.
++   */
++  get visible() !this.container.hasAttribute("hidden"),
++
++  /**
++   * The vbox that the style sidebar should place its elements in.
++   */
++  get container() this.doc.getElementById("devtools-sidebar-box"),
++
++  get _splitter() this.doc.getElementById("devtools-side-splitter"),
++
++  /**
++   * Show the sidebar.
++   */
++  show: function SHS_show()
++  {
++    this.container.removeAttribute("hidden");
++    this._splitter.removeAttribute("hidden");
++  },
++
++  /**
++   * Hide the sidebar.
++   */
++  hide: function SHS_hide()
++  {
++    this.container.setAttribute("hidden", "true");
++    this._splitter.setAttribute("hidden", "true");
++  },
++
++  /**
++   * Destroy the sidebar.
++   */
++  destroy: function SHS_destroy()
++  {
++    this.hide();
++    while (this.container.hasChildNodes()) {
++      this.container.removeChild(this.container.firstChild);
++    }
++  },
++};
++
++
++/**
++ * Used when the sidebar is in a popup XUL panel.
++ *
++ * @param InspectorStyleSidebaar aStyleSidebar
++ *        The sidebar to place in the panel.
++ */
++function StyleHostPanel(aStyleSidebar)
++{
++  this._styleSidebar = aStyleSidebar;
++  this.doc = aStyleSidebar._chromeDoc;
++  this._browser = aStyleSidebar._inspector._browser;
++  this._boundResize = this._onResize.bind(this);
++
++  this._create();
++}
++
++StyleHostPanel.prototype = {
++  toolbarClass: "devtools-toolbar-flat",
++
++  /**
++   * The vbox that the style sidebar should place its elements in.
++   */
++  container: null,
++
++  /**
++   * True if the panel is visible.
++   */
++  get visible() this._panel.state == "open" || this._panel.state == "showing",
++
++  _createResizers: function SHP__createResizers(aType, aDirections)
++  {
++    let box = this.doc.createElement(aType);
++    for (let dir of aDirections) {
++      let resizer = this.doc.createElement("resizer");
++      resizer.setAttribute("dir", dir);
++      resizer.classList.add("devtools-toolbox-resizer");
++      box.appendChild(resizer);
++    }
++    return box;
++  },
++
++  /**
++   * Create the panel.
++   */
++  _create: function SHP__create()
++  {
++    if (this._panel) {
++      return;
++    }
++
++    this._location = this._defaultLocation();
++
++    let doc = this.doc;
++
++    this._panel = doc.createElement("panel");
++    this._panel.setAttribute("noautohide", "true");
++    this._panel.setAttribute("flex", "1")
++    this._panel.setAttribute("backdrag", "true");
++    this._panel.setAttribute("height", this._location.height);
++    this._panel.setAttribute("width", this._location.width);
++
++    this._panel.addEventListener("resize", this._boundResize, false);
++
++    // Create the titlebar...
++    let title = doc.createElement("hbox")
++    title.classList.add("devtools-toolbox-title");
++
++    let spacer = doc.createElement("spacer");
++    spacer.setAttribute("flex", "1");
++    title.appendChild(spacer);
++
++    let attach = doc.createElement("toolbarbutton");
++    attach.classList.add("devtools-toolbox-attach");
++    attach.addEventListener("click", function onAttach() {
++      this._styleSidebar.setPosition("sidebar");
++    }.bind(this), false);
++    title.appendChild(attach);
++
++    let close = doc.createElement("toolbarbutton");
++    close.classList.add("devtools-closebutton");
++    close.addEventListener("click", function() {
++      this._styleSidebar.hide();
++    }.bind(this), false);
++    title.appendChild(close);
++
++    // Create the main container for elements.
++    this.container = doc.createElement("vbox");
++    this.container.setAttribute("flex", "1");
++
++    let hbox = doc.createElement("hbox");
++    hbox.classList.add("devtools-toolbox-panel");
++    hbox.setAttribute("flex", "1");
++
++    let vbox = doc.createElement("vbox");
++    vbox.setAttribute("flex", "1");
++
++    vbox.appendChild(title);
++    vbox.appendChild(this.container);
++    vbox.appendChild(this._createResizers("hbox", [
++      "bottom", "bottomright"
++    ]));
++    hbox.appendChild(vbox);
++    hbox.appendChild(this._createResizers("vbox", [
++      "right", "bottomright"
++    ]));
++    this._panel.appendChild(hbox);
++
++    let popupset = this.doc.getElementById("mainPopupSet");
++    popupset.appendChild(this._panel);
++  },
++
++  _browserRect: function SHP_browserOrigin()
++  {
++    let chromeWin = this._browser.ownerDocument.defaultView;
++    let browserRect = this._browser.getBoundingClientRect();
++    return {
++      left: chromeWin.mozInnerScreenX + browserRect.left,
++      top: chromeWin.mozInnerScreenY + browserRect.top,
++      width: browserRect.width,
++      height: browserRect.height
++    };
++  },
++
++  /**
++   * Returns the starting location for the inspector sidebar.
++   * top and left coordinates are relative to the content browser window.
++   */
++  _defaultLocation: function SHP_defaultLocation()
++  {
++    let pref;
++    try {
++      let str = Services.prefs.getCharPref("devtools.inspector.sidebarLocation");
++      pref = JSON.parse(str);
++    } catch(ex) {
++      pref = {};
++    }
++
++    let browserRect = this._browserRect();
++
++    let loc = {};
++    loc.height = pref.height || this._styleSidebar.lastHeight || 500;
++    loc.width = pref.width || this._styleSidebar.lastWidth || 250;
++    loc.top = pref.top || 0;
++    loc.left = pref.left || browserRect.width - loc.width;
++
++    return loc;
++  },
++
++  _saveLocation: function SHP_saveLocation()
++  {
++    let browserRect = this._browserRect();
++    let rect = this._panel.getOuterScreenRect();
++    this._location.top = rect.top - browserRect.top;
++    this._location.left = rect.left - browserRect.left;
++    this._location.height = rect.height;
++    this._location.width = rect.width;
++    Services.prefs.setCharPref("devtools.inspector.sidebarLocation",
++                               JSON.stringify(this._location));
++  },
++
++  _onResize: function SHP_onResize(aEvent)
++  {
++    this._saveLocation();
++  },
++
++  /**
++   * Show the panel.
++   */
++  show: function SHP_show()
++  {
++    let browserRect = this._browserRect();
++    this._panel.openPopupAtScreen(browserRect.left + this._location.left,
++                                  browserRect.top + this._location.top);
++  },
++
++  /**
++   * Hide the panel.
++   */
++  hide: function SHP_hide()
++  {
++    this._saveLocation();
++    this._panel.hidePopup();
++  },
++
++  /**
++   * Destroy the panel.
++   */
++  destroy: function SHP_destroy() {
++    this._saveLocation();
++
++    let panel = this._panel;
++    delete this._panel;
++    delete this._container;
++
++    panel.removeEventListener("resize", this._boundResize, false);
++    delete this._boundResize;
++
++    if (panel.state == "closed") {
++      panel.parentNode.removeChild(panel);
++    } else {
++      panel.addEventListener("popuphidden", function() {
++        panel.parentNode.removeChild(panel);
++      }, true);
++      panel.hidePopup();
++    }
++  }
++};
++
++
++/**
+  * Manages the UI and loading of registered sidebar tools.
+  * @param aOptions object
+  *   Initialization information for the style sidebar, including:
+  *     document: The chrome document in which the style sidebar
+  *             should be created.
+  *     inspector: The Inspector object tied to this sidebar.
+  */
+ function InspectorStyleSidebar(aOptions)
+ {
+-  this._tools = {};
+   this._chromeDoc = aOptions.document;
+   this._inspector = aOptions.inspector;
++
++  this._position = Services.prefs.getCharPref("devtools.inspector.sidebarPosition");
++  this._create();
++
++  if (Services.prefs.getBoolPref("devtools.inspector.sidebarOpen")) {
++    this.show();
++  }
+ }
+ 
+ InspectorStyleSidebar.prototype = {
+ 
+-  get visible() !this._box.hasAttribute("hidden"),
++  /**
++   * Return true if the sidebar is currently visible.
++   */
++  get visible() this._host.visible,
++
++  /**
++   * The string id of the currently-active sidebar panel.
++   */
+   get activePanel() this._deck.selectedPanel._toolID,
+ 
+-  destroy: function ISS_destroy()
++  /**
++   * Get the style sidebar's position.
++   * @return string "sidebar" if docked, "panel" if floating.
++   */
++  get position() {
++    return this._position;
++  },
++
++  /**
++   * Set the style sidebar's position.
++   *
++   * @param string aPosition
++   *        "sidebar" - Docked in the main browser window.
++   *        "panel" - In a floating panel.
++   */
++  setPosition: function ISS_setPosition(aValue)
+   {
++    let visible = this.visible;
++
++    this.lastHeight = this._host.container.clientHeight;
++    this.lastWidth = this._host.container.clientWidth;
++
++    let newPosition = aValue == "panel" ? "panel" : "sidebar";
++    if (newPosition == this._position) {
++      return;
++    }
++
++    Services.prefs.setCharPref("devtools.inspector.sidebarPosition",
++                               newPosition);
++
++    // Destroy the current sidebar...
++    this.destroy();
++
++    delete this._haveShown;
++
++    this._position = newPosition;
++
++    // ... and build it back up in the new position.
++    this._create();
++
++    if (visible) {
++      this.show();
++    }
++  },
++
++  /**
++   * Create the style sidebar.
++   */
++  _create: function()
++  {
++    if (this.position == "panel") {
++      this._host = new StyleHostPanel(this);
++    } else {
++      this._host = new StyleHostSidebar(this._chromeDoc);
++    }
++
++    let doc = this._host.doc;
++    let container = this._host.container;
++
++    this._toolbar = doc.createElement("toolbar");
++    this._toolbar.setAttribute("class", this._host.toolbarClass);
++    this._toolbar.setAttribute("nowindowdrag", "true");
++    container.appendChild(this._toolbar);
++
++    this._toolbarBox = doc.createElement("hbox");
++    this._toolbarBox.setAttribute("flex", "1");
++    this._toolbar.appendChild(this._toolbarBox);
++
++    if (this.position == "sidebar") {
++      let detach = doc.createElement("toolbarbutton");
++      detach.classList.add("devtools-toolbox-detach");
++      detach.addEventListener("click", function onDetach() {
++        this.setPosition("panel");
++      }.bind(this), false);
++      this._toolbar.appendChild(detach);
++    }
++
++    this._deck = doc.createElement("deck");
++    this._deck.setAttribute("flex", "1");
++    container.appendChild(this._deck);
++
++    this._addTools();
++  },
++
++  /**
++   * Destroy the style sidebar.
++   */
++  destroy: function()
++  {
++    delete this._toolbar;
++    delete this._toolbarBox;
++
+     // close the Layout View
+     if (this._layoutview) {
+       this._layoutview.destroy();
+       this._layoutview = null;
+     }
+ 
+-    for each (let toolID in Object.getOwnPropertyNames(this._tools)) {
++    this._removeTools();
++
++    this._host.destroy();
++    delete this._host;
++  },
++
++  _addTools: function ISS_removeTools()
++  {
++    this._tools = {};
++
++    // Create UI for any sidebars registered with
++    // InspectorUI.registerSidebar()
++    for (let tool of InspectorUI._registeredSidebars) {
++      this.addTool(tool);
++    }
++  },
++
++  _removeTools: function ISS_removeTools()
++  {
++    for (let toolID of Object.getOwnPropertyNames(this._tools)) {
+       this.removeTool(toolID);
+     }
+     delete this._tools;
+-    this._teardown();
+   },
+ 
+   /**
+-   * Called by InspectorUI to create the UI for a registered sidebar tool.
++   * Called by Inspector after a tab switch, when the
++   * inspector is no longer the active tab.
++   */
++  _freeze: function ISS_freeze()
++  {
++    this._frozenVisible = this.visible;
++    this._toolbar.setAttribute("hidden", "true");
++    this._deck.setAttribute("hidden", "true");
++    if (this._layoutview) {
++      this._layoutview.view.setAttribute("hidden", "true");
++    }
++    this.hide();
++  },
++
++  /**
++   * Called by InspectorUI after a tab switch when the
++   * inspector is back to being the active tab.
++   */
++  _thaw: function ISS_thaw()
++  {
++    this._toolbar.removeAttribute("hidden");
++    this._deck.removeAttribute("hidden");
++    if (this._layoutview) {
++      this._layoutview.view.removeAttribute("hidden");
++    }
++
++    if (this._frozenVisible) {
++      this.show();
++    }
++  },
++
++  /**
++   * Creates the UI for a registered sidebar tool.
+    * Will create a toolbar button and an iframe for the tool.
+    * @param aRegObj object
+    *        See the documentation for InspectorUI.registerSidebar().
+    */
+   addTool: function ISS_addTool(aRegObj)
+   {
+     if (aRegObj.id in this._tools) {
+       return;
+@@ -1566,17 +1983,17 @@ InspectorStyleSidebar.prototype = {
+     let btn = this._chromeDoc.createElement("toolbarbutton");
+     btn.setAttribute("label", aRegObj.label);
+     btn.setAttribute("class", "devtools-toolbarbutton");
+     btn.setAttribute("tooltiptext", aRegObj.tooltiptext);
+     btn.setAttribute("accesskey", aRegObj.accesskey);
+     btn.setAttribute("image", aRegObj.icon || "");
+     btn.setAttribute("type", "radio");
+     btn.setAttribute("group", "sidebar-tools");
+-    this._toolbar.appendChild(btn);
++    this._toolbarBox.appendChild(btn);
+ 
+     // create tool iframe
+     let frame = this._chromeDoc.createElement("iframe");
+     frame.setAttribute("flex", "1");
+     frame._toolID = aRegObj.id;
+ 
+     // This is needed to enable tooltips inside the iframe document.
+     frame.setAttribute("tooltip", "aHTMLTooltip");
+@@ -1644,69 +2061,66 @@ InspectorStyleSidebar.prototype = {
+     }
+   },
+ 
+   /**
+    * Shows the sidebar, updating the stored visibility pref.
+    */
+   show: function ISS_show()
+   {
+-    this._box.removeAttribute("hidden");
+-    this._splitter.removeAttribute("hidden");
++    this._host.show();
++
+     this._toggleButton.checked = true;
+ 
+-    this._showDefault();
+-
+-    this._inspector._sidebarOpen = true;
++    if (!this._haveShown) {
++      this._haveShown = true;
++
++      // Hack: force a layout of the sidebar so that the deck and toolbar
++      // have their bindings all set up.
++      this._host.container.getBoundingClientRect();
++
++      this._showDefault();
++    }
++
+     Services.prefs.setBoolPref("devtools.inspector.sidebarOpen", true);
+ 
+     // Instantiate the Layout View if needed.
+     if (Services.prefs.getBoolPref("devtools.layoutview.enabled")
+         && !this._layoutview) {
+       this._layoutview = new LayoutView({
+         document: this._chromeDoc,
+         inspector: this._inspector,
+       });
++      this._host.container.appendChild(this._layoutview.view);
+     }
+   },
+ 
+   /**
+    * Hides the sidebar, updating the stored visibility pref.
+    */
+   hide: function ISS_hide()
+   {
+-    this._teardown();
+-    this._inspector._sidebarOpen = false;
++    this._toggleButton.checked = false;
++    this._host.hide();
+     Services.prefs.setBoolPref("devtools.inspector.sidebarOpen", false);
+   },
+ 
+   /**
+-   * Hides the sidebar UI elements.
+-   */
+-  _teardown: function ISS__teardown()
+-  {
+-    this._toggleButton.checked = false;
+-    this._box.setAttribute("hidden", true);
+-    this._splitter.setAttribute("hidden", true);
+-  },
+-
+-  /**
+    * Sets the current sidebar panel.
+    *
+    * @param aID string
+    *        The ID of the panel to make visible.
+    */
+   activatePanel: function ISS_activatePanel(aID) {
+     let tool = this._tools[aID];
+     Services.prefs.setCharPref("devtools.inspector.activeSidebar", aID);
+-    this._inspector._activeSidebar = aID;
+     this._deck.selectedPanel = tool.frame;
+     this._showContent(tool);
+     tool.button.setAttribute("checked", "true");
+-    let hasSelected = Array.forEach(this._toolbar.children, function(btn) {
++    Array.forEach(this._toolbarBox.children, function(btn) {
+       if (btn != tool.button) {
+         btn.removeAttribute("checked");
+       }
+     });
+   },
+ 
+   /**
+    * Make the iframe content of a given tool visible.  If this is the first
+@@ -1772,39 +2186,25 @@ InspectorStyleSidebar.prototype = {
+   },
+ 
+   /**
+    * If no tool is already selected, show the last-used sidebar.  If there
+    * was no last-used sidebar, just show the first one.
+    */
+   _showDefault: function ISS__showDefault()
+   {
+-    let hasSelected = Array.some(this._toolbar.children,
+-      function(btn) btn.hasAttribute("checked"));
+-
+-    // Make sure the selected panel is loaded...
+-    this._showContent(this._tools[this.activePanel]);
+-
+-    if (hasSelected) {
+-      return;
+-    }
+-
+-    let activeID = this._inspector._activeSidebar;
++    let activeID = Services.prefs.getCharPref("devtools.inspector.activeSidebar");
+     if (!activeID || !(activeID in this._tools)) {
+       activeID = Object.getOwnPropertyNames(this._tools)[0];
+     }
+     this.activatePanel(activeID);
+   },
+ 
+   // DOM elements
+-  get _toggleButton() this._chromeDoc.getElementById("inspector-style-button"),
+-  get _box() this._chromeDoc.getElementById("devtools-sidebar-box"),
+-  get _splitter() this._chromeDoc.getElementById("devtools-side-splitter"),
+-  get _toolbar() this._chromeDoc.getElementById("devtools-sidebar-toolbar"),
+-  get _deck() this._chromeDoc.getElementById("devtools-sidebar-deck"),
++  get _toggleButton() this._chromeDoc.getElementById("inspector-style-button")
+ };
+ 
+ ///////////////////////////////////////////////////////////////////////////
+ //// HTML Breadcrumbs
+ 
+ /**
+  * Display the ancestors of the current node and its children.
+  * Only one "branch" of children are displayed (only one line).
+diff --git a/browser/devtools/highlighter/test/browser_inspector_ruleviewstore.js b/browser/devtools/highlighter/test/browser_inspector_ruleviewstore.js
+--- a/browser/devtools/highlighter/test/browser_inspector_ruleviewstore.js
++++ b/browser/devtools/highlighter/test/browser_inspector_ruleviewstore.js
+@@ -40,45 +40,19 @@ function inspectorUIOpen1()
+ }
+ 
+ function ruleViewOpened1()
+ {
+   let prop = ruleView()._elementStyle.rules[0].textProps[0];
+   is(prop.name, "background-color", "First prop is the background color prop.");
+   prop.setEnabled(false);
+ 
+-  // Open second tab and switch to it
+-  gBrowser.selectedTab = gBrowser.addTab();
+-
+-  gBrowser.selectedBrowser.addEventListener("load", function(evt) {
+-    gBrowser.selectedBrowser.removeEventListener(evt.type, arguments.callee,
+-                                                 true);
+-    waitForFocus(inspectorTabOpen2, content);
+-  }, true);
+-  content.location = "data:text/html,<p>tab 2: the inspector should close now";
+-}
+-
+-function inspectorTabOpen2()
+-{
+-  // Switch back to tab 1.
+-  executeSoon(function() {
+-    Services.obs.addObserver(inspectorFocusTab1,
+-      InspectorUI.INSPECTOR_NOTIFICATIONS.OPENED, false);
+-    gBrowser.removeCurrentTab();
+-    gBrowser.selectedTab = tab1;
+-  });
+-}
+-
+-function inspectorFocusTab1()
+-{
+-  Services.obs.removeObserver(inspectorFocusTab1,
+-    InspectorUI.INSPECTOR_NOTIFICATIONS.OPENED, false);
+-
+-  // Now wait for the rule view to load again...
++  // Detach the sidebar, which will rebuild the rule view.
+   waitForRuleView(ruleViewOpened2);
++  InspectorUI.currentInspector.sidebar.setPosition("panel");
+ }
+ 
+ function ruleViewOpened2()
+ {
+   let prop = ruleView()._elementStyle.rules[0].textProps[0];
+   is(prop.name, "background-color", "First prop is the background color prop.");
+   ok(!prop.enabled, "First prop should be disabled.");
+ 
+diff --git a/browser/devtools/highlighter/test/head.js b/browser/devtools/highlighter/test/head.js
+--- a/browser/devtools/highlighter/test/head.js
++++ b/browser/devtools/highlighter/test/head.js
+@@ -8,16 +8,17 @@ Cu.import("resource:///modules/devtools/
+ let LayoutHelpers = tempScope.LayoutHelpers;
+ 
+ // Clear preferences that may be set during the course of tests.
+ function clearUserPrefs()
+ {
+   Services.prefs.clearUserPref("devtools.inspector.htmlPanelOpen");
+   Services.prefs.clearUserPref("devtools.inspector.sidebarOpen");
+   Services.prefs.clearUserPref("devtools.inspector.activeSidebar");
++  Services.prefs.clearUserPref("devtools.inspector.sidebarPosition");
+ }
+ 
+ registerCleanupFunction(clearUserPrefs);
+ 
+ function isHighlighting()
+ {
+   let veil = InspectorUI.highlighter.veilTransparentBox;
+   return !(veil.style.visibility == "hidden");
+diff --git a/browser/devtools/layoutview/LayoutView.jsm b/browser/devtools/layoutview/LayoutView.jsm
+--- a/browser/devtools/layoutview/LayoutView.jsm
++++ b/browser/devtools/layoutview/LayoutView.jsm
+@@ -23,17 +23,16 @@ function LayoutView(aOptions)
+   this.init();
+ }
+ 
+ LayoutView.prototype = {
+   init: function LV_init() {
+     this.cssLogic = new CssLogic();
+ 
+     this.update = this.update.bind(this);
+-    this.onMessage = this.onMessage.bind(this);
+ 
+     this.isOpen = false;
+     this.documentReady = false;
+ 
+     // Is the layout view was open before?
+     if (!("_layoutViewIsOpen" in this.inspector)) {
+       this.inspector._layoutViewIsOpen =
+         Services.prefs.getBoolPref("devtools.layoutview.open");
+@@ -67,19 +66,16 @@ LayoutView.prototype = {
+     this.inspector.on("unlocked", this.onUnlock);
+ 
+     // Build the layout view in the sidebar.
+     this.buildView();
+ 
+     this.bound_handleKeypress = this.handleKeypress.bind(this);
+     this.iframe.addEventListener("keypress", this.bound_handleKeypress, true);
+ 
+-    // Get messages from the iframe.
+-    this.inspector.chromeWindow.addEventListener("message", this.onMessage, true);
+-
+     // Store for the different dimensions of the node.
+     // 'selector' refers to the element that holds the value in view.xhtml;
+     // 'property' is what we are measuring;
+     // 'value' is the computed dimension, computed in update().
+     this.map = {
+       marginTop: {selector: ".margin.top > span",
+                   property: "margin-top",
+                   value: undefined},
+@@ -122,39 +118,49 @@ LayoutView.prototype = {
+   /**
+    * Destroy the nodes. Remove listeners.
+    */
+   destroy: function LV_destroy() {
+     this.inspector.removeListener("select", this.onSelect);
+     this.inspector.removeListener("unlocked", this.onUnlock);
+     this.browser.removeEventListener("MozAfterPaint", this.update, true);
+     this.iframe.removeEventListener("keypress", this.bound_handleKeypress, true);
+-    this.inspector.chromeWindow.removeEventListener("message", this.onMessage, true);
++
++    if (this._creationListener) {
++      this.iframe.removeEventListener("DOMWindowCreated", this._creationListener, true);
++      delete this._creationListener;
++    }
++
+     this.close();
+     this.iframe = null;
+-    this.view.parentNode.removeChild(this.view);
+   },
+ 
+   /**
+    * Build the Layout container:
+    *
+    * <vbox id="inspector-layoutview-container">
+    *  <iframe src="chrome://browser/content/devtools/layoutview/view.xhtml"/>
+    * </vbox>
+    */
+   buildView: function LV_buildPanel() {
+     this.iframe = this.chromeDoc.createElement("iframe");
++
++    // When the global is created, give it a reference to the LayoutView so
++    // the frame can communicate with us.
++    this._creationListener = function onWindowCreated() {
++      this.iframe.removeEventListener("DOMWindowCreated", this._creationListener);
++      delete this._creationListener;
++      this.iframe.contentWindow.gLayoutView = this;
++    }.bind(this);
++    this.iframe.addEventListener("DOMWindowCreated", this._creationListener, true);
+     this.iframe.setAttribute("src", "chrome://browser/content/devtools/layoutview/view.xhtml");
+ 
+     this.view = this.chromeDoc.createElement("vbox");
+     this.view.id = "inspector-layoutview-container";
+     this.view.appendChild(this.iframe);
+-
+-    let sidebar = this.chromeDoc.getElementById("devtools-sidebar-box");
+-    sidebar.appendChild(this.view);
+   },
+ 
+   /**
+    * Called when the iframe is loaded.
+    */
+   onDocumentReady: function LV_onDocumentReady() {
+     this.documentReady = true;
+     this.doc = this.iframe.contentDocument;
+@@ -171,32 +177,16 @@ LayoutView.prototype = {
+       this.open();
+     } else {
+       this.close();
+     }
+ 
+   },
+ 
+   /**
+-   * This is where we get messages from the layout view iframe.
+-   */
+-  onMessage: function LV_onMessage(e) {
+-    switch (e.data) {
+-      case "layoutview-toggle-view":
+-        this.toggle(true);
+-        break;
+-      case "layoutview-ready":
+-        this.onDocumentReady();
+-        break;
+-      default:
+-        break;
+-    }
+-  },
+-
+-  /**
+    * Handle keypress.
+    */
+    handleKeypress: function LV_handleKeypress(event) {
+      let win = this.inspector.chromeWindow;
+ 
+      // avoid scroll
+      if (event.keyCode == win.KeyEvent.DOM_VK_LEFT ||
+          event.keyCode == win.KeyEvent.DOM_VK_RIGHT ||
+diff --git a/browser/devtools/layoutview/view.xhtml b/browser/devtools/layoutview/view.xhtml
+--- a/browser/devtools/layoutview/view.xhtml
++++ b/browser/devtools/layoutview/view.xhtml
+@@ -32,17 +32,17 @@
+         }
+ 
+         // Mark document as RTL or LTR:
+         let chromeReg = Cc["@mozilla.org/chrome/chrome-registry;1"].
+           getService(Ci.nsIXULChromeRegistry);
+         let dir = chromeReg.isLocaleRTL("global");
+         document.body.setAttribute("dir", dir ? "rtl" : "ltr");
+ 
+-        window.parent.postMessage("layoutview-ready", "*");
++        gLayoutView.onDocumentReady();
+       }
+ 
+       window.onunload = function() {
+         if (elts) {
+           for (let i = 0; i < elts.length; i++) {
+             let elt = elts[i];
+             elt.removeEventListener("mouseover", onmouseover, true);
+             elt.removeEventListener("mouseout", onmouseout, true);
+@@ -54,17 +54,17 @@
+         tooltip.textContent = e.target.getAttribute("tooltip");
+       }
+ 
+       function onmouseout(e) {
+         tooltip.textContent = "";
+       }
+ 
+       function toggleView() {
+-        window.parent.postMessage("layoutview-toggle-view", "*");
++        gLayoutView.toggle(true);
+       }
+     ]]>
+     </script>
+ 
+     <link rel="stylesheet" href="chrome://browser/skin/devtools/layoutview.css" type="text/css"/>
+     <link rel="stylesheet" href="view.css" type="text/css"/>
+ 
+   </head>
+@@ -103,11 +103,10 @@
+       <p class="padding bottom"><span tooltip="padding-bottom"></span></p>
+       <p class="padding left"><span tooltip="padding-left"></span></p>
+ 
+       <p class="size"><span tooltip="&content.tooltip;"></span></p>
+ 
+       <span class="tooltip"></span>
+ 
+     </div>
+-
+   </body>
+ </html>
+diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gnomestripe/devtools/common.css
+--- a/browser/themes/gnomestripe/devtools/common.css
++++ b/browser/themes/gnomestripe/devtools/common.css
+@@ -135,8 +135,62 @@
+   border: 0;
+   -moz-border-start: 1px solid black;
+   min-width: 0;
+   width: 3px;
+   background-color: transparent;
+   -moz-margin-end: -3px;
+   position: relative;
+ }
++
++/* Toolbox Panels */
++
++.devtools-toolbox-panel {
++  border: 1px solid hsl(210,11%,10%);
++  box-shadow: 0 1px 0 hsla(209,29%,72%,.25) inset;
++  background-image: -moz-linear-gradient(top, hsla(209,11%,18%,0.9), hsl(210,11%,16%));
++  border-radius: 3px;
++  padding: 5px 0 0 5px;
++}
++
++.devtools-toolbar-flat {
++  -moz-appearance: none;
++  padding: 4px 3px;
++  color: hsl(210,30%,85%);
++}
++
++.devtools-toolbox-resizer {
++  -moz-appearance: none;
++}
++
++.devtools-toolbox-resizer[dir=bottom] {
++  height: 5px;
++  -moz-box-flex: 1;
++}
++
++.devtools-toolbox-resizer[dir=right] {
++  width: 5px;
++  -moz-box-flex: 1;
++}
++
++.devtools-toolbox-resizer[dir=bottomright] {
++  width: 5px;
++  height: 5px;
++}
++
++.devtools-toolbox-detach {
++  -moz-appearance: none;
++  list-style-image: url("chrome://browser/skin/devtools/inspector-option-icon.png");
++  -moz-image-region: rect(0px 16px 16px 0px);
++  border: none;
++}
++
++.devtools-toolbox-attach {
++  -moz-appearance: none;
++  list-style-image: url("chrome://browser/skin/devtools/inspector-option-icon.png");
++  -moz-image-region: rect(0px 16px 16px 0px);
++  border: none;
++}
++
++.devtools-toolbox-detach > .toolbarbutton-text,
++.devtools-toolbox-attach > .toolbarbutton-text {
++  display: none;
++}
+diff --git a/browser/themes/pinstripe/devtools/common.css b/browser/themes/pinstripe/devtools/common.css
+--- a/browser/themes/pinstripe/devtools/common.css
++++ b/browser/themes/pinstripe/devtools/common.css
+@@ -150,8 +150,63 @@
+   background-image: none;
+   border: 0;
+   -moz-border-start: 1px solid black;
+   min-width: 0;
+   width: 3px;
+   -moz-margin-end: -3px;
+   position: relative;
+ }
++
++/* Toolbox Panels */
++
++.devtools-toolbox-panel {
++  border: 1px solid hsl(210,11%,10%);
++  box-shadow: 0 1px 0 hsla(209,29%,72%,.25) inset;
++  background-image: url(background-noise-toolbar.png),
++                    -moz-linear-gradient(top, hsla(209,18%,18%,0.9), hsl(210,11%,16%));
++  border-radius: 3px;
++  padding: 5px 0 0 5px;
++}
++
++.devtools-toolbar-flat {
++  -moz-appearance: none;
++  padding: 4px 3px;
++  color: hsl(210,30%,85%);
++}
++
++.devtools-toolbox-resizer {
++  -moz-appearance: none;
++}
++
++.devtools-toolbox-resizer[dir=bottom] {
++  height: 5px;
++  -moz-box-flex: 1;
++}
++
++.devtools-toolbox-resizer[dir=right] {
++  width: 5px;
++  -moz-box-flex: 1;
++}
++
++.devtools-toolbox-resizer[dir=bottomright] {
++  width: 5px;
++  height: 5px;
++}
++
++.devtools-toolbox-detach {
++  -moz-appearance: none;
++  list-style-image: url("chrome://browser/skin/devtools/inspector-option-icon.png");
++  -moz-image-region: rect(0px 16px 16px 0px);
++  border: none;
++}
++
++.devtools-toolbox-attach {
++  -moz-appearance: none;
++  list-style-image: url("chrome://browser/skin/devtools/inspector-option-icon.png");
++  -moz-image-region: rect(0px 16px 16px 0px);
++  border: none;
++}
++
++.devtools-toolbox-detach > .toolbarbutton-text,
++.devtools-toolbox-attach > .toolbarbutton-text {
++  display: none;
++}
+diff --git a/browser/themes/winstripe/devtools/common.css b/browser/themes/winstripe/devtools/common.css
+--- a/browser/themes/winstripe/devtools/common.css
++++ b/browser/themes/winstripe/devtools/common.css
+@@ -157,8 +157,62 @@
+   border: 0;
+   -moz-border-start: 1px solid #242b33;
+   min-width: 0;
+   width: 3px;
+   background-color: transparent;
+   -moz-margin-end: -3px;
+   position: relative;
+ }
++
++/* Toolbox Panels */
++
++.devtools-toolbox-panel {
++  border: 1px solid hsl(210,24%,10%);
++  box-shadow: 0 1px 0 hsla(209,29%,72%,.25) inset;
++  background-image: -moz-linear-gradient(top, hsla(209,18%,18%,0.9), hsl(210,24%,16%));
++  border-radius: 3px;
++  padding: 5px 0 0 5px;
++}
++
++.devtools-toolbar-flat {
++  -moz-appearance: none;
++  padding: 4px 3px;
++  color: hsl(210,30%,85%);
++}
++
++.devtools-toolbox-resizer {
++  -moz-appearance: none;
++}
++
++.devtools-toolbox-resizer[dir=bottom] {
++  height: 5px;
++  -moz-box-flex: 1;
++}
++
++.devtools-toolbox-resizer[dir=right] {
++  width: 5px;
++  -moz-box-flex: 1;
++}
++
++.devtools-toolbox-resizer[dir=bottomright] {
++  width: 5px;
++  height: 5px;
++}
++
++.devtools-toolbox-detach {
++  -moz-appearance: none;
++  list-style-image: url("chrome://browser/skin/devtools/inspector-option-icon.png");
++  -moz-image-region: rect(0px 16px 16px 0px);
++  border: none;
++}
++
++.devtools-toolbox-attach {
++  -moz-appearance: none;
++  list-style-image: url("chrome://browser/skin/devtools/inspector-option-icon.png");
++  -moz-image-region: rect(0px 16px 16px 0px);
++  border: none;
++}
++
++.devtools-toolbox-detach > .toolbarbutton-text,
++.devtools-toolbox-attach > .toolbarbutton-text {
++  display: none;
++}
