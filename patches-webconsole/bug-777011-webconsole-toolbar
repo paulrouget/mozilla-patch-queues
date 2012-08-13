@@ -1,11 +1,11 @@
 # HG changeset patch
-# Parent 6fe61ddd71cfdce581a40f16ab57eb955e59b26e
+# Parent 320b8cd5c893d6482e102dc6a043bc40eae010ae
 Bug 777011: WebConsole black toolbar - try: -b do -p linux,linux64,win32 -u none -t none
 
 diff --git a/browser/devtools/webconsole/HUDService.jsm b/browser/devtools/webconsole/HUDService.jsm
 --- a/browser/devtools/webconsole/HUDService.jsm
 +++ b/browser/devtools/webconsole/HUDService.jsm
-@@ -594,17 +594,17 @@ WebConsole.prototype = {
+@@ -593,17 +593,17 @@ WebConsole.prototype = {
  
    /**
     * Initialize the Web Console UI. This method sets up the iframe.
@@ -27,7 +27,7 @@ diff --git a/browser/devtools/webconsole/HUDService.jsm b/browser/devtools/webco
 diff --git a/browser/devtools/webconsole/webconsole.js b/browser/devtools/webconsole/webconsole.js
 --- a/browser/devtools/webconsole/webconsole.js
 +++ b/browser/devtools/webconsole/webconsole.js
-@@ -321,17 +321,17 @@ WebConsoleFrame.prototype = {
+@@ -330,17 +330,17 @@ WebConsoleFrame.prototype = {
      saveBodies.setAttribute("checked", this.saveRequestAndResponseBodies);
  
      let contextMenuId = this.outputNode.getAttribute("context");
@@ -258,7 +258,7 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
    background-color: hsla(210,8%,5%,.2) !important;
  }
  
-@@ -66,16 +75,35 @@
+@@ -66,16 +75,37 @@
  .devtools-menulist > .menulist-dropmarker {
    -moz-appearance: none;
    display: -moz-box;
@@ -269,6 +269,7 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
  
 +.devtools-toolbarbutton[type=menu-button] > .toolbarbutton-menubutton-button {
 +  -moz-appearance: none;
++  color: inherit;
 +  border-width: 0 1px 0 0;
 +  border-right: 1px solid hsla(210,8%,5%,.45);
 +  box-shadow: -1px 0 0 hsla(210,16%,76%,.15) inset, 1px 0 0 hsla(210,16%,76%,.15);
@@ -284,6 +285,7 @@ diff --git a/browser/themes/gnomestripe/devtools/common.css b/browser/themes/gno
 +  -moz-appearance: none!important;
 +  list-style-image: url("chrome://browser/skin/devtools/dropmarker.png");
 +  -moz-box-align: center;
++  margin: 0 3px;
 +}
 +
  /* Search input */
@@ -428,7 +430,7 @@ diff --git a/browser/themes/gnomestripe/devtools/webconsole.css b/browser/themes
 diff --git a/browser/themes/pinstripe/browser.css b/browser/themes/pinstripe/browser.css
 --- a/browser/themes/pinstripe/browser.css
 +++ b/browser/themes/pinstripe/browser.css
-@@ -3309,22 +3309,16 @@ stack[anonid=browserStack][responsivemod
+@@ -3320,22 +3320,16 @@ stack[anonid=browserStack][responsivemod
  .web-console-frame {
    border-bottom: 1px solid #aaa;
  }
@@ -749,7 +751,7 @@ diff --git a/browser/themes/pinstripe/devtools/webconsole.css b/browser/themes/p
    background-color: #000;
    border: 1px solid #333;
    padding: 0.1em;
-@@ -330,20 +268,8 @@
+@@ -334,20 +272,8 @@
  
  .jsterm-complete-node > .textbox-input-box > .textbox-textarea {
    color: GrayText;
