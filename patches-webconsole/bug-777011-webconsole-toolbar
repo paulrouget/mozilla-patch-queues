@@ -1,6 +1,6 @@
 # HG changeset patch
 # Parent 320b8cd5c893d6482e102dc6a043bc40eae010ae
-Bug 777011: WebConsole black toolbar - try: -b do -p linux,linux64,win32 -u none -t none
+Bug 777011: WebConsole black toolbar
 
 diff --git a/browser/devtools/webconsole/HUDService.jsm b/browser/devtools/webconsole/HUDService.jsm
 --- a/browser/devtools/webconsole/HUDService.jsm
